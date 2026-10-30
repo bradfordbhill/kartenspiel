@@ -266,17 +266,10 @@ body { font-size: 13px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .claimstate.avail { color: #6fdc8c; } }
 :root[data-theme="dark"] .claimstate.avail { color: #6fdc8c; }
 
-/* ---------- QoL: affordable cards, aiming, cracks, effects ---------- */
+/* ---------- QoL: affordable cards, aiming, effects ---------- */
 .hcard.afford .card { box-shadow: 0 0 0 3px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }
 .hcard.afford.sel .card { box-shadow: 0 0 0 3px #19e619, 0 0 0 6px var(--focus); outline: none; }
 .boardsizer.aiming, .boardsizer.aiming .cellbtn { cursor: var(--sword), crosshair; }
-/* cracks that grow as a card nears Overwhelm */
-.card.crack1::after, .card.crack2::after, .card.crack3::after { content: ""; position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat; background-size: 100% 100%; }
-.card.crack1::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40' fill='none' stroke='%23333' stroke-width='1.6'/%3E%3C/svg%3E"); }
-.card.crack2::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40 L64 52 M0 70 L16 64 L22 74 L36 70 L42 82' fill='none' stroke='%23333' stroke-width='1.8'/%3E%3C/svg%3E"); }
-.card.crack3::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40 L64 52 L52 64 L58 78 M0 70 L16 64 L22 74 L36 70 L42 82 L52 64 M88 96 L74 92 L70 104 L58 100 L50 118 M30 0 L34 14 L26 24 L32 36' fill='none' stroke='%23b00' stroke-width='2'/%3E%3C/svg%3E"); animation: tremble .9s steps(2) infinite; }
-@keyframes tremble { 50% { transform: translate(.6px, -.4px); } }
-@media (prefers-reduced-motion: reduce) { .card.crack3::after { animation: none; } }
 /* animation layer (FX in ui.js) */
 .fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
 .fx { position: fixed; left: 0; top: 0; }
@@ -429,3 +422,20 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .bottom .hcard { width: 128px; height: 176px; }
   .bottom .card .txt.mid { font-size: 10.5px; }
 }
+
+/* ---------- Overwhelm pressure: bars on the threatened sides (pressureHTML in ui.js) ---------- */
+.card .press { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.press .pe, .press .po { position: absolute; }
+.press .pe { background: var(--pc); box-shadow: 0 0 0 1px #000; }
+.press .pe-N { top: -1px; left: 10%; right: 10%; height: 7px; } .press .pe-S { bottom: -1px; left: 10%; right: 10%; height: 7px; }
+.press .pe-W { left: -1px; top: 10%; bottom: 10%; width: 7px; } .press .pe-E { right: -1px; top: 10%; bottom: 10%; width: 7px; }
+.press .pe-NE, .press .pe-SE, .press .pe-SW, .press .pe-NW { width: 22px; height: 22px; }
+.press .pe-NE { top: -1px; right: -1px; clip-path: polygon(0 0, 100% 0, 100% 100%); } .press .pe-SE { bottom: -1px; right: -1px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.press .pe-SW { bottom: -1px; left: -1px; clip-path: polygon(0 0, 100% 100%, 0 100%); } .press .pe-NW { top: -1px; left: -1px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.press .pe-N::after, .press .pe-S::after, .press .pe-W::after, .press .pe-E::after { content: ""; position: absolute; border: 5px solid transparent; }
+.press .pe-N::after { left: 50%; top: 100%; margin-left: -5px; border-top-color: var(--pc); } .press .pe-S::after { left: 50%; bottom: 100%; margin-left: -5px; border-bottom-color: var(--pc); }
+.press .pe-W::after { top: 50%; left: 100%; margin-top: -5px; border-left-color: var(--pc); } .press .pe-E::after { top: 50%; right: 100%; margin-top: -5px; border-right-color: var(--pc); }
+.press.hot .pe { box-shadow: 0 0 0 1px #000, 0 0 8px 3px rgba(220, 0, 0, .85); }
+.press .po { background: repeating-linear-gradient(90deg, #d00 0 6px, transparent 6px 10px); opacity: .9; }
+.press .po.pe-W, .press .po.pe-E { background: repeating-linear-gradient(180deg, #d00 0 6px, transparent 6px 10px); }
+.press .po.pe-NE, .press .po.pe-SE, .press .po.pe-SW, .press .po.pe-NW { background: repeating-linear-gradient(45deg, #d00 0 4px, transparent 4px 7px); }

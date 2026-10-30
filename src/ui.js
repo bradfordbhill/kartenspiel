@@ -347,8 +347,7 @@
     var u = E.top(st, k), c = st.cards[u], d = E.def(st, u), suit = E.suitOf(st, u), stack = st.board[k];
     var ruined = c.ruined, covered = E.isCovered(st, k);
     var noOW = c.ascended || !!(E.rawDef(st, u).mods || {}).immune;
-    var ocx = !ruined && !noOW ? E.overwhelmCount(st, k) : null, crack = ocx && ocx.n > 0 ? Math.min(3, Math.ceil(ocx.n / ocx.th * 3)) : 0;
-    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + (crack ? ' crack' + crack : '') + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '">';
+    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '">';
     h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(suit) + '</div>';
     var art = artOf(c.def); if (art && !ruined) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
     h += '<div class="nm">' + esc(ruined ? E.rawDef(st, u).name : d.name) + '</div><div class="ty">' + esc(ruined ? (c.overwhelmed ? 'Overwhelmed' : 'Ruined') : d.type) + '</div>';
@@ -356,6 +355,7 @@
     if (c.dtok > 0 && !ruined) h += '<span class="defb" title="' + c.dtok + ' Defense token' + (c.dtok > 1 ? 's' : '') + ': each one stops a Ruin or Curse">' + shieldStack(c.dtok) + (c.dtok > 4 ? '<b>' + c.dtok + '</b>' : '') + '</span>';
     if (!ruined && (c.apBonus || c.vpBonus || c.decay || E.protectedStack(st, k))) h += '<span class="bonusb">' + (E.protectedStack(st, k) ? '⚑' : '') + (c.vpBonus ? '+' + c.vpBonus + '◇' : '') + (c.apBonus ? '+' + c.apBonus + '●' : '') + (c.decay ? ' ☠' + c.decay : '') + '</span>';
     if (c.ascended && !ruined) h += '<span class="ascb" title="Ascended: invulnerable, every suit, +8◇ and +12●">Ascended</span>';
+    if (ctx.ui.showOW && !ruined && !noOW && !covered && !E.protectedStack(st, k)) h += pressureHTML(st, k);
     if (ctx.ui.showOW && !ruined && !noOW) { var oc = E.overwhelmCount(st, k); if (oc && oc.n > 0) h += '<span class="owc' + (oc.n >= oc.th - 1 ? ' hot' : '') + '" title="Enemy-suit neighbors / Overwhelm number">' + oc.n + '/' + oc.th + '</span>'; }
     if (covered) h += '<div class="badge curse">Covering a card</div>';
     else if (E.isCursed(st, k)) { var cfx = []; if (E.noIncome(st, k)) cfx.push('no ●'); if (E.curseFx(st, k, 'halveValue')) cfx.push('½◇'); if (E.curseFx(st, k, 'halveIncome')) cfx.push('½●'); if (E.curseFx(st, k, 'intoxicate')) cfx.push('+3●'); if (E.curseFx(st, k, 'owMinus') + E.curseFx(st, k, 'intoxicate')) cfx.push('−' + (E.curseFx(st, k, 'owMinus') + E.curseFx(st, k, 'intoxicate')) + ' OW'); h += '<div class="badge curse" title="Cursed">Cursed' + (cfx.length ? ': ' + cfx.join(' ') : '') + '</div>'; }
@@ -363,6 +363,30 @@
     if (!ruined && c.claimants.length) { var v = E.cardValue(st, k, c.claimants[0]) + E.volcanicBonus(st, k); val = v + '◇'; }
     var inc = !ruined ? E.cardIncome(st, k) : 0;
     h += '<div class="foot"><span class="meeps">' + c.claimants.map(function (p) { return '<span class="meep" style="background:' + st.players[p].color + '" title="' + esc(st.players[p].name) + '"></span>'; }).join('') + (c.tokens ? '<span title="tokens">⬤' + c.tokens + '</span>' : '') + '</span><span class="val">' + val + (inc ? ' ' + inc + '●' : '') + '</span></div>';
+    return h + '</div>';
+  }
+
+  /* ---------------- Overwhelm pressure ---------------- */
+  // Shows where the pressure on a card comes from: a bar on each side held by an enemy-suit card (the cards
+  // Overwhelm counts), in that card's owner's colour (grey if unclaimed), with a notch pointing in. Foundations
+  // also count diagonals, shown as corner wedges. One away from Overwhelm, the bars glow red and the open
+  // sides are marked with red dashes: that's where the last enemy would go.
+  var DIRS8 = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0], NE: [1, -1], SE: [1, 1], SW: [-1, 1], NW: [-1, -1] };
+  function pressure(st, k) {
+    var u = E.top(st, k), xy = E.XY(k), en = E.enemies(st, E.suitOf(st, u)), found = E.rawDef(st, u).type === 'Foundation';
+    var out = { oc: E.overwhelmCount(st, k), sides: [], open: [] };
+    (found ? ['N', 'E', 'S', 'W', 'NE', 'SE', 'SW', 'NW'] : ['N', 'E', 'S', 'W']).forEach(function (d) {
+      var t = E.top(st, E.K(xy[0] + DIRS8[d][0], xy[1] + DIRS8[d][1]));
+      if (!t) { out.open.push(d); return; }
+      if (en.some(function (s) { return E.hasSuit(st, t, s); })) { var c = st.cards[t]; out.sides.push({ d: d, color: c.claimants.length ? st.players[c.claimants[0]].color : '#7a7a7a' }); }
+    });
+    return out;
+  }
+  function pressureHTML(st, k) {
+    var pr = pressure(st, k); if (!pr.sides.length) return '';
+    var hot = pr.oc.n >= pr.oc.th - 1, h = '<div class="press' + (hot ? ' hot' : '') + '" aria-hidden="true">';
+    pr.sides.forEach(function (sd) { h += '<i class="pe pe-' + sd.d + '" style="--pc:' + sd.color + '"></i>'; });
+    if (hot) pr.open.forEach(function (d) { h += '<i class="po pe-' + d + '"></i>'; });
     return h + '</div>';
   }
 
@@ -459,7 +483,7 @@
       '<button class="btn sm' + (u.fit ? ' on' : '') + '" data-act="fit">Fit board</button>' +
       '<label><input type="checkbox" data-tog="showSeen"' + (u.showSeen ? ' checked' : '') + '> What it sees</label>' +
       '<label><input type="checkbox" data-tog="showSeenBy"' + (u.showSeenBy ? ' checked' : '') + '> What sees it</label>' +
-      '<label><input type="checkbox" data-tog="showOW"' + (u.showOW ? ' checked' : '') + '> Overwhelm counts</label>' +
+      '<label><input type="checkbox" data-tog="showOW"' + (u.showOW ? ' checked' : '') + '> Overwhelm pressure</label>' +
       '<label><input type="checkbox" data-tog="coords"' + (u.coords ? ' checked' : '') + '> Grid</label>' +
       '<button class="btn sm" data-act="debug" title="Copy the log and board state to the clipboard">Copy debug report</button>' +
       '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
@@ -1021,7 +1045,7 @@
   function helpPage() {
     return helpEdition('<div class="page scroll"><div class="pane help">' +
       '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
-      '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm.</p>' +
+      '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm. A coloured bar on a card’s edge shows where an enemy-suit neighbour is pressing, in that neighbour’s owner’s colour (grey if unclaimed; corners for a Foundation’s diagonals). One away from Overwhelm, the bars glow red and the open sides are dashed red: that’s where the last enemy would go.</p>' +
       '<p><b>Hover</b> over any card to see a magnified copy with its rules text. A card with a <b>bright green border</b> has a once-per-turn ability you can use right now (and afford); select it and use the button in the right panel. The <b>Overlay</b> menu covers every card with one kind of information. <b>Quickview</b> shows each card’s ● production and ◇ value in its owner’s colour (unclaimed cards’ ● in grey), with each player’s totals above the board. <b>War</b> splits each card into one strip per enemy neighbour it takes to Overwhelm it, filled in its owner’s colour as enemies gather; a red outline means one more will do it. Log lines are color-coded: blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, gray card movement, italic gray referee edits.</p>' +
       '<h2>Drag and drop, and phones</h2><p>Drag a card from your hand onto a green space to play it, or anywhere on the board for cards played straight from hand. Drag your meeple (shown while a claim is available) onto an orange-outlined card to claim it, and drop two cards on the discard pile to discard 2 and draw 1. Clicking still works for all of it.</p><p>On a phone the game screen rearranges: your numbers and <b>End turn</b> along the top, the board in the middle, your hand along the bottom, and <b>Players</b>, <b>Log</b>, <b>Card</b> and <b>Menu</b> as tabs. Pinch to zoom, drag the board to move around, tap a card for its details, and press and hold any card to read it.</p>' +
       '<h2>A turn</h2><ol><li>Pass the device. The next player clicks <b>Start turn</b>: they gain ● from their Kingdom (3● before their Foundation is down) and draw cards (2 by default; set on the New game page). Or they take back one meeple instead, which is their whole turn.</li>' +
