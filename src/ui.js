@@ -390,6 +390,82 @@
     return h + '</div>';
   }
 
+  /* ---------------- suits: who pressures whom ---------------- */
+  // Each archetype is weak to one suit: that suit pressures the archetype's own suit (it counts toward Overwhelm,
+  // and the archetype can't play it). Sword also pressures every other suit (engine: enemies()). Read from the
+  // Foundations, so the wheel stays right if the cards change.
+  function suitRelations(defs) {
+    var arch = {}, edges = [];   // edges: [from, to] = from pressures to
+    defs.forEach(function (d) { if (d.type === 'Foundation' && d.archetype && d.weakTo) { arch[d.suit] = d.archetype; edges.push([d.weakTo, d.suit, 'arch']); } });
+    D.SUITS.forEach(function (sv) { if (sv !== 'Sword' && !edges.some(function (e) { return e[0] === 'Sword' && e[1] === sv; })) edges.push(['Sword', sv, 'sword']); });
+    return { arch: arch, edges: edges };
+  }
+  // The wheel: Sword in the middle, the other suits on a ring in the order the chain runs.
+  function suitWheelSVG(defs) {
+    var rel = suitRelations(defs), next = {}, ring = [], cur0 = null;
+    rel.edges.forEach(function (e) { if (e[2] === 'arch') next[e[0]] = e[1]; });
+    D.SUITS.forEach(function (sv) { if (next.Sword === sv) cur0 = sv; });
+    for (var x = cur0, guard = 0; x && x !== 'Sword' && ring.indexOf(x) < 0 && guard++ < 8; x = next[x]) ring.push(x);
+    D.SUITS.forEach(function (sv) { if (sv !== 'Sword' && ring.indexOf(sv) < 0) ring.push(sv); });
+    var W = 440, cx = W / 2, cy = 176, R = 118, pos = { Sword: [cx, cy] };
+    ring.forEach(function (sv, i) { var a = -Math.PI / 2 + i * 2 * Math.PI / ring.length; pos[sv] = [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
+    // two suits that pressure each other (Bone and Sword) get two parallel arrows, nudged apart
+    var mutual = function (a, b) { return rel.edges.some(function (e) { return e[0] === b && e[1] === a; }); };
+    function line(a, b, cls) {
+      var p = pos[a], q = pos[b], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), r0 = 26, r1 = 30;
+      var off = mutual(a, b) ? 5 : 0, ox = -dy / L * off, oy = dx / L * off;
+      return '<line class="' + cls + '" x1="' + (p[0] + dx / L * r0 + ox).toFixed(1) + '" y1="' + (p[1] + dy / L * r0 + oy).toFixed(1) + '" x2="' + (q[0] - dx / L * r1 + ox).toFixed(1) + '" y2="' + (q[1] - dy / L * r1 + oy).toFixed(1) + '" marker-end="url(#wh-' + cls + ')"/>';
+    }
+    // labels sit on the outside of each suit, clear of the arrows; Sword's beside the centre
+    function label(sv) {
+      var p = pos[sv], name = sv, arch = rel.arch[sv] ? esc(rel.arch[sv]) : '', x, y1, y2, anchor = 'middle';
+      if (sv === 'Sword') { x = p[0] + 30; y1 = p[1] - 2; y2 = p[1] + 11; anchor = 'start'; }
+      else {
+        var ux = (p[0] - cx) / R, uy = (p[1] - cy) / R;
+        if (Math.abs(ux) > 0.6) { x = p[0] + ux * 30; y1 = p[1] - 2; y2 = p[1] + 11; anchor = ux > 0 ? 'start' : 'end'; }
+        else if (uy < 0) { x = p[0]; y1 = p[1] - 46; y2 = p[1] - 33; var t = name; name = arch; arch = t; }
+        else { x = p[0]; y1 = p[1] + 38; y2 = p[1] + 51; }
+      }
+      var cls1 = sv === 'Sword' || (Math.abs((p[0] - cx) / R) > 0.6) || (p[1] >= cy) ? ['wh-name', 'wh-arch'] : ['wh-arch', 'wh-name'];
+      return '<text x="' + x + '" y="' + y1 + '" text-anchor="' + anchor + '" class="' + cls1[0] + '">' + name + '</text>' + (arch ? '<text x="' + x + '" y="' + y2 + '" text-anchor="' + anchor + '" class="' + cls1[1] + '">' + arch + '</text>' : '');
+    }
+    var h = '<svg class="suitwheel" viewBox="0 0 ' + W + ' 360" role="img" aria-label="Suit wheel: each arrow points from a suit to the suit it pressures">' +
+      '<defs>' + ['arch', 'sword'].map(function (c) { return '<marker id="wh-' + c + '" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="wh-head ' + c + '"/></marker>'; }).join('') + '</defs>';
+    rel.edges.forEach(function (e) { if (pos[e[0]] && pos[e[1]]) h += line(e[0], e[1], e[0] === 'Sword' ? 'sword' : 'arch'); });
+    Object.keys(pos).forEach(function (sv) {
+      var p = pos[sv];
+      h += '<g class="wh-node"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="24"/><g transform="translate(' + (p[0] - 12) + ',' + (p[1] - 13) + ') scale(1.5)" fill="none" stroke="' + (SUITINK[sv] || '#000') + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + (ICON[sv] || '') + '</g>' +
+        label(sv) + '</g>';
+    });
+    return h + '</svg>';
+  }
+  function suitWheelHTML(defs, me) {
+    var rel = suitRelations(defs), mine = me && Object.keys(rel.arch).filter(function (sv) { return rel.arch[sv] === me.arch; })[0];
+    var weak = mine && rel.edges.filter(function (e) { return e[1] === mine && e[2] === 'arch'; })[0];
+    return '<div class="wheelbox">' + suitWheelSVG(defs) + '<p class="small">Each arrow points from a suit to the suit it <b>pressures</b>: next to it, it counts toward that card’s Overwhelm, and that suit’s archetype can’t play it. <b style="color:#b01010">Sword</b> pressures every other suit, and only Bone pressures Sword.</p>' +
+      (weak ? '<p class="small"><b>You</b> (' + esc(me.arch) + ', ' + esc(mine) + ') are weak to <b>' + esc(weak[0]) + '</b>' + (weak[0] !== 'Sword' ? ' and Sword' : '') + '.</p>' : '') + '</div>';
+  }
+  function suitsModal() {
+    var ctx = cur(), st = ctx && ctx.state, defs = st ? Object.keys(st.defs).map(function (id) { return st.defs[id]; }) : app.lib;
+    var me = st && st.players[viewer(ctx)];
+    app.modal = function () { return modal('Suits: who pressures whom', suitWheelHTML(defs, me), '<button class="btn def" data-act="closeModal">Close</button>'); }; render();
+  }
+  // While a Structure or Foundation is about to go on space k: green chevrons point from the space toward cards it
+  // would pressure, red ones from cards that would pressure it toward the space. Directions follow Overwhelm:
+  // diagonals count only for a Foundation (theirs or the one being placed).
+  function placeChevrons(st, k, pc) {
+    var xy = E.XY(k), h = '';
+    Object.keys(DIRS8).forEach(function (d) {
+      var nk = E.K(xy[0] + DIRS8[d][0], xy[1] + DIRS8[d][1]), t = E.top(st, nk); if (!t) return;
+      var diag = d.length === 2, c = st.cards[t], td = E.rawDef(st, t), tFound = td.type === 'Foundation';
+      var g = (!diag || tFound) && !c.ruined && !c.ascended && !(td.mods || {}).immune && !E.isCovered(st, nk) && !E.protectedStack(st, nk) && E.enemies(st, E.suitOf(st, t)).indexOf(pc.suit) >= 0;
+      var r = (!diag || pc.found) && E.enemies(st, pc.suit).some(function (sv) { return E.hasSuit(st, t, sv); });
+      if (g) h += '<i class="chev g d-' + d + (r ? ' both' : '') + '" title="Would pressure ' + esc(td.name) + '"></i>';
+      if (r) h += '<i class="chev r d-' + d + (g ? ' both' : '') + '" title="' + esc(td.name) + ' would pressure it"></i>';
+    });
+    return h;
+  }
+
   /* ---------------- board ---------------- */
   // Draw the board. Cells are absolutely positioned; only occupied cells and cells that matter
   // right now (legal spots, targets, highlights) get drawn.
@@ -398,10 +474,11 @@
     if (!ks.length) b = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     var pad = 1; b = { minX: b.minX - pad, maxX: b.maxX + pad, minY: b.minY - pad, maxY: b.maxY + pad };
     // extend for legal cells
-    var legal = {}, pd = st.pending, optSet = {};
+    var legal = {}, pd = st.pending, optSet = {}, placing = null;
     var buryingSuit = pd && pd.kind === 'cell' && pd.verb === 'bury' && st.res && st.res.src ? E.suitOf(st, st.res.src) : null;
     if (ctx.kind === 'game' && myTurn(ctx) && ui.hand && st.turn && st.turn.started && !st.pending && !st.res && E.needsPlacement(E.rawDef(st, ui.hand))) legal = E.legalCells(st, ui.hand);
     if (pd && pd.kind === 'cell' && canAnswer(ctx, pd)) pd.options.forEach(function (k) { optSet[k] = 1; });
+    if (Object.keys(legal).length) { var hd = E.rawDef(st, ui.hand); if (hd.type === 'Structure' || hd.type === 'Foundation') placing = { suit: hd.suit, found: hd.type === 'Foundation' }; }
     Object.keys(legal).concat(Object.keys(optSet)).forEach(function (k) { var p = E.XY(k); b.minX = Math.min(b.minX, p[0]); b.maxX = Math.max(b.maxX, p[0]); b.minY = Math.min(b.minY, p[1]); b.maxY = Math.max(b.maxY, p[1]); });
     var cols = b.maxX - b.minX + 1, rows = b.maxY - b.minY + 1, W = cols * (CW + GAP) + GAP, Hh = rows * (CH + GAP) + GAP;
     var see = {}, counted = {}, seenBy = {};
@@ -427,6 +504,7 @@
       h += '<div class="' + cls + '" style="left:' + lx + 'px;top:' + ly + 'px">';
       if (u) h += boardFace(st, k, ctx);
       if (ov && ov.on) h += '<div class="ovl full ' + ov.cls + '">' + ov.html + '</div>';
+      if (legal[k] != null && placing) h += placeChevrons(st, k, placing);
       if (legal[k] != null) h += '<div class="cost">' + (legal[k] > E.funds(st.players[st.cur]) ? '<span>' + legal[k] + '●<br>Not enough AP</span>' : legal[k] + '●') + '</div>';
       if (ui.coords) h += '<span class="coord">' + k + '</span>';
       h += '<button class="cellbtn" data-cell="' + k + '" aria-label="' + (u ? esc(E.def(st, u).name) + ' at ' + k : 'Empty space ' + k) + '"></button></div>';
@@ -487,6 +565,7 @@
       '<label><input type="checkbox" data-tog="coords"' + (u.coords ? ' checked' : '') + '> Grid</label>' +
       '<button class="btn sm" data-act="debug" title="Copy the log and board state to the clipboard">Copy debug report</button>' +
       '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
+      '<button class="btn sm" data-act="suits" title="Which suits pressure which">Suits</button>' +
       '<label>Overlay <select data-sel="overlay">' + [['none', 'None'], ['quick', 'Quickview (● and ◇)'], ['war', 'War (Overwhelm)']].map(function (o) { return '<option value="' + o[0] + '"' + ((u.overlay || 'none') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       overlayTotal(ctx) +
       '<span class="muted legend">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
@@ -902,7 +981,7 @@
     h += '<div class="raised row" style="padding:4px">Search <input type="text" data-focus-key="libq" data-lib="q" value="' + esc(L.q) + '" style="width:160px">' +
       'Suit <select data-lib="suit"><option value="">All</option>' + D.SUITS.map(function (s) { return '<option' + (L.suit === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
       'Type <select data-lib="type"><option value="">All</option>' + D.TYPES.map(function (s) { return '<option' + (L.type === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
-      '<span class="grow" style="flex:1"></span>' + (ONLINE ? '<span class="muted small">' + app.lib.length + ' cards</span>' : '<button class="btn" data-act="newCard">New card</button><button class="btn" data-act="exportLib">Export…</button><button class="btn" data-act="importLib">Import…</button><button class="btn" data-act="restoreAsk">Restore starter cards…</button>') + '</div>';
+      '<span class="grow" style="flex:1"></span><button class="btn" data-act="suits">Suit wheel</button>' + (ONLINE ? '<span class="muted small">' + app.lib.length + ' cards</span>' : '<button class="btn" data-act="newCard">New card</button><button class="btn" data-act="exportLib">Export…</button><button class="btn" data-act="importLib">Import…</button><button class="btn" data-act="restoreAsk">Restore starter cards…</button>') + '</div>';
     h += '<div class="split"><div class="sunken scroll"><table class="list small"><thead><tr>' +
       [['name', 'Name'], ['suit', 'Suit'], ['type', 'Type'], ['cost', 'Cost'], ['', 'Value'], ['', 'Income'], ['', 'Copies'], ['', 'Automation']].map(function (c) { return '<th' + (c[0] ? ' data-sort="' + c[0] + '"' : '') + '>' + c[1] + (L.sort === c[0] ? ' ▾' : '') + '</th>'; }).join('') + '</tr></thead><tbody>';
     rows.forEach(function (c) {
@@ -1053,6 +1132,7 @@
       '<li>Click a card in hand, then a green space. The green number is the cost there (Watchtower adds to it). Play as many cards as your ● allows.</li>' +
       '<li>Claim once per turn: the last card you placed, or an unclaimed card next to it. Your cursor turns into a meeple in your color: click an orange-outlined card to claim it. A card you claim produces its ● right away.</li>' +
       '<li>Any time during your turn: <b>Discard 2, draw 1</b>.</li><li><b>End turn</b>. If you have 48◇ or more at that moment, you win.</li></ol>' +
+      '<h2>Suits: who pressures whom</h2>' + suitWheelHTML(app.lib) +
       '<h2>Rules the table enforces</h2><ul><li>Placement: orthogonal adjacency, placement icons (at least one allowed side touches, all others clear), Watchtower on a corner only.</li><li>Weak-to: you cannot play your archetype’s weak suit.</li><li>Foundation by turn 3; it is always yours and needs no meeple. It can never be discarded, buried from hand, or taken by another player.</li>' +
       '<li>Actions and Blessings that affect adjacent cards (Absolution, Phalanx-style effects) are placed in a space first. All others are played straight from hand with <b>Play it</b>. Either way they resolve, then are buried under a card they affected (your choice); if they affected nothing, under an adjacent card, or for cards played from hand, any card you choose. Curses tuck under their target; Sarcophagus covers it.</li>' +
       '<li>Overwhelm: 3 enemy-suit neighbors (Encampment 4; Foundations 8 counting diagonals). Enemies are the suit its archetype is weak to, plus Sword for every suit but Sword. Different enemy suits add up. Credit goes to whoever caused it.</li>' +
@@ -1403,7 +1483,7 @@
   // Eat the click that follows a drag, a pan or a long press, so it doesn't also select or place something.
   // That click is stamped within a few ms of the pointerup; a real later tap is stamped when it happens, even if
   // the page was too busy to handle it at once (a timer could fire too late and eat it).
-  function swallow(e) { swallowAt = e.timeStamp; }
+  function swallow(e) { var at = swallowAt = e.timeStamp; setTimeout(function () { if (swallowAt === at) swallowAt = null; }, 0); }   // that click, if any, comes before this timer
   document.addEventListener('click', function (e) {
     var eat = swallowAt != null && e.timeStamp >= swallowAt - 5 && e.timeStamp - swallowAt < 120; swallowAt = null;
     if (eat) { e.stopPropagation(); e.preventDefault(); }
@@ -1741,6 +1821,7 @@
       case 'sbReset': app.modal = null; app._sbReset = true; lsDel('ks.sandbox'); newSandbox(); render(); return;
       case 'closeModal': app.modal = null; render(); return;
       case 'keys': keysModal(); return;
+      case 'suits': suitsModal(); return;
       case 'installApp': if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); } return;
       case 'fullscreen':
         if (document.fullscreenElement) document.exitFullscreen();

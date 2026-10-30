@@ -25,7 +25,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure bars, `e2e/app.js` installing as an app and playing offline |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure bars, `e2e/app.js` installing as an app and playing offline, `e2e/suits.js` the suit wheel and placement chevrons |
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
