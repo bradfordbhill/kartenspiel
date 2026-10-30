@@ -1,8 +1,12 @@
-// Self-play with three bot personalities:
+// Self-play with four bot personalities:
 //  greedy    – best short-term gain for itself (as in the first analysis)
 //  tactician – greedy, plus uses every ready ability every turn (Tithing Hall, Funeral Pyre, Confessional, University, ...)
 //  raider    – values damage to opponents highly; aims Ruins and Curses at opponents' biggest ● and ◇ producers; also uses abilities
-// Usage: node tools/sim2.js <players> <first game> <last game> <output.json>
+//  warlord   – plays for War and Conquest: values every Ruin and Overwhelm it causes, Reserves, and pressure on rival cards
+//              (enemy-suit neighbours piling up toward their Overwhelm number); uses every ability, aims like a raider
+// Usage: node tools/sim2.js <players> <first game> <last game> <output.json> [lineup]
+//   lineup (optional) fixes styles instead of rotating them, e.g. "Warmonger=warlord,*=greedy".
+//   An archetype named in it plays in every game.
 // Every bot move is tried on a copy of the state with E.apply and scored with evalState; the best one is kept.
 const D=require('../src/data.js'), E=require('../src/engine.js'), fs=require('fs');
 const ARCH=['Archbishop','Hedonist','Warmonger','Cryptkeeper','Gardener','Philosopher'], STRATS=['greedy','tactician','raider'];
@@ -11,19 +15,26 @@ function ap(st,a){const r=E.apply(st,a); return r.error?null:r;}
 function tot(st,p){return E.scores(st)[p].total;}
 function oppSum(st,p,f){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m+=f(st,i)});return m;}
 function oppBest(st,p){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m=Math.max(m,tot(st,i))});return m;}
+// Ruins and Overwhelms credited to player p so far (from the log).
+function ruinsBy(st,p){ const me=' by '+st.players[p].name+'.'; return st.log.filter(l=>(/ is (Ruined|Overwhelmed) by /.test(l))&&l.endsWith(me)).length; }
+// How close rival cards are to being Overwhelmed: each enemy-suit neighbour counts, one away from the number counts triple.
+function pressure(st,p){ let s=0; E.keys(st).forEach(k=>{ const u=E.top(st,k), c=st.cards[u]; if(c.ruined||!c.claimants.length||c.claimants.includes(p)||E.untargetable(st,u)) return;
+  const oc=E.overwhelmCount(st,k); if(!oc||!oc.n) return; s+= oc.n>=oc.th-1 ? 3 : oc.n/oc.th; }); return s; }
 function cardWorth(st,k){ const u=E.top(st,k), c=st.cards[u]; if(!c.claimants.length) return 0; return E.cardValue(st,k,c.claimants[0])+2*E.cardIncome(st,k); }
 // Answer every pending prompt the way this bot would. Returns the new state, or null if it got stuck.
 function resolve(st,me,strat){
   let g=0; while(st&&st.pending&&g++<16){ const pd=st.pending, p=pd.player; let v;
     if(pd.kind==='cell'){ const opts=pd.options;
-      if(pd.verb==='ruin'||pd.verb==='curse'||(pd.verb==='target'&&p===me)){
-        let best=null,bv=-1e9; opts.forEach(k=>{const u=E.top(st,k); if(!u){ if(bv<-1e8){bv=-1e8;best=k;} return;} const c=st.cards[u]; const own=c.claimants.includes(p); const s=own?-100:(strat==='raider'?cardWorth(st,k):(c.claimants.length?E.cardValue(st,k,c.claimants[0])+E.cardIncome(st,k):0)); if(s>bv){bv=s;best=k}});
+      if(strat==='warlord'&&p===me&&pd.verb!=='bury'&&opts.length<=12){ v=trial(st,me,strat,opts.concat(pd.optional?[null]:[])); }
+      else if(pd.verb==='ruin'||pd.verb==='curse'||(pd.verb==='target'&&p===me)){
+        let best=null,bv=-1e9; opts.forEach(k=>{const u=E.top(st,k); if(!u){ if(bv<-1e8){bv=-1e8;best=k;} return;} const c=st.cards[u]; const own=c.claimants.includes(p); const s=own?-100:(strat==='raider'||strat==='warlord'?cardWorth(st,k):(c.claimants.length?E.cardValue(st,k,c.claimants[0])+E.cardIncome(st,k):0)); if(s>bv){bv=s;best=k}});
         v=(pd.optional&&bv<=0&&pd.verb!=='target')?null:best; }
       else if(pd.verb==='suit'){ let best=opts[0]; for(const k of opts){ if(st.cards[E.top(st,k)].claimants.includes(p)){best=k;break;} } v=best; }
       else if(pd.verb==='bury'){ let best=opts[0]; for(const k of opts){ if(E.kingdom(st,p).includes(k)){best=k;break;} } v=best; }
       else if(pd.verb==='move'||pd.verb==='claim'||pd.verb==='copy'||pd.verb==='dig'||pd.verb==='cleanse'||pd.verb==='restore') v=opts[0];
       else v=opts[0]; }
     else if(pd.kind==='hand'){ const pool=(pd.options||st.players[p].hand).slice().sort((a,b)=>(+st.defs[st.cards[a].def].cost)-(+st.defs[st.cards[b].def].cost)); v=pool.slice(0,pd.count); }
+    else if(pd.kind==='suit'&&strat==='warlord'&&p===me){ v=trial(st,me,strat,pd.options); }
     else if(pd.kind==='suit'){ v=MAIN[st.players[p].arch]; if(!pd.options.includes(v)) v=pd.options[0];
       // when recolouring an opponent's card, a raider picks a suit that is an enemy of its neighbours' owners
       if(strat==='raider'&&st.res&&st.res.sub&&st.res.sub.picked&&st.res.sub.picked.length){ const t=E.top(st,st.res.sub.picked[0]); if(t&&!st.cards[t].claimants.includes(p)) v=pd.options.includes('Sword')?'Sword':pd.options[0]; } }
@@ -32,9 +43,13 @@ function resolve(st,me,strat){
     else v=true;
     const n=ap(st,{t:'answer',v}); if(!n) { const n2=ap(st,{t:'answer',v:pd.kind==='cell'?(pd.options[0]||null):v}); if(!n2) return null; st=n2; } else st=n; }
   if(st&&st.reveal) st=ap(st,{t:'closeReveal'}); return st; }
+// Warlord: answer a prompt by trying each option and keeping the one that scores best (a quick look ahead).
+function trial(st,me,strat,opts){ let best=opts[0],bv=-1e9; for(const o of opts){ const n=ap(st,{t:'answer',v:o}); if(!n) continue; const v=evalState(st,n,me,strat); if(v>bv){bv=v;best=o;} } return best; }
 // How much better st is than st0 for player p: own ◇ and ● gained, minus what opponents gained.
 function evalState(st0,st,p,strat){ const rem=6;
   const mine=(tot(st,p)-tot(st0,p)) + 0.5*(E.income(st,p)-E.income(st0,p))*rem/3;
+  if(strat==='warlord') return mine + 3*(ruinsBy(st,p)-ruinsBy(st0,p)) + 1.5*(pressure(st,p)-pressure(st0,p)) + 0.25*((st.players[p].reserve||0)-(st0.players[p].reserve||0))
+    - 0.5*(oppSum(st,p,tot)-oppSum(st0,p,tot));
   if(strat==='raider') return mine - 1.0*(oppSum(st,p,tot)-oppSum(st0,p,tot)) - 0.4*(oppSum(st,p,E.income)-oppSum(st0,p,E.income))*rem/3;
   return mine - 0.6*(oppBest(st,p)-oppBest(st0,p)); }
 // Try every possible claim and keep the best one, if any is worth it.
@@ -45,7 +60,7 @@ function useAbilities(st,p,strat,stats){
     for(const k of E.keys(st)){ if(!E.abilityReady(st,k)) continue; const d=E.def(st,E.top(st,k));
       if(strat==='greedy' && !(d.ability&&d.ability.kind==='exchange')) continue;
       const s=resolve(ap(st,{t:'ability',k}),p,strat); if(!s||s.pending) continue;
-      if(strat!=='raider' && d.ability.kind!=='exchange' && evalState(st,s,p,strat) < -0.5) continue;
+      if(strat!=='raider' && strat!=='warlord' && d.ability.kind!=='exchange' && evalState(st,s,p,strat) < -0.5) continue;
       st=s; used=true; stats.abil[d.id]=(stats.abil[d.id]||0)+1; }
     if(!used) break; }
   return st; }
@@ -66,22 +81,27 @@ function turn(st,stats,strats){ const p=st.cur, strat=strats[p]; let s0=ap(st,{t
   let e=ap(st,{t:'endTurn'}); if(e&&e.pending) e=resolve(e,p,strat); if(e) st=e; else return null;
   return st; }
 // Game g for n players. Archetypes and strategies rotate with g so every combination gets played.
-function game(n,g,stats){
-  const combos=[]; (function rec(s,a){ if(a.length===n){combos.push(a);return;} for(let i=s;i<6;i++) rec(i+1,a.concat(ARCH[i])); })(0,[]);
+// lineup = { Archetype: style, '*': style } or null (rotate styles as before).
+function game(n,g,stats,lineup){
+  let combos=[]; (function rec(s,a){ if(a.length===n){combos.push(a);return;} for(let i=s;i<6;i++) rec(i+1,a.concat(ARCH[i])); })(0,[]);
+  if(lineup) { const must=Object.keys(lineup).filter(a=>a!=='*'); combos=combos.filter(c=>must.every(a=>c.includes(a))); }
   const c=combos[g%combos.length], rot=Math.floor(g/combos.length)%n; const archs=c.slice(rot).concat(c.slice(0,rot));
-  const strats=archs.map((a,i)=>STRATS[(g+i*(n===3?1:2)+Math.floor(g/combos.length))%3]);
+  const strats=archs.map((a,i)=>lineup ? (lineup[a]||lineup['*']||'greedy') : STRATS[(g+i*(n===3?1:2)+Math.floor(g/combos.length))%3]);
   let st=E.newGame(D.STARTER,{players:archs.map((a,i)=>({name:'P'+i,arch:a})),seed:5000+g+n*1000}); let guard=0;
   while(st.winner==null && st.round<=30 && guard++<400){ if(st.pending) { st=resolve(st,st.cur,strats[st.cur]); if(!st) break; continue; } const s=turn(st,stats,strats); if(!s) break; st=s; }
   return {st,archs,strats}; }
 // Command line: play games [from, to) (stopping after ~255 s) and save results for analyze2.js.
 if(require.main===module){
   const n=+process.argv[2], from=+process.argv[3], to=+process.argv[4], out=process.argv[5];
+  const lineup=process.argv[6] ? Object.fromEntries(process.argv[6].split(',').map(x=>x.split('='))) : null;
   const stats={played:{},abil:{},left:[],inc:[]}, games=[], cards={};
   const t0=Date.now();
-  for(let g=from; g<to; g++){ if(Date.now()-t0>255000) break; const {st,archs,strats}=game(n,g,stats); const sc=E.scores(st);
+  for(let g=from; g<to; g++){ if(Date.now()-t0>255000) break; const {st,archs,strats}=game(n,g,stats,lineup); const sc=E.scores(st);
     const L=st.log, cnt=re=>L.filter(l=>re.test(l)).length;
     games.push({n,g,rounds:st.round,winner:st.winner,archs,strats,scores:sc.map(s=>s.total),income:st.players.map((q,i)=>E.income(st,i)),out:st.players.map(q=>q.out),
-      ruins:cnt(/ is Ruined/), over:cnt(/ is Overwhelmed/), curses:cnt(/ is tucked under| covers |Curse/)-cnt(/destroyed|absorbs/), defended:cnt(/absorbs/), ascended:cnt(/ASCENDS/), elim:cnt(/out of the game/)});
+      ruins:cnt(/ is Ruined/), over:cnt(/ is Overwhelmed/), curses:cnt(/ is tucked under| covers |Curse/)-cnt(/destroyed|absorbs/), defended:cnt(/absorbs/), ascended:cnt(/ASCENDS/), elim:cnt(/out of the game/),
+      ruinsBy:st.players.map(q=>cnt(new RegExp(' is Ruined by '+q.name+'\\.$'))), overBy:st.players.map(q=>cnt(new RegExp(' is Overwhelmed by '+q.name+'\\.$'))),
+      warcamp:st.players.map(q=>L.filter(l=>l.startsWith(q.name+' banks ')&&l.endsWith('(Warcamp).')).reduce((s,l)=>s+(+(l.match(/banks (\d+)/)||[0,0])[1]),0))});
     st.players.forEach((q,p)=>E.kingdom(st,p).forEach(k=>{ const id=st.cards[E.top(st,k)].def; const r=cards[id]=cards[id]||{v:[],i:[],win:0,any:0,exp:0}; r.v.push(E.cardValue(st,k,p)); r.i.push(E.cardIncome(st,k)); r.any++; r.exp+=1/n; if(p===st.winner) r.win++; })); }
   fs.writeFileSync(out,JSON.stringify({games,stats,cards})); console.log('done',games.length,'games in',((Date.now()-t0)/1000).toFixed(0)+'s');
 }
