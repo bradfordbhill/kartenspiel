@@ -36,4 +36,10 @@ T('Brambles',()=>{ game('Warmonger','Gardener'); toB(); A({t:'endTurn'}); A({t:'
   chk('Brambles', st.pending&&st.pending.kind==='confirm'&&st.pending.player===1, 'offered when one away'); ans(true);
   chk('Brambles', nm('5,5')==='Brambles' && st.board['5,5'].length===2 && top('5,5').claimants[0]===1 && st.players[1].debt===3, 'buried target, claimed, 3● debt'); });
 T('Decay',()=>{ game('Cryptkeeper'); A({t:'sbPlace',id:'fairgrounds',k:'1,0'}); const d=give('decay'); A({t:'play',uid:d,k:'2,0'}); ans('1,0'); chk('Decay', top('1,0').decay===1, 'token placed (no effect yet)'); });
+T('Repent with no target',()=>{ game('Warmonger','Archbishop'); A({t:'sbPlace',id:'sanctuary',k:'2,0'}); A({t:'sbClaim',k:'2,0',owner:1});
+  const rp=give('repent',1); const h=give('halberd-strike'); A({t:'sbPlace',id:'fairgrounds',k:'1,0'}); A({t:'sbClaim',k:'1,0',owner:0}); A({t:'cast',uid:h}); ans('2,0');
+  if(st.pending&&st.pending.verb==='bury') ans(st.pending.options[0]);
+  chk('Repent with no target', st.pending&&/Repent/.test(st.pending.prompt), 'offered'); ans(true);
+  // B owns nothing next to A's cards except the Ruined Sanctuary, so there is nothing to Ruin
+  chk('Repent with no target', !st.pending && st.players[1].hand.includes(rp) && !st.players[1].debt, 'nothing to Ruin: Repent stays in hand and costs nothing'); });
 R.forEach(r=>console.log(r[1],'|',r[0],'|',r[2]));

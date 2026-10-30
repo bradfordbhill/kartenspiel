@@ -28,7 +28,8 @@ T('Exile',()=>{ game('Archbishop','Hedonist'); A({t:'sbPlace',id:'fairgrounds',k
   chk('Exile',!top('1,0').claimants.length&&st.players[1].meeples===8,'claim removed, meeple home'); });
 T('You’ll Regret That',()=>{ game('Warmonger','Archbishop'); A({t:'endTurn'}); A({t:'startTurn'}); st.players[1].ap=99; A({t:'play',uid:st.players[1].foundationUid,k:'0,1'}); A({t:'sbPlace',id:'sanctuary',k:'2,0'}); A({t:'sbClaim',k:'2,0',owner:1});
   const y=give('youll-regret-that',1); chk('You’ll Regret That',!!E.playBlock(st,1,y),'cannot be played normally'); A({t:'endTurn'}); A({t:'startTurn'}); st.players[0].ap=99;
-  const t=give('trebuchet'); A({t:'play',uid:t,k:'-1,0'}); ans('2,0'); chk('You’ll Regret That',st.pending&&st.pending.kind==='confirm'&&st.pending.player===1,'victim is asked'); ans(true);
+  const t=give('trebuchet'); A({t:'play',uid:t,k:'-1,0'}); ans('2,0'); while(st.pending&&/Repent/.test(st.pending.prompt)) ans(false);   // the deal may also hold Repent: decline it
+  chk('You’ll Regret That',st.pending&&st.pending.kind==='confirm'&&st.pending.player===1&&/Regret/.test(st.pending.prompt),'victim is asked'); ans(true);
   chk('You’ll Regret That',E.noIncome(st,'-1,0')&&!st.players[1].hand.includes(y),'Trebuchet cursed'); });
 T('Overwhelming Evidence',()=>{ game('Philosopher'); A({t:'sbPlace',id:'fairgrounds',k:'1,0'}); A({t:'sbRuin',k:'1,0'}); const o=give('overwhelming-evidence'); A({t:'cast',uid:o}); ans('1,0'); ans(true);
   chk('Overwhelming Evidence',!top('1,0').ruined&&E.suitOf(st,E.top(st,'1,0'))==='Tome'&&top('1,0').claimants[0]===0,'restored as Tome and claimed'); });

@@ -447,7 +447,7 @@ var KEngine = (function () {
     if (r.kind === 'replay') { var rd = def(st, r.uid); if (!top(st, r.key) || top(st, r.key) !== r.uid) return runReactions(st); log(st, rd.name + '’s placement effect triggers again.');
       st.res = { kind: 'reaction', src: r.uid, srcKey: r.key, player: r.p, steps: JSON.parse(JSON.stringify(rd.onPlay || [])), i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     if (r.kind === 'repent') { ctx0.ownerIs = r.target;
-      st.res = { kind: 'reaction', src: r.uid, srcKey: null, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Repent to Ruin a card of ' + st.players[r.target].name + '’s next to one of yours? Your next turn starts with 3● less.' }, { do: 'payDebt', n: 3, discard: true }, { do: 'ruin', area: 'adjacentToOwn', ownerIs: 'ctx' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
+      st.res = { kind: 'reaction', src: r.uid, srcKey: null, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Repent to Ruin a card of ' + st.players[r.target].name + '’s next to one of yours? Your next turn starts with 3● less.' }, { do: 'ruin', area: 'adjacentToOwn', ownerIs: 'ctx' }, { do: 'payDebt', n: 3, discard: true, requires: 'ruined' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     if (r.kind === 'brambles') { var bu = top(st, r.key); if (!bu || st.players[r.p].hand.indexOf(r.uid) < 0) return runReactions(st);
       st.res = { kind: 'reaction', src: r.uid, srcKey: r.key, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Brambles on top of ' + rawDef(st, bu).name + ' (one away from being Overwhelmed)? It and everything under it get buried. Your next turn starts with 3● less.' }, { do: 'brambles' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     var steps = r.kind === 'regret'
@@ -570,10 +570,10 @@ var KEngine = (function () {
         if (s.ownAdjacentAtLeast) { var own = n4(res.srcKey).filter(function (k) { return ownedBy(st, k, res.player); }).length; if (own < s.ownAdjacentAtLeast) { log(st, 'Condition not met: own ' + s.ownAdjacentAtLeast + ' adjacent cards.'); return 'done'; } }
         var t = targets(st, res, s, 'ruin');
         if (!t.length) { log(st, 'No card to Ruin.'); return 'done'; }
-        if (s.auto && t.length === 1) { ruinAt(st, t[0], res.player, 'ruin'); affect(res, t[0]); return 'done'; }
+        if (s.auto && t.length === 1) { ruinAt(st, t[0], res.player, 'ruin'); affect(res, t[0]); res.ctx.ruined = true; return 'done'; }
         return pend(res, { kind: 'cell', options: t, prompt: 'Choose a card to Ruin.', verb: 'ruin', optional: !!s.optional });
       }
-      if (ans) { ruinAt(st, ans, res.player, 'ruin'); affect(res, ans); if (s.asCurse) res.ctx.curseTarget = ans; }
+      if (ans) { ruinAt(st, ans, res.player, 'ruin'); affect(res, ans); res.ctx.ruined = true; if (s.asCurse) res.ctx.curseTarget = ans; }
       return 'done';
     },
     setSuit: function (st, res, s, ans) {
