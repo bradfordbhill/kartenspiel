@@ -24,7 +24,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts |
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
@@ -109,6 +109,8 @@ After anything changes the board, `afterBoardChange` runs the automatic rules: m
 `ui.js` is plain JavaScript with no framework. On every change it rebuilds the page's HTML from scratch (`render()` → `renderNow()`). Buttons and cells don't have their own listeners. Instead they carry `data-` attributes (`data-act="endTurn"`, `data-cell="1,0"`, ...), and one click handler at the bottom of the file reads those attributes and routes each click.
 
 The game page and the sandbox are each a *context*: `{ state, hist (undo history), ui (selection, zoom, toggles) }`. `dispatch(ctx, action)` is the only way the UI talks to the engine.
+
+Keyboard shortcuts (`onKey` in `ui.js`) mostly press the same on-screen button a click would, so they follow its rules; press **?** in the app for the list.
 
 The file runs top to bottom like this: helpers and icons → app state and library loading → dispatch and undo → animations (`FX`) → card faces → board → inspector panel → players and log → one function per page → event handlers → hover magnifier.
 

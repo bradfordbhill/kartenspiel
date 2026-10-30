@@ -378,6 +378,8 @@ input[type=password] { background: var(--field); border: 2px solid; border-color
 .stat { padding: 8px 14px; min-width: 130px; }
 .won { color: #137a30; }
 table.list td.wrap { white-space: normal; }
+table.keys td { white-space: normal; }
+table.keys td:first-child { width: 110px; }
 </style></head><body><div id="app"></div><script>
 /* Kartenspiel — starter data. Card definitions are plain JSON so they can live in a db later. */
 var KData = (function () {
@@ -5669,6 +5671,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       '<label><input type="checkbox" data-tog="showOW"' + (u.showOW ? ' checked' : '') + '> Overwhelm counts</label>' +
       '<label><input type="checkbox" data-tog="coords"' + (u.coords ? ' checked' : '') + '> Grid</label>' +
       '<button class="btn sm" data-act="debug" title="Copy the log and board state to the clipboard">Copy debug report</button>' +
+      '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
       '<label>Overlay <select data-sel="overlay">' + [['none', 'None'], ['quick', 'Quickview (● and ◇)'], ['war', 'War (Overwhelm)']].map(function (o) { return '<option value="' + o[0] + '"' + ((u.overlay || 'none') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       overlayTotal(ctx) +
       '<span class="muted">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
@@ -5845,6 +5848,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
     var lg = $('.log'); if (lg && atBottom) lg.scrollTop = lg.scrollHeight;
     var bw2 = $('.boardwrap'); if (bw2) { applyZoom(cur()); if (!cur().ui.fit) { bw2.scrollLeft = bsx; bw2.scrollTop = bsy; } }
     if (app.page === 'game') botDriver(app.game);
+    keyHints();
     if (focusSel) { var f = document.querySelector('[data-focus-key="' + focusSel + '"]'); if (f) { f.focus(); if (f.setSelectionRange && f.value != null) { try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) { } } } }
   }
   function statusText() {
@@ -6249,6 +6253,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
   }
   // The public site has no sandbox or card builder: swap the first paragraph and drop the builder section.
   function helpEdition(h) {
+    h = h.replace(/<\/div><\/div>$/, '<h2>Keyboard shortcuts</h2>' + keysTable() + '</div></div>');
     if (!ONLINE) return h;
     return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Single player</b> puts you against bots: on the Play locally page, set any seat to a greedy, tactician or warlord bot. <b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
         'Pick an archetype in the table’s lobby (first come, first served); the host starts the game. Your <b>Profile</b> keeps your win/loss record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</p>' +
@@ -6519,6 +6524,64 @@ if (typeof module !== 'undefined') module.exports = KBots;
     return h + end;
   }
 
+  /* ---------------- keyboard shortcuts ---------------- */
+  // Most keys press the same on-screen button a click would, so they follow its rules (a disabled button = no effect).
+  var KEYS = [['Space', 'Start your turn, or the highlighted button in a dialog or the prompt bar'], ['E', 'End turn'], ['1–9', 'Pick a card in your hand, or an option in a dialog'],
+    ['C', 'Claim (if only one card can be claimed; otherwise the options light up)'], ['A', 'Use the selected card’s ability'], ['D', 'Discard 2, draw 1'], ['U or Ctrl+Z', 'Undo'],
+    ['Y / N', 'Answer yes / no'], ['S', 'Skip an optional choice'], ['Esc', 'Cancel: deselect, close a dialog, leave a mode'],
+    ['Q (hold)', 'Quickview overlay while held'], ['W (hold)', 'War overlay while held'], ['O', 'Cycle the overlay: None, Quickview, War'],
+    ['F', 'Fit the board'], ['+ / −', 'Zoom'], ['G', 'Grid'], ['?', 'This list']];
+  var KEYHINT = { endTurn: 'E', undo: 'U or Ctrl+Z', startSwap: 'D', skip: 'S', answerYes: 'Y', answerNo: 'N', startTurn: 'Space', claim: 'C', ability: 'A', fit: 'F', zoomin: '+', zoomout: '−', keys: '?' };
+  function keysTable() { return '<table class="list small keys">' + KEYS.map(function (r) { return '<tr><td><span class="kbd">' + esc(r[0]) + '</span></td><td>' + esc(r[1]) + '</td></tr>'; }).join('') + '</table><p class="small muted">Keys do nothing while you type in a text box. Turn keys only work when it’s your turn.</p>'; }
+  function keysModal() { app.modal = function () { return modal('Keyboard shortcuts', keysTable(), '<button class="btn def" data-act="closeModal">Close</button>'); }; render(); }
+  // Tooltips name each button's key (run after every render).
+  function keyHints() {
+    document.querySelectorAll('[data-act]').forEach(function (el) { var key = KEYHINT[el.getAttribute('data-act')]; if (key && !/\(\S+.*\)$/.test(el.title || '')) el.title = (el.title || el.textContent.trim()) + ' (' + key + ')'; });
+    document.querySelectorAll('.modal .btn.def, .prompt .btn.def').forEach(function (el) { if (!/\(Space\)$/.test(el.title || '')) el.title = (el.title || el.textContent.trim()) + ' (Space)'; });
+    var ov = document.querySelector('[data-sel="overlay"]'); if (ov) ov.title = 'O cycles the overlay; hold Q or W to peek';
+  }
+  function press(sel) { var b = document.querySelector(sel); if (b && !b.disabled) { b.click(); return true; } return false; }
+  function claimKey(ctx) {
+    var st = ctx.state; if (ctx.kind !== 'game' || !myTurn(ctx) || !st.turn || !st.turn.started || st.pending || st.res) return;
+    var co = E.claimOptions(st, st.cur);
+    if (co.length === 1) { ctx.ui.sel = co[0]; dispatch(ctx, { t: 'claim', k: co[0] }); }
+    else toast(co.length ? 'Claim: click one of the ' + co.length + ' orange-outlined cards.' : 'Nothing to claim right now.');
+  }
+  // Hold Q or W to see an overlay; letting go puts the previous one back.
+  var peek = null;
+  function endPeek() { var c = cur(); if (c) c.ui.overlay = peek; peek = null; render(); }
+  // Returns true when the key was used.
+  function onKey(e) {
+    var t = e.target, k = e.key, lower = k.length === 1 ? k.toLowerCase() : k;
+    if ((t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable)) || e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (k === '?') { keysModal(); return true; }
+    if (k === ' ') return t && t.tagName === 'BUTTON' ? false : press('.modal .btn.def') || press('.prompt .btn.def');
+    if (document.querySelector('.modal')) {          // a dialog is open: only its own keys
+      if (/^[1-9]$/.test(k)) { var o = document.querySelectorAll('.modal [data-pick], .modal [data-answer], .modal [data-answer-p]')[+k - 1]; if (o) { o.click(); return true; } return false; }
+      if (lower === 'y') return press('.modal [data-act="answerYes"]');
+      if (lower === 'n') return press('.modal [data-act="answerNo"]');
+      if (lower === 'u') return press('.modal [data-act="undo"]');
+      return false;
+    }
+    var ctx = cur(); if (!ctx) return false;
+    if (/^[1-9]$/.test(k)) { var hc = document.querySelectorAll('.bottom [data-hand]')[+k - 1]; if (hc) { hc.click(); return true; } return false; }
+    switch (lower) {
+      case 'e': return press('[data-act="endTurn"]');
+      case 'u': return press('[data-act="undo"]');
+      case 'd': return press('[data-act="startSwap"]');
+      case 's': return press('[data-act="skip"]');
+      case 'a': return press('[data-act="ability"]');
+      case 'c': claimKey(ctx); return true;
+      case 'f': return press('[data-act="fit"]');
+      case '+': case '=': return press('[data-act="zoomin"]');
+      case '-': case '_': return press('[data-act="zoomout"]');
+      case 'g': ctx.ui.coords = !ctx.ui.coords; render(); return true;
+      case 'o': var order = ['none', 'quick', 'war']; ctx.ui.overlay = order[(order.indexOf(ctx.ui.overlay || 'none') + 1) % order.length]; peek = null; render(); return true;
+      case 'q': case 'w': if (!e.repeat) { if (peek == null) peek = ctx.ui.overlay || 'none'; ctx.ui.overlay = lower === 'q' ? 'quick' : 'war'; render(); } return true;
+    }
+    return false;
+  }
+
   /* ---------------- events ---------------- */
   // One click handler for the whole app. Elements say what they do through data- attributes (data-act, data-cell, data-hand, ...).
   document.addEventListener('click', function (e) {
@@ -6624,6 +6687,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       }; render(); return;
       case 'sbReset': app.modal = null; app._sbReset = true; lsDel('ks.sandbox'); newSandbox(); render(); return;
       case 'closeModal': app.modal = null; render(); return;
+      case 'keys': keysModal(); return;
       case 'newCard': openBuilder(D.make({ name: 'New card', id: '', suit: 'Sceptre', type: 'Structure', cost: 6 })); return;
       case 'editCard': openBuilder(libById(t.getAttribute('data-id'))); return;
       case 'dupCard': { var src = clone(libById(t.getAttribute('data-id'))); src.name += ' (copy)'; src.id = ''; openBuilder(src); app.builder.orig = null; app.builder.card.id = slug(src.name); render(); return; }
@@ -6768,9 +6832,12 @@ if (typeof module !== 'undefined') module.exports = KBots;
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-nf') === 'pw') { netAuth('login'); return; }
     if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-nf') === 'code') { netAct('netJoinCode'); return; }
+    if (onKey(e)) { e.preventDefault(); return; }
     if (e.key === 'Escape') { var ctx = cur(); if (app.modal) { app.modal = null; render(); return; } if (ctx) { ctx.ui.hand = null; ctx.ui.mode = null; ctx.ui.swap = null; render(); } }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && (app.page === 'game' || app.page === 'sandbox') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); undo(cur()); }
   });
+  document.addEventListener('keyup', function (e) { if (peek != null && /^[qw]$/i.test(e.key)) endPeek(); });
+  window.addEventListener('blur', function () { if (peek != null) endPeek(); });
   window.addEventListener('resize', function () { var c = cur(); if (c && c.ui.fit) applyZoom(c); });
 
   /* ---------------- hover magnifier ---------------- */

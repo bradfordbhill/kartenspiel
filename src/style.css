@@ -367,3 +367,5 @@ input[type=password] { background: var(--field); border: 2px solid; border-color
 .stat { padding: 8px 14px; min-width: 130px; }
 .won { color: #137a30; }
 table.list td.wrap { white-space: normal; }
+table.keys td { white-space: normal; }
+table.keys td:first-child { width: 110px; }
