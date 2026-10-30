@@ -1,6 +1,9 @@
 /* Kartenspiel playtest UI. All game logic lives in KEngine; this file only renders state and dispatches actions. */
 (function () {
   var E = KEngine, D = KData;
+  // The same UI builds two apps: the playtest table (default) and the public site (KConfig.edition === 'online'),
+  // which adds online play, a home page and profiles, and drops the card builder, sandbox and library editing.
+  var ONLINE = typeof KConfig !== 'undefined' && KConfig.edition === 'online';
   // Player colors by seat, and the board cell size in pixels.
   var COLORS = ['#d42020', '#1f4fd1', '#138a36', '#d39a00', '#8a2be2'];
   var CW = 88, CH = 118, GAP = 10;
@@ -56,7 +59,7 @@
   /* ---------------- app state ---------------- */
   // Everything the UI keeps between renders. `game` and `sandbox` are contexts (see newCtx).
   var app = {
-    page: 'new', lib: [], libSource: 'built-in', db: null, dbEmpty: false, libReady: false,
+    page: ONLINE ? 'home' : 'new', lib: [], libSource: 'built-in', db: null, dbEmpty: false, libReady: false,
     open: {}, game: null, sandbox: null, libUI: { q: '', suit: '', type: '', sort: 'suit', sel: null }, builder: null, toast: null
   };
   function libById(id) { for (var i = 0; i < app.lib.length; i++) if (app.lib[i].id === id) return app.lib[i]; return null; }
@@ -73,6 +76,7 @@
   // Load the card library: the copy cached in this browser, else the built-in starter cards.
   // Where a shared card database is available (window.claude), stay synced with it live.
   function initLibrary() {
+    if (ONLINE) { app.lib = sortLib(D.STARTER.map(normalizeCard)); return; }   // the public site's library is fixed
     var cached = lsGet('ks.lib');
     app.lib = sortLib((cached && cached.length ? cached : D.STARTER).map(normalizeCard));
     app.libSource = cached ? 'this browser' : 'built-in';
@@ -121,17 +125,25 @@
   // Send an action to the engine. On success: keep the old state for undo, autosave, animate, re-render.
   // On error: show the message and keep the old state.
   function dispatch(ctx, a) {
+    if (ctx.online) { ctx.err = null; KNet.send({ t: 'act', a: a }); uiAfter(ctx, a); render(); return true; }   // the server answers with a new state
     var r = E.apply(ctx.state, a);
     if (r.error) { ctx.err = r.error; render(); return false; }
     ctx.err = null; ctx.hist.push(ctx.state); if (ctx.hist.length > 80) ctx.hist.shift();
     ctx.state = r;
     if (ctx.kind === 'sandbox' && ctx.ui.autoCheck && /^sb(Place|Suit|Move|Remove|Bury|Unbury)$/.test(a.t)) { var r2 = E.apply(ctx.state, { t: 'sbCheck', quiet: true }); if (!r2.error) ctx.state = r2; }
-    if (a.t === 'play' || a.t === 'cast' || a.t === 'answer' || a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.hand = null; ctx.ui.picked = []; }
-    if (a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.passOK = false; ctx.ui.mode = null; ctx.ui.sel = null; ctx.ui.swap = null; }
+    uiAfter(ctx, a);
     lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state);
     var fx = FX.diff(ctx, ctx.hist[ctx.hist.length - 1], ctx.state, a);
     render(); FX.run(fx); maybeAutoEnd(ctx); return true;
   }
+  // Clear selections that an action has used up.
+  function uiAfter(ctx, a) {
+    if (a.t === 'play' || a.t === 'cast' || a.t === 'answer' || a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.hand = null; ctx.ui.picked = []; }
+    if (a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.passOK = false; ctx.ui.mode = null; ctx.ui.sel = null; ctx.ui.swap = null; }
+  }
+  // Whose eyes the game is drawn through: online, always your own seat; on one shared screen, whoever's turn it is.
+  function viewer(ctx) { return ctx.online ? ctx.me : ctx.state.cur; }
+  function myTurn(ctx) { return !ctx.online || ctx.state.cur === ctx.me; }
   /* ---- auto end turn when out of ● with nothing free to do ---- */
   function canAfford(st, u) {
     var d = E.rawDef(st, u); if (E.playBlock(st, st.cur, u)) return false;
@@ -152,15 +164,15 @@
   // If stuck, end the turn after a short pause (the player can stop it with "Wait, I'm not done").
   function maybeAutoEnd(ctx) {
     clearTimeout(maybeAutoEnd.t);
-    if (ctx.kind !== 'game' || ctx.state.opts.autoEnd === false || !stuck(ctx.state) || ctx.ui.holdTurn === ctx.state.log.length) { ctx.ui.autoEnding = false; return; }
+    if (ctx.kind !== 'game' || !myTurn(ctx) || ctx.state.opts.autoEnd === false || !stuck(ctx.state) || ctx.ui.holdTurn === ctx.state.log.length) { ctx.ui.autoEnding = false; return; }
     ctx.ui.autoEnding = true; render();
     var mark = ctx.state.log.length;
     maybeAutoEnd.t = setTimeout(function () { if (ctx.ui.autoEnding && ctx.state.log.length === mark && stuck(ctx.state)) { ctx.ui.autoEnding = false; dispatch(ctx, { t: 'endTurn' }); } }, 1600);
   }
   // Go back to the previous state in the history.
-  function undo(ctx) { if (!ctx.hist.length) return; ctx.state = ctx.hist.pop(); ctx.err = null; ctx.ui.hand = null; ctx.ui.picked = []; lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state); render(); }
+  function undo(ctx) { if (ctx.online || !ctx.hist.length) return; ctx.state = ctx.hist.pop(); ctx.err = null; ctx.ui.hand = null; ctx.ui.picked = []; lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state); render(); }
   // The context for the page on screen.
-  function cur() { return app.page === 'sandbox' ? app.sandbox : app.game; }
+  function cur() { return app.page === 'sandbox' ? app.sandbox : app.page === 'online' ? (N.room && N.room.status !== 'lobby' ? N.ctx : null) : app.page === 'game' ? app.game : null; }
 
   /* ---------------- effects: crumble, ◇ and ● flying to their piles ---------------- */
   var FX = (function () {
@@ -350,15 +362,15 @@
     // extend for legal cells
     var legal = {}, pd = st.pending, optSet = {};
     var buryingSuit = pd && pd.kind === 'cell' && pd.verb === 'bury' && st.res && st.res.src ? E.suitOf(st, st.res.src) : null;
-    if (ctx.kind === 'game' && ui.hand && st.turn && st.turn.started && !st.pending && !st.res && E.needsPlacement(E.rawDef(st, ui.hand))) legal = E.legalCells(st, ui.hand);
-    if (pd && pd.kind === 'cell' && (pd.player === st.cur || ctx.kind === 'sandbox')) pd.options.forEach(function (k) { optSet[k] = 1; });
+    if (ctx.kind === 'game' && myTurn(ctx) && ui.hand && st.turn && st.turn.started && !st.pending && !st.res && E.needsPlacement(E.rawDef(st, ui.hand))) legal = E.legalCells(st, ui.hand);
+    if (pd && pd.kind === 'cell' && (ctx.online ? pd.player === ctx.me : pd.player === st.cur || ctx.kind === 'sandbox')) pd.options.forEach(function (k) { optSet[k] = 1; });
     Object.keys(legal).concat(Object.keys(optSet)).forEach(function (k) { var p = E.XY(k); b.minX = Math.min(b.minX, p[0]); b.maxX = Math.max(b.maxX, p[0]); b.minY = Math.min(b.minY, p[1]); b.maxY = Math.max(b.maxY, p[1]); });
     var cols = b.maxX - b.minX + 1, rows = b.maxY - b.minY + 1, W = cols * (CW + GAP) + GAP, Hh = rows * (CH + GAP) + GAP;
     var see = {}, counted = {}, seenBy = {};
     if (ui.sel && E.top(st, ui.sel) && ui.showSeen) { var sg = E.sight(st, ui.sel); sg.cells.forEach(function (k) { see[k] = 1; }); sg.counted.forEach(function (k) { counted[k] = 1; }); }
     if (ui.sel && ui.showSeenBy) ks.forEach(function (k) { if (k !== ui.sel && E.sight(st, k).cells.indexOf(ui.sel) >= 0) seenBy[k] = 1; });
     var claimSet = {};
-    if (ctx.kind === 'game' && st.turn && st.turn.started && !st.pending && !st.res && !ui.hand && !ui.mode && !ui.swap && st.winner == null) E.claimOptions(st, st.cur).forEach(function (k) { optSet[k] = 1; claimSet[k] = 1; });
+    if (ctx.kind === 'game' && myTurn(ctx) && st.turn && st.turn.started && !st.pending && !st.res && !ui.hand && !ui.mode && !ui.swap && st.winner == null) E.claimOptions(st, st.cur).forEach(function (k) { optSet[k] = 1; claimSet[k] = 1; });
     var claiming = Object.keys(claimSet).length > 0;
     var h = '';
     for (var y = b.minY; y <= b.maxY; y++) for (var x = b.minX; x <= b.maxX; x++) {
@@ -371,7 +383,7 @@
       if (claimSet[k]) cls += ' claimable';
       if (see[k]) cls += ' see'; if (counted[k]) cls += ' counted'; if (seenBy[k]) cls += ' seenby';
       if (ui.sel === k) cls += ' focus';
-      if (u && ctx.kind === 'game' && E.abilityReady(st, k)) cls += ' ready';
+      if (u && ctx.kind === 'game' && myTurn(ctx) && E.abilityReady(st, k)) cls += ' ready';
       var ov = u ? overlayFor(ctx, k) : null; if (ov) cls += ov.on ? ' ovl-on' : ' ovl-dim';
       if (!u && legal[k] == null && !optSet[k] && !see[k] && !(ctx.kind === 'sandbox' || ui.mode === 'move')) { if (!ui.coords) continue; }
       h += '<div class="' + cls + '" style="left:' + lx + 'px;top:' + ly + 'px">';
@@ -449,7 +461,7 @@
     var st = ctx.state, ui = ctx.ui, h = '';
     if (ui.hand && !ui.sel) {
       var hu = ui.hand, hd = E.rawDef(st, hu); h += '<div class="panelhead">In hand</div>' + defFace(Object.assign({}, hd, { art: artOf(hd.id) }), { big: true });
-      var why = E.playBlock(st, st.cur, hu); if (why) h += '<p class="err">' + esc(why) + '</p>';
+      var why = E.playBlock(st, viewer(ctx), hu); if (why) h += '<p class="err">' + esc(why) + '</p>';
       else h += E.needsPlacement(hd) ? '<p class="small">Green spaces are legal; the number is the cost there.</p>' : '<p class="small">Played straight from your hand: click <b>Play it</b> in the bar above the board. Afterward it is buried under a card it affected, or under any card you choose.</p>';
       return h;
     }
@@ -481,12 +493,12 @@
     // actions
     if (ctx.kind === 'game') {
       var p = st.cur, btns = '';
-      if (st.turn && st.turn.started && !st.pending && !st.res && st.winner == null) {
+      if (myTurn(ctx) && st.turn && st.turn.started && !st.pending && !st.res && st.winner == null) {
         if (E.claimOptions(st, p).indexOf(k) >= 0) btns += '<button class="btn def" data-act="claim" data-k="' + k + '">Claim (' + st.players[p].meeples + ' meeples left)</button>';
         if (d.ability && (c.claimants.indexOf(p) >= 0 || d.ability.anyPlayer) && !c.ruined) btns += '<button class="btn" data-act="ability" data-k="' + k + '"' + (st.turn.used[u] ? ' disabled' : '') + '>' + esc(abilityLabel(d.ability)) + '</button>';
       }
       if (btns) h += '<div class="row">' + btns + '</div>';
-      h += '<details style="margin-top:8px" data-keep="reftools"' + (app.open.reftools ? ' open' : '') + '><summary>Referee tools</summary>' + refTools(ctx, k) + '</details>';
+      if (!ctx.online) h += '<details style="margin-top:8px" data-keep="reftools"' + (app.open.reftools ? ' open' : '') + '><summary>Referee tools</summary>' + refTools(ctx, k) + '</details>';
     } else h += '<fieldset><legend>Sandbox tools</legend>' + refTools(ctx, k) + '</fieldset>';
     return h;
   }
@@ -561,7 +573,7 @@
     var st = ctx.state, sc = E.scores(st), h = '<div class="plist">';
     st.players.forEach(function (pl, i) {
       var isCur = ctx.kind === 'game' && i === st.cur;
-      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
+      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + (ctx.online && i === ctx.me ? ' (you)' : '') + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + (ctx.online && !isConnected(pl.name) ? ' · offline' : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
         '<div class="pbody"><span data-fx="pile-' + i + '">' + jewelPile(sc[i].total) + '</span><div class="pstats"><div class="bignum" title="Victory points: cards ' + sc[i].cards + ' + tokens ' + sc[i].tokens + '">' + sc[i].total + '<span class="unit">◇</span></div>' +
         '<div class="small">♟ ' + pl.meeples + ' meeples' + (ctx.kind === 'game' ? ' · ' + pl.hand.length + ' in hand' : '') + (pl.reserve > 0 ? ' · ' + pl.reserve + '● Reserves' : '') + '</div></div></div></div>';
     });
@@ -602,12 +614,13 @@
     var scrollLog = $('.log'); var atBottom = !scrollLog || scrollLog.scrollTop + scrollLog.clientHeight >= scrollLog.scrollHeight - 20;
     var bw = $('.boardwrap'), bsx = bw ? bw.scrollLeft : 0, bsy = bw ? bw.scrollTop : 0;
     var focusSel = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-focus-key');
-    var tabs = [['new', 'New game'], ['game', 'Game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
-    var h = '<div class="win raised"><div class="titlebar"><span>Kartenspiel — playtest table</span><span class="grow"></span><span class="small" style="font-weight:400">Library: ' + esc(app.libSource) + ', ' + app.lib.length + ' cards</span></div>';
+    var tabs = ONLINE ? [['home', 'Home'], ['new', 'Pass-and-Play'], ['game', 'Local game'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
+      : [['new', 'New game'], ['game', 'Game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
+    var h = '<div class="win raised"><div class="titlebar"><span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? 'Signed in as ' + N.user : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
     h += '<div class="menubar" role="tablist">' + tabs.map(function (t) { var dis = t[0] === 'game' && !app.game; return '<button class="tab' + (app.page === t[0] ? ' on' : '') + '" role="tab" data-page="' + t[0] + '"' + (dis ? ' disabled style="opacity:.5"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
     h += '<div class="content">' + pageHTML() + '</div>';
     var st = cur() && cur().state;
-    h += '<div class="statusbar small"><div class="sunken grow">' + esc(statusText()) + '</div>' + (st && app.page !== 'library' && app.page !== 'builder' && app.page !== 'help' && app.page !== 'new' ? '<div class="sunken">Deck ' + st.deck.length + ' · Discard ' + st.discard.length + '</div>' : '') + '</div></div>';
+    h += '<div class="statusbar small"><div class="sunken grow">' + esc(statusText()) + '</div>' + (st && app.page !== 'library' && app.page !== 'builder' && app.page !== 'help' && app.page !== 'new' && app.page !== 'home' && app.page !== 'profile' ? '<div class="sunken">Deck ' + st.deck.length + ' · Discard ' + st.discard.length + '</div>' : '') + '</div></div>';
     h += modalHTML();
     root.innerHTML = h;
     var lg = $('.log'); if (lg && atBottom) lg.scrollTop = lg.scrollHeight;
@@ -617,10 +630,12 @@
   function statusText() {
     if (app.toast) return app.toast;
     var c = cur();
-    if ((app.page === 'game' || app.page === 'sandbox') && c) {
+    if (app.page === 'online' && !c) return N.status === 'on' ? 'Connected to the game server.' : N.status === 'none' ? 'No game server set.' : 'Connecting to the game server…';
+    if ((app.page === 'game' || app.page === 'sandbox' || app.page === 'online') && c) {
       var st = c.state;
       if (c.err) return c.err;
       if (st.winner != null) return st.players[st.winner].name + ' wins.';
+      if (c.online) return (N.room ? N.room.name + ' — ' : '') + 'round ' + st.round + ', ' + (st.cur === c.me ? 'your turn' : st.players[st.cur].name + '’s turn') + (N.status === 'on' ? '' : ' (reconnecting…)');
       if (app.page === 'game') return st.players[st.cur].name + ' — round ' + st.round + (st.turn.started ? ', ' + st.players[st.cur].ap + '● to spend' + (st.turn.claimed ? ', claim used' : ', claim available') : ', waiting to start the turn');
       return 'Sandbox: free placement, no costs or turns.';
     }
@@ -632,9 +647,13 @@
       case 'game': return app.game ? gamePage(app.game) : newGamePage();
       case 'sandbox': return sandboxPage();
       case 'library': return libraryPage();
-      case 'builder': return builderPage();
+      case 'builder': return ONLINE ? homePage() : builderPage();
+      case 'home': return homePage();
+      case 'online': return onlinePage();
+      case 'profile': return profilePage();
+      case 'new': return newGamePage();
       case 'help': return helpPage();
-      default: return newGamePage();
+      default: return ONLINE ? homePage() : newGamePage();
     }
   }
 
@@ -690,12 +709,12 @@
     h += '<div class="left"><div class="pane raised" style="flex:0 0 auto">' + playersPanel(ctx) + '</div>';
     h += '<div class="pane raised col" style="flex:0 0 auto"><div class="apbox"><span data-fx="jar">' + apJar(st.turn.started ? pl.ap : 0) + '</span><div><div class="bignum">' + (st.turn.started ? pl.ap : '—') + '<span class="unit">●</span></div><div class="small">' + (st.turn.started ? 'Aktion points left' : 'Turn not started') + '</div>' + (pl.debt > 0 ? '<div class="reserve" title="Owed for reactions; taken from your next turn">− ' + pl.debt + '● owed next turn</div>' : '') + (pl.reserve > 0 ? '<div class="reserve" title="Reserves are spent like ● after your ● runs out, and stay between turns">+ ' + pl.reserve + '● Reserves</div>' : '') +
       (st.turn.started ? (function () { var co = E.claimOptions(st, st.cur).length; return '<div class="claimstate' + (co ? ' avail' : '') + '">' + (st.turn.claimed ? 'Claim used' : co ? '♟ Claim available' : 'Claim: nothing to claim yet') + '</div>'; })() : '') + '</div></div>' +
-      '<div class="row"><button class="btn def big" data-act="endTurn"' + (st.turn.started && !st.pending && !st.res && st.winner == null ? '' : ' disabled') + '>End turn</button>' +
-      '<button class="btn big" data-act="undo"' + (ctx.hist.length ? '' : ' disabled') + ' title="Undo the last action">Undo</button></div>' +
-      '<details class="small" data-keep="ref"' + (app.open.ref ? ' open' : '') + '><summary>Referee</summary><div class="col" style="margin-top:4px"><div class="row">● <button class="btn sm" data-act="apAdj" data-d="-1">−</button><button class="btn sm" data-act="apAdj" data-d="1">+</button> ◇ tokens <button class="btn sm" data-act="tokAdj" data-d="-1">−</button><button class="btn sm" data-act="tokAdj" data-d="1">+</button></div>' +
-      '<select data-sel="giveId" style="max-width:100%">' + cardOptions(st, ui.giveId) + '</select><button class="btn sm" data-act="give">Give to ' + esc(pl.name) + '’s hand</button></div></details></div>';
+      '<div class="row"><button class="btn def big" data-act="endTurn"' + (myTurn(ctx) && st.turn.started && !st.pending && !st.res && st.winner == null ? '' : ' disabled') + '>End turn</button>' +
+      (ctx.online ? '' : '<button class="btn big" data-act="undo"' + (ctx.hist.length ? '' : ' disabled') + ' title="Undo the last action">Undo</button>') + '</div>' +
+      (ctx.online ? '' : '<details class="small" data-keep="ref"' + (app.open.ref ? ' open' : '') + '><summary>Referee</summary><div class="col" style="margin-top:4px"><div class="row">● <button class="btn sm" data-act="apAdj" data-d="-1">−</button><button class="btn sm" data-act="apAdj" data-d="1">+</button> ◇ tokens <button class="btn sm" data-act="tokAdj" data-d="-1">−</button><button class="btn sm" data-act="tokAdj" data-d="1">+</button></div>' +
+      '<select data-sel="giveId" style="max-width:100%">' + cardOptions(st, ui.giveId) + '</select><button class="btn sm" data-act="give">Give to ' + esc(pl.name) + '’s hand</button></div></details>') + '</div>';
     h += '<div class="raised" style="flex:1;min-height:0;display:flex;flex-direction:column;padding:3px"><div class="panelhead" style="margin:0 0 3px">Log</div><div class="log sunken">' + logPanel(st) + '</div></div></div>';
-    h += '<div class="center">' + boardBar(ctx) + promptBar(ctx) + '<div class="boardwrap sunken">' + boardHTML(ctx).html + '</div></div>';
+    h += '<div class="center">' + (ctx.online ? onlineBar(ctx) : '') + boardBar(ctx) + promptBar(ctx) + '<div class="boardwrap sunken">' + boardHTML(ctx).html + '</div></div>';
     h += '<div class="right raised pane">' + inspector(ctx) + '</div>';
     h += '<div class="bottom raised">' + handHTML(ctx) + '</div>';
     return h + '</div></div>';
@@ -708,8 +727,9 @@
       if (ui.mode === 'move') return '<div class="prompt">Click an empty space to move the card from ' + esc(ui.moveFrom) + '. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
       return '';
     }
-    if (st.winner != null) return '<div class="prompt"><b>' + esc(st.players[st.winner].name) + ' wins!</b> <button class="btn sm" data-page="new">New game</button></div>';
-    if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' Click an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
+    if (st.winner != null) return '<div class="prompt"><b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm" data-page="new">New game</button>') + '</div>';
+    if (ctx.online) { var ow = onlineWaiting(ctx); if (ow) return ow; }
+    if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' Click an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res && !ctx.online ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
     if (ui.autoEnding) return '<div class="prompt"><b>Out of ●.</b> Nothing left to play, claim or use, so your turn ends in a moment. <button class="btn sm" data-act="holdTurn">Wait, I’m not done</button></div>';
     if (ui.mode === 'reclaim') return '<div class="prompt">Click one of your claimed cards to take its meeple back. This ends your turn. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
     if (ui.mode === 'move') return '<div class="prompt">Referee move: click an empty space for the card from ' + esc(ui.moveFrom) + '. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
@@ -722,15 +742,15 @@
   }
   // The current player's hand. A green border means it can be afforded right now.
   function handHTML(ctx) {
-    var st = ctx.state, ui = ctx.ui, pl = st.players[st.cur];
-    if (!st.turn.started || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
-    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + esc(pl.name) + '’s hand</b> <span class="muted">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
-      '<button class="btn sm" data-act="startSwap"' + (pl.hand.filter(function (x) { return E.rawDef(st, x).type !== 'Foundation'; }).length >= 2 && !st.pending && !ui.swap ? '' : ' disabled') + '>Discard 2, draw 1…</button>' +
+    var st = ctx.state, ui = ctx.ui, pl = st.players[viewer(ctx)];
+    if ((!ctx.online && !st.turn.started) || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
+    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + (ctx.online ? 'Your hand' : esc(pl.name) + '’s hand') + '</b> <span class="muted">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
+      '<button class="btn sm" data-act="startSwap"' + (pl.hand.filter(function (x) { return E.rawDef(st, x).type !== 'Foundation'; }).length >= 2 && !st.pending && !ui.swap && myTurn(ctx) ? '' : ' disabled') + '>Discard 2, draw 1…</button>' +
       (st.turn.played === 0 && !st.turn.claimed ? '' : '') + '</div><div class="hand">';
     pl.hand.forEach(function (u) {
-      var d = E.rawDef(st, u), cls = 'hcard', blocked = E.playBlock(st, st.cur, u);
+      var d = E.rawDef(st, u), cls = 'hcard', blocked = E.playBlock(st, viewer(ctx), u);
       if (ui.hand === u) cls += ' sel'; if (blocked) cls += ' blocked'; if (ui.swap && ui.swap.indexOf(u) >= 0) cls += ' pick';
-      if (!blocked && !st.pending && !st.res && canAfford(st, u)) cls += ' afford';
+      if (!blocked && myTurn(ctx) && !st.pending && !st.res && canAfford(st, u)) cls += ' afford';
       var free = E.isFree(st, u); if (free) cls += ' free';
       h += '<div class="' + cls + '"' + (blocked ? ' title="' + esc(blocked) + '"' : '') + '>' + defFace(Object.assign({}, d, { art: artOf(d.id) }), free ? { mid: true, cost: 0 } : { mid: true }) + (free ? '<span class="freetag">Free this turn</span>' : '') + '<button class="cellbtn" data-hand="' + u + '" aria-label="' + esc(d.name) + '"></button></div>';
     });
@@ -745,13 +765,21 @@
   // and engine prompts that aren't answered by clicking the board.
   function modalHTML() {
     if (app.modal) return app.modal();
-    var ctx = cur(); if (!ctx || (app.page !== 'game' && app.page !== 'sandbox')) return '';
+    var ctx = cur(); if (!ctx || (app.page !== 'game' && app.page !== 'sandbox' && app.page !== 'online')) return '';
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
-    if (st.reveal) {
+    if (st.reveal && (!ctx.online || st.reveal.to === ctx.me)) {
       var rv = st.reveal;
       return modal(st.players[rv.of].name + '’s hand', '<p>Shown to ' + esc(st.players[rv.to].name) + ' only.</p><div class="hand">' + rv.cards.map(function (u) { return '<div class="hcard">' + defFace(E.rawDef(st, u), { mid: true }) + '</div>'; }).join('') + (rv.cards.length ? '' : '<span class="muted">Their hand is empty.</span>') + '</div>', '<button class="btn def" data-act="closeReveal">Close</button>');
     }
     if (ctx.kind !== 'game') { if (pd && pd.kind !== 'cell') return pendingModal(ctx); return ''; }
+    if (ctx.online) {
+      if (st.winner == null && myTurn(ctx) && !st.turn.started && ui.mode !== 'reclaim' && !st.players[ctx.me].out) {
+        var mine = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(ctx.me) >= 0; });
+        return modal('Your turn', '<p style="font-size:15px">It’s your turn, ' + esc(st.players[ctx.me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
+          '<button class="btn" data-act="reclaimMode"' + (mine ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start my turn</button>');
+      }
+      return pd && pd.kind !== 'cell' && st.winner == null ? pendingModal(ctx) : '';
+    }
     if (st.winner != null) return '';
     if (!st.turn.started && ui.mode !== 'reclaim') {
       var pl = st.players[st.cur];
@@ -765,14 +793,15 @@
   // Dialog for an engine prompt: choose cards, a suit, a player, yes/no, or resolve by hand. Asks to pass the device first if someone else must answer.
   function pendingModal(ctx) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending, who = st.players[pd.player];
-    if (pd.kind !== 'cell' && pd.player !== st.cur && ui.passFor !== pd.player + ':' + st.log.length)
+    if (ctx.online && pd.player !== ctx.me) return '';
+    if (!ctx.online && pd.kind !== 'cell' && pd.player !== st.cur && ui.passFor !== pd.player + ':' + st.log.length)
       return modal('Pass the device', '<p>Pass the device to <b>' + esc(who.name) + '</b> for a decision.</p>', '<button class="btn def" data-act="passOK" data-v="' + pd.player + ':' + st.log.length + '">I’m ' + esc(who.name) + '</button>');
     if (pd.kind === 'hand') {
       var hand = pd.options || who.hand, picked = ui.picked;
       return modal(who.name + ': choose cards', '<p>' + esc(pd.prompt) + ' (' + picked.length + ' of ' + pd.count + ' chosen)</p><div class="hand" style="flex-wrap:wrap">' + hand.map(function (u) {
         var weak = (E.archInfo(st)[who.arch] || {}).weakTo, isWeak = weak && E.rawDef(st, u).suit === weak;
         return '<div class="hcard' + (picked.indexOf(u) >= 0 ? ' pick' : '') + (isWeak ? ' weak' : '') + '"' + (isWeak ? ' title="Your weak suit: you can’t play this card"' : '') + '>' + defFace(E.rawDef(st, u), { mid: true }) + (isWeak ? '<span class="weaktag">Weak suit</span>' : '') + '<button class="cellbtn" data-pick="' + u + '" aria-label="' + esc(E.rawDef(st, u).name) + '"></button></div>';
-      }).join('') + '</div>', (st.res ? '<button class="btn" data-act="cancelEffect">Cancel effect</button>' : '') + '<button class="btn def" data-act="answerHand"' + (picked.length === pd.count ? '' : ' disabled') + '>Confirm</button>');
+      }).join('') + '</div>', (st.res && !ctx.online ? '<button class="btn" data-act="cancelEffect">Cancel effect</button>' : '') + '<button class="btn def" data-act="answerHand"' + (picked.length === pd.count ? '' : ' disabled') + '>Confirm</button>');
     }
     if (pd.kind === 'suit') return modal(who.name + ': choose a suit', '<p>' + esc(pd.prompt) + '</p><div class="row">' + pd.options.map(function (s) { return '<button class="btn" data-answer="' + s + '">' + icon(s) + ' ' + s + '</button>'; }).join('') + (pd.allowKeep ? '<button class="btn" data-answer="keep">Keep its suit</button>' : '') + '</div>', '');
     if (pd.kind === 'player') return modal(who.name + ': choose a player', '<p>' + esc(pd.prompt) + '</p><div class="row">' + pd.options.map(function (i) { return '<button class="btn" data-answer-p="' + i + '"><span class="swatch" style="background:' + st.players[i].color + '"></span> ' + esc(st.players[i].name) + ' (' + st.players[i].hand.length + ' cards)</button>'; }).join('') + (pd.allowNone ? '<button class="btn" data-act="answerNone">' + esc(pd.noneLabel || 'No one') + '</button>' : '') + (pd.options.length || pd.allowNone ? '' : '<span class="muted">No player can be chosen.</span>') + '</div>', pd.options.length || pd.allowNone ? '' : '<button class="btn def" data-act="answerNone">OK</button>');
@@ -825,7 +854,7 @@
     h += '<div class="raised row" style="padding:4px">Search <input type="text" data-focus-key="libq" data-lib="q" value="' + esc(L.q) + '" style="width:160px">' +
       'Suit <select data-lib="suit"><option value="">All</option>' + D.SUITS.map(function (s) { return '<option' + (L.suit === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
       'Type <select data-lib="type"><option value="">All</option>' + D.TYPES.map(function (s) { return '<option' + (L.type === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
-      '<span class="grow" style="flex:1"></span><button class="btn" data-act="newCard">New card</button><button class="btn" data-act="exportLib">Export…</button><button class="btn" data-act="importLib">Import…</button><button class="btn" data-act="restoreAsk">Restore starter cards…</button></div>';
+      '<span class="grow" style="flex:1"></span>' + (ONLINE ? '<span class="muted small">' + app.lib.length + ' cards</span>' : '<button class="btn" data-act="newCard">New card</button><button class="btn" data-act="exportLib">Export…</button><button class="btn" data-act="importLib">Import…</button><button class="btn" data-act="restoreAsk">Restore starter cards…</button>') + '</div>';
     h += '<div class="split"><div class="sunken scroll"><table class="list small"><thead><tr>' +
       [['name', 'Name'], ['suit', 'Suit'], ['type', 'Type'], ['cost', 'Cost'], ['', 'Value'], ['', 'Income'], ['', 'Copies'], ['', 'Automation']].map(function (c) { return '<th' + (c[0] ? ' data-sort="' + c[0] + '"' : '') + '>' + c[1] + (L.sort === c[0] ? ' ▾' : '') + '</th>'; }).join('') + '</tr></thead><tbody>';
     rows.forEach(function (c) {
@@ -833,7 +862,7 @@
     });
     h += '</tbody></table>' + (rows.length ? '' : '<p class="pane muted">No cards match. Clear the filters or add a new card.</p>') + '</div>';
     var sel = L.sel && libById(L.sel);
-    h += '<div class="raised pane">' + (sel ? '<div class="panelhead">Preview</div>' + defFace(sel, { big: true }) + '<div class="row" style="margin-top:6px"><button class="btn def" data-act="editCard" data-id="' + esc(sel.id) + '">Edit</button><button class="btn" data-act="dupCard" data-id="' + esc(sel.id) + '">Duplicate</button><button class="btn" data-act="delCard" data-id="' + esc(sel.id) + '">Delete…</button></div>' : '<p class="muted">Select a card to preview it.</p>') + '</div></div></div>';
+    h += '<div class="raised pane">' + (sel ? '<div class="panelhead">Preview</div>' + defFace(sel, { big: true }) + (ONLINE ? '' : '<div class="row" style="margin-top:6px"><button class="btn def" data-act="editCard" data-id="' + esc(sel.id) + '">Edit</button><button class="btn" data-act="dupCard" data-id="' + esc(sel.id) + '">Duplicate</button><button class="btn" data-act="delCard" data-id="' + esc(sel.id) + '">Delete…</button></div>') : '<p class="muted">Select a card to preview it.</p>') + '</div></div></div>';
     return h;
   }
   // Short tag for how much of a card the engine automates.
@@ -966,7 +995,7 @@
   /* ----- help ----- */
   // The Help page (static text).
   function helpPage() {
-    return '<div class="page scroll"><div class="pane help">' +
+    return helpEdition('<div class="page scroll"><div class="pane help">' +
       '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
       '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm.</p>' +
       '<p><b>Hover</b> over any card to see a magnified copy with its rules text. A card with a <b>bright green border</b> has a once-per-turn ability you can use right now (and afford); select it and use the button in the right panel. The <b>Overlay</b> menu shows either every card producing ● for the current player with its output, or the current player\u2019s cards with their own ◇ value in a white box and any tokens they hold or have banked as a gold <i>+n</i> chip. Card values change as the board changes; tokens never do. Log lines are color-coded: blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, gray card movement, italic gray referee edits.</p>' +
@@ -990,7 +1019,237 @@
       '<h2>When something isn’t automated</h2><p>Every card on the board has <b>Referee tools</b>: Ruin or flip back, change suit, move, remove, bury a card under it, adjust tokens, and claim for any player. <b>Undo</b> steps back one action at a time. An effect can be cancelled from the prompt bar.</p>' +
       '<h2>Card builder</h2><p>Pick how a card scores, what it sees (for highlighting), which sides may touch, its Overwhelm number, what happens when it is played (a list of presets, or JSON steps), and any ongoing ability or modifier. Saved cards go to the shared library when it is available, otherwise to this browser. Games in progress keep the card set they started with.</p>' +
       '<h2>Saving</h2><p><b>Copy debug report</b> (above the board) copies the log, a text map of the board, every card\u2019s state and the full saved state, so a bug can be pasted into a message and reproduced.</p><p>The current game and sandbox are kept in this browser and survive a reload. <b>Copy current game as text</b> on the New game page gives you a save you can paste back later, which is also the format a future online version would send between players.</p>' +
-      '</div></div>';
+      '</div></div>');
+  }
+  // The public site has no sandbox or card builder: swap the first paragraph and drop the builder section.
+  function helpEdition(h) {
+    if (!ONLINE) return h;
+    return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
+        'Pick an archetype in the table’s lobby (first come, first served); the host starts the game. Your <b>Profile</b> keeps your win/loss record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</p>' +
+        '<p>Online, you only ever see your own hand. If you lose your connection you have two minutes to come back before you forfeit; leaving a game in progress counts as a loss.</p>')
+      .replace(/<h2>Card builder<\/h2><p>.*?<\/p>/, '')
+      .replace(/<p>Every card on the board has <b>Referee tools<\/b>.*?<\/p>/, '<p>In a pass-and-play game, every card on the board has <b>Referee tools</b> (Ruin or flip back, change suit, move, remove, bury, tokens, claims) and <b>Undo</b> steps back one action. Online games have neither: the server enforces the rules.</p>');
+  }
+
+  /* ---------------- online play (public site only) ---------------- */
+  // Connection, account, server list and room. N.ctx is the running online game: a normal game context
+  // with ctx.online = true and ctx.me = your seat. Its state comes from the server, already redacted.
+  var N = app.net = { started: false, status: 'off', server: '', user: null, token: lsGet('ks.token'), lobbies: [], room: null, defs: null, ctx: null,
+    form: { name: '', pw: '', table: '', priv: false, max: '4', code: '', server: '' }, authErr: null, profile: null, profileFor: null, viewing: null, joinCode: null };
+
+  function netStart() {
+    if (N.started) return; N.started = true;
+    N.server = KNet.connect(onNet);
+    N.status = N.server ? 'connecting' : 'none';
+  }
+  // Every message from the server lands here.
+  function onNet(m) {
+    switch (m.t) {
+      case '_open': N.status = 'on'; KNet.send({ t: 'hello', token: N.token }); break;
+      case '_close': N.status = 'down'; break;
+      case 'welcome':
+        N.user = m.user; N.room = null;          // the server re-sends the room if we're still in one
+        if (!m.user && N.token) { N.token = null; lsDel('ks.token'); }
+        if (m.user && N.joinCode) { KNet.send({ t: 'join', code: N.joinCode }); N.joinCode = null; }
+        break;
+      case 'lobbies': N.lobbies = m.list; break;
+      case 'room': N.room = m.room; if (m.room.status === 'lobby') N.ctx = null; break;
+      case 'left': N.room = null; N.ctx = null; N.defs = null; break;
+      case 'defs': N.defs = m.defs; N.ctx = null; break;
+      case 'state': onlineState(m.state, m.seat); return;
+      case 'error': if (N.ctx && N.room && N.room.status !== 'lobby') { N.ctx.err = m.msg; break; } toast(m.msg); return;
+    }
+    render();
+  }
+  // A new game state from the server: animate the difference, like a local move.
+  function onlineState(st, seat) {
+    st.defs = N.defs || {};
+    var ctx = N.ctx, prev = ctx && ctx.state;
+    if (!ctx) { ctx = N.ctx = newCtx(st, 'game'); ctx.online = true; ctx.me = seat; }
+    else ctx.state = st;
+    if (prev && prev.cur !== st.cur) { ctx.ui.hand = null; ctx.ui.mode = null; ctx.ui.swap = null; }
+    var fx = prev ? FX.diff(ctx, prev, st, { t: 'remote' }) : [];
+    render(); if (app.page === 'online') FX.run(fx); maybeAutoEnd(ctx);
+  }
+  function isConnected(name) { var p = N.room && N.room.players.filter(function (q) { return q.name === name; })[0]; return !p || p.connected; }
+
+  function netAuth(kind) {
+    var f = N.form; N.authErr = null;
+    KNet.api('/api/' + kind, { name: f.name.trim(), password: f.pw }).then(function (r) {
+      if (r.error) { N.authErr = r.error; render(); return; }
+      N.token = r.token; lsSet('ks.token', r.token); f.pw = ''; N.profileFor = null;
+      KNet.send({ t: 'hello', token: r.token });
+    }).catch(function () { N.authErr = 'Can’t reach the game server.'; render(); });
+  }
+  // Host options in the lobby: read every option field and send them together.
+  function sendOpts() {
+    var o = {}, max = null;
+    document.querySelectorAll('[data-netopt]').forEach(function (el) { var k = el.getAttribute('data-netopt'); if (k === 'max') max = +el.value; else o[k] = el.type === 'checkbox' ? el.checked : el.value; });
+    KNet.send({ t: 'opts', opts: o, max: max });
+  }
+  function inviteLink() { return location.origin + location.pathname + location.search + '#join=' + (N.room && N.room.code); }
+  function netAct(a, t) {
+    var f = N.form;
+    switch (a) {
+      case 'netLogin': case 'netRegister': netAuth(a === 'netLogin' ? 'login' : 'register'); return;
+      case 'netLogout':
+        if (N.room) KNet.send({ t: 'leave' });
+        KNet.api('/api/logout', { token: N.token }).catch(function () { });
+        N.token = null; lsDel('ks.token'); N.user = null; N.room = null; N.ctx = null; N.viewing = null; N.profileFor = null;
+        KNet.send({ t: 'hello', token: null }); render(); return;
+      case 'netCreate': KNet.send({ t: 'create', name: f.table, private: !!f.priv, max: +f.max || 4 }); return;
+      case 'netJoin': KNet.send({ t: 'join', id: t.getAttribute('data-id') }); return;
+      case 'netJoinCode': if (f.code.trim()) KNet.send({ t: 'join', code: f.code.trim() }); return;
+      case 'netRefresh': KNet.send({ t: 'list' }); return;
+      case 'netPick': KNet.send({ t: 'pick', arch: t.getAttribute('data-arch') || null }); return;
+      case 'netStart': KNet.send({ t: 'start' }); return;
+      case 'netAgain': KNet.send({ t: 'again' }); return;
+      case 'netLeave':
+        if (N.room && N.room.status === 'playing' && N.ctx && !N.ctx.state.players[N.ctx.me].out) {
+          app.modal = function () { return modal('Leave the game?', '<p>Leaving now counts as a loss, and you can’t come back to this game.</p>', '<button class="btn" data-act="closeModal">Stay</button><button class="btn def" data-act="netLeaveYes">Leave</button>'); };
+          render(); return;
+        }
+        KNet.send({ t: 'leave' }); return;
+      case 'netLeaveYes': app.modal = null; KNet.send({ t: 'leave' }); render(); return;
+      case 'netServer': KNet.setServer((f.server || '').trim()); location.reload(); return;
+      case 'netServerReset': KNet.setServer(''); location.reload(); return;
+      case 'viewProfile': N.viewing = t.getAttribute('data-name'); N.profileFor = null; app.page = 'profile'; render(); return;
+      case 'myProfile': N.viewing = null; N.profileFor = null; render(); return;
+      case 'copyInvite': copyText(inviteLink(), function (ok) { toast(ok ? 'Invite link copied.' : 'Invite link: ' + inviteLink()); }); return;
+    }
+  }
+
+  /* ----- home ----- */
+  function homePage() {
+    var saved = !app.game && lsGet('ks.game'), resume = app.game ? '<button class="btn big" data-page="game">Back to your game</button>' : saved && saved.players && saved.winner == null ? '<button class="btn big" data-act="resume">Resume saved game</button>' : '';
+    return '<div class="page scroll"><div class="home"><h1>Kartenspiel</h1>' +
+      '<p>An asymmetric tableau-building card game for 2–5 players. Six archetypes share one board: build your Kingdom, claim cards with your meeples, and Overwhelm your rivals. First to the victory target wins.</p>' +
+      '<div class="choices"><div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-page="new">New game</button>' + resume + '</div></div>' +
+      '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
+      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>.</p></div></div>';
+  }
+
+  /* ----- online: sign in, server list, lobby, game ----- */
+  function onlinePage() {
+    netStart();
+    var h = '<div class="page scroll"><div class="pane online">', end = '</div></div>';
+    if (N.status === 'none') return h + '<h2>Online play</h2><p>This copy of the site isn’t connected to a game server yet.</p>' + serverForm(true) + end;
+    if (N.status !== 'on' && !N.room) return h + '<h2>Online play</h2><p>' + (N.status === 'down' ? 'Can’t reach the game server at <code>' + esc(N.server) + '</code>. Retrying…' : 'Connecting to the game server…') + '</p>' + serverForm(false) + end;
+    if (!N.user) return h + '<h2>Sign in to play online</h2><p class="muted">Your profile keeps your win/loss record, most played archetypes and cards, and recent games.</p>' + authForm() + end;
+    if (N.room && N.room.status !== 'lobby') return N.ctx ? gamePage(N.ctx) : h + '<p>Loading the game…</p>' + end;
+    if (N.room) return h + roomHTML() + end;
+    return h + serverListHTML() + end;
+  }
+  function serverForm(open) {
+    return '<details' + (open ? ' open' : '') + ' class="small" style="margin-top:8px"><summary>Game server</summary><div class="row" style="margin-top:4px"><input type="text" data-nf="server" data-focus-key="nf-server" placeholder="https://your-server.example.com" style="width:300px" value="' + esc(N.form.server || N.server) + '">' +
+      '<button class="btn" data-act="netServer">Use this server</button>' + (N.server ? '<button class="btn" data-act="netServerReset">Reset</button>' : '') + '</div></details>';
+  }
+  function authForm() {
+    var f = N.form;
+    return '<div class="form" style="max-width:420px"><label>Name</label><input type="text" data-nf="name" data-focus-key="nf-name" autocomplete="username" value="' + esc(f.name) + '">' +
+      '<label>Password</label><input type="password" data-nf="pw" data-focus-key="nf-pw" autocomplete="current-password" value="' + esc(f.pw) + '"></div>' +
+      (N.authErr ? '<p class="err">' + esc(N.authErr) + '</p>' : '') +
+      '<div class="row" style="margin-top:8px"><button class="btn def" data-act="netLogin">Sign in</button><button class="btn" data-act="netRegister">Create profile</button>' +
+      '<span class="small muted">Names: 3–16 letters, digits, _ or -. Passwords: 6 or more characters.</span></div>';
+  }
+  function serverListHTML() {
+    var f = N.form, h = '<div class="row spread"><h2>Server list</h2><span class="small">Signed in as <button class="linkbtn" data-act="viewProfile" data-name="' + esc(N.user) + '">' + esc(N.user) + '</button> · <button class="linkbtn" data-act="netLogout">Sign out</button></span></div>';
+    h += '<table class="list small"><thead><tr><th>Table</th><th>Host</th><th>Players</th><th>Status</th><th><button class="btn sm" data-act="netRefresh">Refresh</button></th></tr></thead><tbody>';
+    if (!N.lobbies.length) h += '<tr><td colspan="5" class="muted">No public tables right now. Start one below.</td></tr>';
+    N.lobbies.forEach(function (r) {
+      var open = r.status === 'lobby' && r.players < r.max;
+      h += '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.host) + '</td><td>' + r.players + '/' + r.max + '</td><td>' + (r.status === 'lobby' ? (open ? 'Waiting for players' : 'Full') : r.status === 'playing' ? 'Playing' : 'Finished') + '</td>' +
+        '<td><button class="btn sm' + (open ? ' def' : '') + '" data-act="netJoin" data-id="' + esc(r.id) + '"' + (open ? '' : ' disabled') + '>Join</button></td></tr>';
+    });
+    h += '</tbody></table><div class="split2"><fieldset><legend>Start a table</legend><div class="form">' +
+      '<label>Name</label><input type="text" data-nf="table" data-focus-key="nf-table" maxlength="40" placeholder="' + esc(N.user + '’s table') + '" value="' + esc(f.table) + '">' +
+      '<label>Seats</label><select data-nf="max">' + ['2', '3', '4', '5'].map(function (n) { return '<option' + (n === String(f.max) ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select>' +
+      '<label>Visibility</label><span class="col" style="gap:2px"><label><input type="radio" name="vis" data-nf="priv" value="0"' + (f.priv ? '' : ' checked') + '> Public: shown in the server list</label>' +
+      '<label><input type="radio" name="vis" data-nf="priv" value="1"' + (f.priv ? ' checked' : '') + '> Private: join with a code</label></span></div>' +
+      '<div class="row" style="margin-top:6px"><button class="btn def" data-act="netCreate">Create table</button></div></fieldset>' +
+      '<fieldset><legend>Join a private table</legend><div class="row"><input type="text" data-nf="code" data-focus-key="nf-code" maxlength="6" placeholder="CODE" class="codein" value="' + esc(f.code) + '"><button class="btn def" data-act="netJoinCode">Join</button></div>' +
+      '<p class="small muted">Ask the host for the 6-character code, or open their invite link.</p></fieldset></div>';
+    return h;
+  }
+  function roomHTML() {
+    var r = N.room, me = N.user, host = r.host === me, h = '', o = r.opts, dis = host ? '' : ' disabled';
+    h += '<div class="row spread"><h2>' + esc(r.name) + '</h2><button class="btn" data-act="netLeave">Leave table</button></div>';
+    h += '<p class="small">' + (r.private ? 'Private table. Share the code <b class="code">' + esc(r.code) + '</b> or <button class="linkbtn" data-act="copyInvite">copy an invite link</button>.' : 'Public table: anyone can join from the server list.') + '</p>';
+    h += '<fieldset><legend>Players ' + r.players.length + '/' + r.max + ' (turn order, top to bottom)</legend>' + r.players.map(function (p, i) {
+      return '<div class="row" style="margin:2px 0"><span class="swatch" style="background:' + COLORS[i] + '"></span><button class="linkbtn" data-act="viewProfile" data-name="' + esc(p.name) + '">' + esc(p.name) + '</button>' +
+        (p.name === r.host ? '<span class="tag">host</span>' : '') + (p.connected ? '' : '<span class="tag off">offline</span>') + '<span class="muted">' + (p.arch ? esc(p.arch) : 'choosing…') + '</span></div>';
+    }).join('') + '</fieldset>';
+    h += '<fieldset><legend>Choose your archetype: first come, first served</legend><div class="archpick">' + archetypes().map(function (c) {
+      var by = r.players.filter(function (p) { return p.arch === c.archetype; })[0], mine = by && by.name === me, taken = by && !mine;
+      return '<div class="hcard' + (mine ? ' pick' : '') + (taken ? ' blocked' : '') + '" data-row="' + esc(c.id) + '">' + defFace(c, { mid: true }) +
+        '<span class="archtag">' + esc(c.archetype) + (taken ? ': ' + esc(by.name) : mine ? ' (you)' : '') + '</span>' +
+        (taken ? '' : '<button class="cellbtn" data-act="netPick" data-arch="' + esc(mine ? '' : c.archetype) + '" aria-label="' + esc(c.archetype) + '"></button>') + '</div>';
+    }).join('') + '</div><p class="small muted">Click your archetype again to give it back. Each archetype is weak to one suit and can’t play it.</p></fieldset>';
+    function num(k, label, lo, hi) { return '<label>' + label + '</label><input type="number" min="' + lo + '" max="' + hi + '" data-netopt="' + k + '" value="' + esc(o[k]) + '"' + dis + '>'; }
+    function box(k, label, text) { return '<label>' + label + '</label><label><input type="checkbox" data-netopt="' + k + '"' + (o[k] ? ' checked' : '') + dis + '> ' + text + '</label>'; }
+    h += '<fieldset><legend>Options' + (host ? '' : ' (the host sets these)') + '</legend><div class="form">' +
+      '<label>Seats</label><select data-netopt="max"' + dis + '>' + [2, 3, 4, 5].map(function (n) { return '<option' + (n === r.max ? ' selected' : '') + (n < r.players.length ? ' disabled' : '') + '>' + n + '</option>'; }).join('') + '</select>' +
+      num('target', 'Victory target ◇', 1, 999) + num('handSize', 'Hand size', 1, 10) + num('drawPerTurn', 'Cards drawn per turn', 0, 5) + num('meeples', 'Meeples each', 1, 30) + num('foundationBy', 'Foundation deadline', 0, 10) +
+      box('enforceWeak', 'Weak-to rule', 'Players can’t play their weak suit') + box('autoEnd', 'Auto end turn', 'End the turn when a player is out of ● with nothing free to do') +
+      box('seatStart', 'Seat start', 'Later seats get more ● on their first turn') + box('burySuitOW', 'Deep foundations', 'Same-suit burials raise a card’s Overwhelm number') +
+      box('defense', 'Defense tokens', 'Every 2 same-suit burials give a Defense token') + box('adjDiscount', 'Building discount', 'Placing next to your own card costs 3● less') +
+      box('noWander', 'No wandering', 'Cards can’t move away from every other card') + box('ascension', 'Ascension', 'Five suits in one stack Ascends') + '</div></fieldset>';
+    var ready = r.players.length >= 2 && r.players.every(function (p) { return p.arch; });
+    h += '<div class="row">' + (host ? '<button class="btn def big" data-act="netStart"' + (ready ? '' : ' disabled') + '>Start game</button>' : '') + '<span class="muted">' +
+      (r.players.length < 2 ? 'Waiting for at least one more player…' : !ready ? 'Waiting for everyone to choose an archetype…' : host ? 'Everyone is ready.' : 'Waiting for ' + esc(r.host) + ' to start the game.') + '</span></div>';
+    return h;
+  }
+  // Bits of the game page that only exist online.
+  function onlineBar(ctx) {
+    var r = N.room || {}, out = ctx.state.players[ctx.me].out;
+    return '<div class="raised row small" style="padding:2px 6px"><b>' + esc(r.name || 'Online game') + '</b>' + (r.private ? '<span class="muted">code ' + esc(r.code) + '</span>' : '') +
+      (N.status === 'on' ? '' : '<span class="err">Reconnecting…</span>') + '<span class="grow" style="flex:1"></span>' +
+      '<button class="btn sm" data-act="netLeave">' + (r.status === 'playing' && !out ? 'Leave game (forfeit)' : 'Leave table') + '</button></div>';
+  }
+  function onlineAfterGame() {
+    return N.room && N.room.host === N.user ? '<button class="btn sm def" data-act="netAgain">Back to the lobby</button> <button class="btn sm" data-act="netLeave">Leave table</button>'
+      : '<span class="muted">The host can reopen the table for another game.</span> <button class="btn sm" data-act="netLeave">Leave table</button>';
+  }
+  // Prompt bar text while someone else is acting, or '' when it's up to you.
+  function onlineWaiting(ctx) {
+    var st = ctx.state, pd = st.pending, nm = function (i) { return '<b>' + esc(st.players[i].name) + '</b>'; };
+    if (pd && pd.player !== ctx.me) return '<div class="prompt">Waiting for ' + nm(pd.player) + ' to decide…</div>';
+    if (st.reveal && st.reveal.to !== ctx.me) return '<div class="prompt">' + nm(st.reveal.to) + ' is looking at ' + nm(st.reveal.of) + '’s hand…</div>';
+    if (!myTurn(ctx)) return '<div class="prompt">' + (st.players[ctx.me].out ? 'You’re out of this game. ' : '') + nm(st.cur) + '’s turn' + (st.turn.started ? '.' : ': starting…') + '</div>';
+    return '';
+  }
+
+  /* ----- profiles ----- */
+  function profilePage() {
+    netStart();
+    var who = N.viewing || N.user, h = '<div class="page scroll"><div class="pane online">', end = '</div></div>';
+    if (N.status === 'none') return h + '<h2>Profile</h2><p>Profiles live on the game server, and this copy of the site isn’t connected to one.</p>' + end;
+    if (!who) return h + '<h2>Your profile</h2>' + (N.status === 'on' ? '<p class="muted">Sign in or create a profile to play online and track your games.</p>' + authForm() : '<p>Connecting to the game server…</p>') + end;
+    if (N.profileFor !== who) {
+      N.profileFor = who; N.profile = null;
+      KNet.api('/api/profile/' + encodeURIComponent(who)).then(function (p) { if (N.profileFor === who) { N.profile = p; render(); } })
+        .catch(function () { if (N.profileFor === who) { N.profile = { error: 'Can’t reach the game server.' }; render(); } });
+    }
+    var p = N.profile;
+    if (!p) return h + '<p>Loading ' + esc(who) + '’s profile…</p>' + end;
+    if (p.error) return h + '<p class="err">' + esc(p.error) + '</p>' + end;
+    var pct = function (w, n) { return n ? Math.round(100 * w / n) + '%' : '—'; }, same = function (a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); };
+    h += '<div class="row spread"><h2>' + esc(p.name) + '</h2>' + (N.user && same(p.name, N.user) ? '<button class="btn" data-act="netLogout">Sign out</button>' : N.user ? '<button class="btn" data-act="myProfile">My profile</button>' : '') + '</div>';
+    h += '<p class="small muted">Playing since ' + esc(new Date(p.created).toLocaleDateString()) + '</p>';
+    h += '<div class="stats"><div class="stat raised"><div class="bignum">' + p.wins + '–' + p.losses + '</div><div class="small">Wins – losses</div></div>' +
+      '<div class="stat raised"><div class="bignum">' + pct(p.wins, p.games) + '</div><div class="small">Win rate</div></div>' +
+      '<div class="stat raised"><div class="bignum">' + p.games + '</div><div class="small">Games played</div></div></div>';
+    h += '<div class="split2"><fieldset><legend>Most played archetypes</legend>' + (p.archetypes.length ? '<table class="list small"><thead><tr><th>Archetype</th><th>Played</th><th>Won</th><th>Win rate</th></tr></thead><tbody>' +
+      p.archetypes.map(function (a) { return '<tr><td>' + esc(a.name) + '</td><td>' + a.played + '</td><td>' + a.won + '</td><td>' + pct(a.won, a.played) + '</td></tr>'; }).join('') + '</tbody></table>' : '<p class="muted small">No games yet.</p>') + '</fieldset>' +
+      '<fieldset><legend>Most played cards</legend>' + (p.cards.length ? '<table class="list small"><thead><tr><th>Card</th><th>Times played</th></tr></thead><tbody>' +
+      p.cards.map(function (c) { var d = libById(c.id); return '<tr data-row="' + esc(c.id) + '"><td>' + (d ? icon(d.suit) + ' ' : '') + esc(c.name) + '</td><td>' + c.count + '</td></tr>'; }).join('') + '</tbody></table>' : '<p class="muted small">No cards played yet.</p>') + '</fieldset></div>';
+    h += '<fieldset><legend>Recent games</legend>' + (p.history.length ? '<table class="list small"><thead><tr><th>Date</th><th>Table</th><th>Players</th><th>Rounds</th><th>Result</th></tr></thead><tbody>' +
+      p.history.map(function (g) {
+        var mine = g.players.filter(function (q) { return same(q.name, p.name); })[0];
+        return '<tr><td>' + esc(new Date(g.date).toLocaleDateString()) + '</td><td>' + esc(g.room) + '</td><td class="wrap">' + g.players.map(function (q) { return (q.won ? '<b>' : '') + esc(q.name) + ' (' + esc(q.arch) + ', ' + q.score + '◇)' + (q.won ? '</b>' : ''); }).join(', ') + '</td>' +
+          '<td>' + g.rounds + '</td><td>' + (mine && mine.won ? '<b class="won">Won</b>' : 'Lost') + '</td></tr>';
+      }).join('') + '</tbody></table>' : '<p class="muted small">No games yet.</p>') + '</fieldset>';
+    return h + end;
   }
 
   /* ---------------- events ---------------- */
@@ -998,7 +1257,7 @@
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-page],[data-act],[data-cell],[data-hand],[data-pick],[data-answer],[data-answer-p],[data-row],[data-sort]');
     if (!t) return;
-    if (t.hasAttribute('data-page')) { if (t.disabled) return; app.page = t.getAttribute('data-page'); app.modal = null; render(); return; }
+    if (t.hasAttribute('data-page')) { if (t.disabled) return; app.page = t.getAttribute('data-page'); app.modal = null; if (app.page === 'profile') { N.viewing = null; N.profileFor = null; } render(); return; }
     if (t.hasAttribute('data-row')) { app.libUI.sel = t.getAttribute('data-row'); render(); return; }
     if (t.hasAttribute('data-sort')) { app.libUI.sort = t.getAttribute('data-sort'); render(); return; }
     var ctx = cur();
@@ -1013,12 +1272,12 @@
   // or just select it. In the sandbox it places or buries the chosen card.
   function cellClick(ctx, k) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
-    if (pd && pd.kind === 'cell' && pd.options.indexOf(k) >= 0) { dispatch(ctx, { t: 'answer', v: k }); return; }
+    if (pd && pd.kind === 'cell' && pd.options.indexOf(k) >= 0 && (!ctx.online || pd.player === ctx.me)) { dispatch(ctx, { t: 'answer', v: k }); return; }
     if (ui.mode === 'move') { if (!E.top(st, k)) { ui.mode = null; dispatch(ctx, { t: 'sbMove', from: ui.moveFrom, to: k }); ui.sel = k; } else { ui.sel = k; render(); } return; }
     if (ctx.kind === 'game') {
       if (ui.mode === 'reclaim') { ui.mode = null; if (!dispatch(ctx, { t: 'reclaim', k: k })) ui.mode = 'reclaim'; return; }
-      if (!ui.hand && !pd && !st.res && !ui.swap && st.turn && st.turn.started && E.claimOptions(st, st.cur).indexOf(k) >= 0) { ui.sel = k; dispatch(ctx, { t: 'claim', k: k }); return; }
-      if (ui.hand && !pd) { var L = E.legalCells(st, ui.hand); if (k in L) { var h = ui.hand; ui.sel = k; dispatch(ctx, { t: 'play', uid: h, k: k }); return; } }
+      if (myTurn(ctx) && !ui.hand && !pd && !st.res && !ui.swap && st.turn && st.turn.started && E.claimOptions(st, st.cur).indexOf(k) >= 0) { ui.sel = k; dispatch(ctx, { t: 'claim', k: k }); return; }
+      if (ui.hand && !pd && myTurn(ctx)) { var L = E.legalCells(st, ui.hand); if (k in L) { var h = ui.hand; ui.sel = k; dispatch(ctx, { t: 'play', uid: h, k: k }); return; } }
       ui.sel = E.top(st, k) ? k : null; ui.hand = null; render(); return;
     }
     // sandbox
@@ -1033,6 +1292,8 @@
   }
   // What each data-act button does.
   function act(a, t, ctx) {
+    if (/^net|^(viewProfile|myProfile|copyInvite)$/.test(a)) return netAct(a, t);
+    if (ONLINE && /^(newCard|editCard|dupCard|delCard|delYes|saveCard|saveCopy|restoreAsk|restore|importLib)$/.test(a)) return;   // no library editing on the public site
     var k = t.getAttribute('data-k');
     switch (a) {
       case 'zoomin': ctx.ui.fit = false; ctx.ui.zoom = Math.min(2.5, ctx.ui.zoom * 1.25); applyZoom(ctx); render(); return;
@@ -1154,7 +1415,7 @@
         L.push(k + '  ' + bits.join(' | '));
       });
     }
-    if (st.res || st.pending) { L.push(''); L.push('IN PROGRESS'); if (st.res) L.push('effect: ' + JSON.stringify({ card: E.rawDef(st, st.res.src).name, at: st.res.srcKey, step: st.res.i, steps: st.res.steps, phase: st.res.phase })); if (st.pending) L.push('waiting for: ' + JSON.stringify(st.pending)); }
+    if (st.res || st.pending) { L.push(''); L.push('IN PROGRESS'); if (st.res) L.push('effect: ' + JSON.stringify({ card: st.res.src ? E.rawDef(st, st.res.src).name : 'hidden', at: st.res.srcKey, step: st.res.i, steps: st.res.steps, phase: st.res.phase })); if (st.pending) L.push('waiting for: ' + JSON.stringify(st.pending)); }
     if (ctx.err) L.push('Last error: ' + ctx.err);
     L.push(''); L.push('LOG'); st.log.forEach(function (l) { L.push(l); });
     L.push(''); L.push('STATE JSON (paste into New game > Load a game from text to reproduce)'); L.push(JSON.stringify(st));
@@ -1191,6 +1452,8 @@
       else if (w === 'sbCard') { ctx.ui.sbCard = t.value; render(); }
       return;
     }
+    if (t.hasAttribute('data-nf')) { N.form[t.getAttribute('data-nf')] = t.type === 'radio' ? t.value === '1' : t.value; return; }
+    if (t.hasAttribute('data-netopt')) { sendOpts(); return; }
     if (t.hasAttribute('data-sbmode')) { ctx.ui.sbMode = t.getAttribute('data-sbmode'); render(); return; }
     if (t.hasAttribute('data-sbn')) { sbSetup.n = +t.value; render(); return; }
     if (t.hasAttribute('data-sbarch')) { sbSetup.arch[+t.getAttribute('data-sbarch')] = t.value; return; }
@@ -1217,12 +1480,15 @@
   // Live typing: player names, library search, and builder text (which only refreshes the preview, so the cursor isn't lost).
   document.addEventListener('input', function (e) {
     var t = e.target;
+    if (t.hasAttribute('data-nf') && t.type !== 'radio') { N.form[t.getAttribute('data-nf')] = t.value; return; }
     if (t.hasAttribute('data-pname')) { setup.players[+t.getAttribute('data-pname')].name = t.value; return; }
     if (t.hasAttribute('data-lib') && t.tagName === 'INPUT') { app.libUI.q = t.value; render(); return; }
     if (t.hasAttribute('data-b') && (t.tagName === 'TEXTAREA' || t.type === 'text')) { builderChange(t.getAttribute('data-b'), t.value); var pv = document.querySelector('.split > .raised.pane:last-child'); if (pv) pv.innerHTML = '<div class="panelhead">Preview</div>' + defFace(app.builder.card, { big: true }); }
   });
   // Esc cancels the current selection or dialog; Ctrl/Cmd+Z undoes.
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-nf') === 'pw') { netAuth('login'); return; }
+    if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('data-nf') === 'code') { netAct('netJoinCode'); return; }
     if (e.key === 'Escape') { var ctx = cur(); if (app.modal) { app.modal = null; render(); return; } if (ctx) { ctx.ui.hand = null; ctx.ui.mode = null; ctx.ui.swap = null; render(); } }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && (app.page === 'game' || app.page === 'sandbox') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); undo(cur()); }
   });
@@ -1271,6 +1537,10 @@
 
   /* ---------------- boot ---------------- */
   initLibrary();
+  if (ONLINE) {   // an invite link (#join=CODE) opens the Online page and joins once signed in
+    var jm = /#join=([A-Za-z0-9]+)/.exec(location.hash);
+    if (jm) { N.joinCode = jm[1].toUpperCase(); app.page = 'online'; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
+  }
   var sv = lsGet('ks.game'); if (sv && sv.players && sv.winner == null) { /* offered on New game page */ }
   render();
 })();

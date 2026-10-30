@@ -324,9 +324,9 @@ var KEngine = (function () {
     if (wasFoundation && how === 'overwhelm' && owner != null && !st.opts.sandbox) eliminate(st, owner);
   }
   // A player whose Foundation is Overwhelmed is out: their cards are Ruined. Last one standing wins.
-  function eliminate(st, p) {
+  function eliminate(st, p, why) {
     var pl = st.players[p]; if (pl.out) return; pl.out = true;
-    log(st, pl.name + '’s Foundation was Overwhelmed. ' + pl.name + ' is out of the game.');
+    log(st, why || pl.name + '’s Foundation was Overwhelmed. ' + pl.name + ' is out of the game.');
     keys(st).forEach(function (k) { var u = top(st, k); var c = st.cards[u]; if (c.claimants.indexOf(p) >= 0) { c.ruined = true; c.fixed = false; returnMeeples(st, u); } });
     pl.hand.forEach(function (u) { st.discard.push(u); }); pl.hand = [];
     var alive = st.players.map(function (q, i) { return q.out ? -1 : i; }).filter(function (i) { return i >= 0; });
@@ -1094,6 +1094,13 @@ var KEngine = (function () {
   }
 
   // Rule violations come back as st.error on the returned state; nothing is thrown.
+  // Abandon the resolving effect. A played Action, Blessing or Curse goes to the discard pile.
+  function cancelRes(st) {
+    var rs = st.res; st.res = null; st.pending = null; var d3 = rawDef(st, rs.src);
+    if (rs.kind === 'play' && (d3.type === 'Action' || d3.type === 'Blessing' || d3.type === 'Curse') && rs.srcKey && top(st, rs.srcKey) === rs.src) { st.board[rs.srcKey].shift(); if (!st.board[rs.srcKey].length) delete st.board[rs.srcKey]; toDiscard(st, rs.src); }
+    else if (rs.kind === 'play' && !rs.srcKey) toDiscard(st, rs.src);
+  }
+
   function err(st, m) { st.error = m; return st; }
 
   // The one entry point: apply(state, action) returns a new state. Actions look like { t: "play", uid, k }.
@@ -1252,6 +1259,22 @@ var KEngine = (function () {
 
       case 'closeReveal': st.reveal = null; return st;
 
+      // Player a.p leaves (online: quits or stays disconnected). They are out, exactly as if Overwhelmed.
+      // Anything waiting on them is dropped so the game can carry on.
+      case 'resign': {
+        var rp = a.p, rpl = st.players[rp];
+        if (!rpl || rpl.out) return err(st, 'That player is not in the game.');
+        st.reactions = (st.reactions || []).filter(function (r) { return r.p !== rp; });
+        if (st.res && (st.res.player === rp || (st.pending && st.pending.player === rp))) cancelRes(st);
+        st.reveal = st.reveal && (st.reveal.to === rp || st.reveal.of === rp) ? null : st.reveal;
+        eliminate(st, rp, rpl.name + ' leaves the game.');
+        if (st.winner != null) return st;
+        if (st.cur === rp) { st.res = null; st.pending = null; st.endAfter = false; nextPlayer(st); return st; }
+        if (!st.res) runReactions(st);
+        if (!st.res && st.endAfter) { st.endAfter = false; var rs = scores(st)[st.cur]; if (rs.total >= st.opts.target) { st.winner = st.cur; log(st, st.players[st.cur].name + ' ends their turn with ' + rs.total + '◇ and wins!'); } else nextPlayer(st); }
+        return st;
+      }
+
       /* ----- referee / sandbox tools: free edits ----- */
       // These bypass the normal rules. Used by the sandbox, the referee tools and the tests.
       case 'sbPlace': { var nu = mkCard(st, a.id); if (top(st, a.k)) st.board[a.k].unshift(nu); else st.board[a.k] = [nu]; var dd = rawDef(st, nu); if (dd.type === 'Foundation' && a.owner != null) { st.cards[nu].claimants = [a.owner]; st.cards[nu].fixed = true; st.players[a.owner].foundationPlaced = true; st.players[a.owner].foundationUid = nu; } log(st, 'Placed ' + dd.name + ' at ' + a.k + '.'); if (a.check) afterBoardChange(st, null); return st; }
@@ -1267,7 +1290,7 @@ var KEngine = (function () {
       case 'sbDraw': draw(st, a.i, 1); return st;
       case 'sbGive': { var gu = mkCard(st, a.id); st.players[a.i].hand.push(gu); log(st, 'Referee gives ' + rawDef(st, gu).name + ' to ' + st.players[a.i].name + '.'); return st; }
       case 'sbCheck': afterBoardChange(st, a.credit != null ? a.credit : null); if (!a.quiet) log(st, 'Checked for Overwhelm.'); return st;
-      case 'sbCancelEffect': if (st.res) { log(st, 'Effect cancelled by the referee.'); var rs = st.res; st.res = null; st.pending = null; var d3 = rawDef(st, rs.src); if (rs.kind === 'play' && (d3.type === 'Action' || d3.type === 'Blessing' || d3.type === 'Curse') && rs.srcKey && top(st, rs.srcKey) === rs.src) { st.board[rs.srcKey].shift(); if (!st.board[rs.srcKey].length) delete st.board[rs.srcKey]; toDiscard(st, rs.src); } else if (rs.kind === 'play' && !rs.srcKey) toDiscard(st, rs.src); } return st;
+      case 'sbCancelEffect': if (st.res) { log(st, 'Effect cancelled by the referee.'); cancelRes(st); } return st;
     }
     return err(st, 'Unknown action.');
   }
@@ -1314,6 +1337,30 @@ var KEngine = (function () {
     return true;
   }
   // Cells player p could claim right now.
+  /* ---------- hidden information (online play) ---------- */
+  // Stand-in definition for cards a player isn't allowed to see.
+  var HIDDEN = { id: '__hidden', name: 'Hidden card', suit: '', type: 'Hidden', cost: 0, copies: 0, income: 0, text: '', place: ['N', 'E', 'S', 'W'], overwhelm: null,
+    score: { kind: 'none' }, sees: { area: 'none' }, onPlay: [], curse: null, ability: null, perTurn: null, incomePerToken: 0, mods: {}, archetype: '', weakTo: '', art: '', note: '' };
+  // The copy of the state that player `seat` may see: other players' hands and set-aside cards become
+  // placeholder cards (so counts still show), the deck order and shuffle seed are hidden, and so is a
+  // reaction card another player is still deciding whether to use. Foundations are public.
+  function redact(st0, seat) {
+    var st = clone(st0), inHand = {}, n = 0;
+    st.players.forEach(function (pl, i) { if (i !== seat) pl.hand.concat(pl.aside || []).forEach(function (u) { if (u !== pl.foundationUid) inHand[u] = 1; }); });
+    function hide(list) { return list.map(function (u) { if (!inHand[u]) return u; var h = 'h' + (n++); st.cards[h] = { uid: h, def: HIDDEN.id, suit: null, ruined: false, overwhelmed: false, claimants: [], tokens: 0, copyOf: null, prevClaimants: null, fixed: false }; return h; }); }
+    st.players.forEach(function (pl, i) { if (i !== seat) { pl.hand = hide(pl.hand); if (pl.aside) pl.aside = hide(pl.aside); } });
+    st.deck.forEach(function (u) { inHand[u] = 1; });
+    st.deck = st.deck.map(function () { return null; });
+    if (st.reveal && st.reveal.to === seat) st.reveal.cards.forEach(function (u) { delete inHand[u]; });
+    else if (st.reveal) st.reveal.cards = [];
+    if (st.res && inHand[st.res.src]) { st.res.src = null; st.res.steps = []; if (st.pending) st.pending.prompt = ''; }
+    if (st.pending && st.pending.player !== seat && st.pending.kind === 'hand') st.pending.options = [];
+    st.reactions = (st.reactions || []).map(function (r) { return r.p === seat ? r : { p: r.p, kind: r.kind }; });
+    Object.keys(inHand).forEach(function (u) { delete st.cards[u]; });
+    st.defs[HIDDEN.id] = clone(HIDDEN); st.seed = 0;
+    return st;
+  }
+
   function claimOptions(st, p) {
     if (!st.turn || !st.turn.lastKey || st.turn.claimed) return [];
     return [st.turn.lastKey].concat(n4(st.turn.lastKey)).filter(function (k) {
@@ -1330,7 +1377,7 @@ var KEngine = (function () {
     newGame: newGame, apply: apply, scores: scores, income: income, cardValue: cardValue, volcanicBonus: volcanicBonus,
     legalCells: legalCells, needsPlacement: needsPlacement, protectedStack: protectedStack, funds: funds, curseFx: curseFx, hasSuit: hasSuit, onSuitBuried: onSuitBuried, valueParts: valueParts, bankedBreakdown: bankedBreakdown, abilityReady: abilityReady, isFree: isFree, untargetable: untargetable, playBlock: playBlock, sight: sight, bounds: bounds, top: top, keys: keys, def: def, rawDef: rawDef,
     suitOf: suitOf, isCursed: isCursed, isCovered: isCovered, noIncome: noIncome, overwhelmCount: overwhelmCount, enemies: enemies,
-    archInfo: archInfo, kingdom: kingdom, claimOptions: claimOptions, cardIncome: cardIncome, n4: n4, K: K, XY: XY, SUITS: SUITS
+    archInfo: archInfo, kingdom: kingdom, claimOptions: claimOptions, redact: redact, cardIncome: cardIncome, n4: n4, K: K, XY: XY, SUITS: SUITS
   };
 })();
 if (typeof module !== 'undefined') module.exports = KEngine;

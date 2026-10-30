@@ -1,22 +1,30 @@
 # Kartenspiel — playtest table
 
-An asymmetric tableau-building card game for 2–5 players, with six archetypes (Archbishop, Hedonist, Warmonger, Cryptkeeper, Gardener, Philosopher), and this browser app to playtest it.
+An asymmetric tableau-building card game for 2–5 players, with six archetypes (Archbishop, Hedonist, Warmonger, Cryptkeeper, Gardener, Philosopher).
 
-## Play
+This repo builds two apps from the same source:
 
-Open `index.html` in any modern browser. It is one self-contained file, so there's nothing to install and no server to run. Games save in the browser automatically.
+- **The playtest table** (`index.html`): for designing the game. It has the card builder, sandbox and referee tools. Open it in any browser; nothing to install.
+- **The public site** (`site/index.html`, published to GitHub Pages): for playing. It has **Pass-and-Play** on one device and **Online Multiplayer** with a server list, public and private tables, first-come-first-served archetypes, and player profiles (win/loss record, most played archetypes and cards, recent games). The card library is fixed: there's no card builder or sandbox.
+
+Online play needs the game server in `server/`, which you host yourself (see [Deploying](#deploying)).
 
 ## Layout
 
 | Path | What it is |
 | --- | --- |
-| `index.html` | The built app. `build.sh` generates it, so don't edit it by hand |
+| `index.html` | The built playtest table. `build.sh` generates it, so don't edit it by hand |
+| `site/index.html` | The built public site (not committed; `build.sh` makes it) |
 | `src/data.js` | The card library: all 87 starter cards |
-| `src/engine.js` | The rules engine: a pure `apply(state, action) → state`, no DOM |
-| `src/ui.js` | The interface: game, sandbox, library, card builder, help |
+| `src/engine.js` | The rules engine: a pure `apply(state, action) → state`, no DOM. Also `redact()`, which hides other players' cards for online play |
+| `src/ui.js` | The interface for both apps. `KConfig.edition === 'online'` switches on the public site's pages |
+| `src/net.js` | Public site only: the connection to the game server |
+| `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
+| `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `e2e/online.js` two browsers playing online |
+| `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis (greedy, tactician and raider bots) |
 | `tools/analyze2.js` | Summarizes simulation output |
 
@@ -28,13 +36,22 @@ You need Node.js for everything except playing.
 ./build.sh
 ```
 
-This joins `src/` into `index.html`. **Run it after every change to `src/`.** Then reload the page.
+This joins `src/` into `index.html` and `site/index.html`. **Run it after every change to `src/`.** Then reload the page.
+
+To run the online version on your own computer:
+
+```
+npm install
+npm start
+```
+
+Then open http://localhost:8080. The server hosts the site itself, so this is the complete game; open a second browser window (or a private window) to play against yourself.
 
 ```
 for t in tests/*.js; do node "$t"; done
 ```
 
-Every line should read PASS (`qc3.js` prints only its failures, then a pass count). One check currently fails: `qc5.js`, "You’ll Regret That | Trebuchet cursed".
+Every line should read PASS (`qc3.js` prints only its failures, then a pass count). One check currently fails: `qc5.js`, "You’ll Regret That | Trebuchet cursed". `qc9-server.js` needs `npm install` first. The browser test needs Playwright: `node tests/e2e/online.js`.
 
 ```
 mkdir -p tools/simout
@@ -93,7 +110,35 @@ The game page and the sandbox are each a *context*: `{ state, hist (undo history
 
 The file runs top to bottom like this: helpers and icons → app state and library loading → dispatch and undo → animations (`FX`) → card faces → board → inspector panel → players and log → one function per page → event handlers → hover magnifier.
 
-Saved in the browser's localStorage: `ks.lib` (the card library), `ks.game` and `ks.sandbox`.
+Saved in the browser's localStorage: `ks.lib` (the card library), `ks.game` and `ks.sandbox`; on the public site also `ks.token` (your sign-in) and `ks.server` (a server address you chose).
+
+### Online play
+
+The server owns every online game. Browsers never run game rules for an online game; they send actions, and the server does three things with each one:
+
+1. **Checks it's that player's move.** Only the current player may act, except to answer a question the game asked them. Referee and sandbox actions are refused.
+2. **Runs `KEngine.apply`.** This is the same engine as everywhere else.
+3. **Sends each player their own view of the new state.** `KEngine.redact(state, seat)` replaces other players' hands with "Hidden card" placeholders and hides the deck order and the shuffle seed.
+
+The server is `server/server.js`, built on Node's `http` module plus the `ws` package. Messages are small JSON objects: `hello` signs a connection in with a session token, then `create`, `join`, `pick` (archetype), `opts`, `start`, `act` (a game action) and `leave`. The server replies with `room`, `defs` (the card definitions, sent once per game), `state`, `lobbies` and `error`. Accounts and profiles go over plain HTTP: `POST /api/register`, `POST /api/login`, `GET /api/profile/NAME`.
+
+- **Disconnects.** A player who disconnects keeps their seat for 2 minutes (20 seconds in a lobby). After that they resign: the engine's `resign` action puts them out, as if their Foundation had been Overwhelmed. Leaving a game in progress counts as a loss.
+- **Stats.** These are recorded when a game ends, for everyone who played: wins and losses, games per archetype, how many times each card was played, and the last 30 games. Passwords are stored as salted scrypt hashes.
+
+## Deploying
+
+The site and the server deploy separately: GitHub Pages can only host static files, so the server needs a host that runs Node.
+
+**The site (GitHub Pages).** `.github/workflows/pages.yml` builds and publishes it on every push to `main`. It's served at https://bradfordbhill.github.io/kartenspiel/. Pass-and-Play works there with no server.
+
+**The server.** Pick any one of these:
+- **Render:** New → Blueprint → choose this repo. It reads `render.yaml`.
+- **Docker:** `docker build -t kartenspiel . && docker run -p 8080:8080 -v kartenspiel-data:/data kartenspiel`
+- **Any Node host:** `npm ci && npm start`. Settings: `PORT` (default 8080) and `DATA_DIR` (default `server/data`).
+
+Accounts and stats live in `DATA_DIR/db.json`. That folder must be on a disk that survives restarts; Render's free plan wipes its disk, so stats reset there. The server's own address also serves the full site.
+
+**Connecting them.** Add a repository variable `KARTENSPIEL_SERVER` set to the server's address (GitHub → Settings → Secrets and variables → Actions → Variables), then re-run the Pages workflow. Until then, a player can paste a server address on the site's Online page, or add `?server=https://...` to the URL.
 
 ## Glossary
 
@@ -120,7 +165,9 @@ Saved in the browser's localStorage: `ks.lib` (the card library), `ks.game` and 
 
 **Add a new way to score.** Add a `case` to `cardValue0` in `engine.js`, a label in `SCORE_KINDS`, and a line in `scoreText` (both in `ui.js`).
 
-**Add a rule option.** Read it into `opts` in `newGame` (`engine.js`) and use it via `st.opts`. In `ui.js`, add a default to `setup`, a checkbox in `newGamePage`, and pass the option through in the `'start'` case of `act()`.
+**Add a rule option.** Read it into `opts` in `newGame` (`engine.js`) and use it via `st.opts`. In `ui.js`, add a default to `setup`, a checkbox in `newGamePage`, and pass the option through in the `'start'` case of `act()`. For online games, also add it to `DEFAULT_OPTS` and `cleanOpts` in `server/server.js` and to the options in `roomHTML` (`ui.js`).
+
+**Change the cards on the public site.** The site and the server both use the built-in cards in `src/data.js`; edit them there and redeploy both. Cards made in the playtest table's card builder don't reach the site until you copy them into `data.js` (Library → Export… gives you the JSON).
 
 **Write a test.** Copy the pattern in `tests/qc7.js`: start a `game()`, set up the board with `sbPlace`/`sbClaim`/`give`, play the card with `A({ t: 'play' ... })` or `A({ t: 'cast' ... })`, answer prompts with `ans(...)`, then `chk(name, condition, message)`.
 

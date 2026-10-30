@@ -1,0 +1,12 @@
+{
+  "name": "kartenspiel",
+  "private": true,
+  "description": "Kartenspiel: playtest table, pass-and-play and online multiplayer",
+  "scripts": {
+    "build": "./build.sh",
+    "start": "./build.sh && node server/server.js",
+    "test": "for t in tests/*.js; do node \"$t\"; done"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}

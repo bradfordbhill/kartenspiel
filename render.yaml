@@ -1,0 +1,19 @@
+# One-click deploy of the game server on Render (render.com → New → Blueprint → pick this repo).
+# The server also hosts the site itself, so its own address works as a complete game.
+# Note: on the free plan the disk is wiped whenever the server restarts or redeploys, which resets
+# accounts and stats. To keep them, use a paid instance and uncomment the disk below.
+services:
+  - type: web
+    name: kartenspiel
+    runtime: node
+    plan: free
+    buildCommand: npm ci && ./build.sh
+    startCommand: node server/server.js
+    healthCheckPath: /api/health
+    # envVars:
+    #   - key: DATA_DIR
+    #     value: /var/data
+    # disk:
+    #   name: kartenspiel-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
