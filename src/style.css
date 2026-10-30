@@ -443,25 +443,25 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }
 
 /* ---------- placement chevrons: green = this card would pressure that one, red = that one would pressure this card ---------- */
-.chev { position: absolute; width: 12px; height: 12px; z-index: 3; pointer-events: none; opacity: .8; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 45% 0, 100% 50%, 45% 100%, 0 100%, 55% 50%); }
+.chev { position: absolute; width: 6px; height: 20px; z-index: 3; pointer-events: none; opacity: .8; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 50% 0, 100% 50%, 50% 100%, 0 100%, 50% 50%); }
 .chev.g { background: #16b416; } .chev.r { background: #e01010; }
-.cell.legal:hover .chev, .cell.drophover .chev { opacity: 1; width: 15px; height: 15px; }
-.chev.d-E { right:3px;top:50%;margin-top:-6px; } .chev.g.d-E { transform: rotate(0deg); } .chev.r.d-E { transform: rotate(180deg); }
-.chev.g.both.d-E { margin-top:-15px; } .chev.r.both.d-E { margin-top:3px; }
-.chev.d-SE { bottom:3px;right:3px; } .chev.g.d-SE { transform: rotate(45deg); } .chev.r.d-SE { transform: rotate(225deg); }
-.chev.g.both.d-SE { right:14px; } .chev.r.both.d-SE { bottom:14px; }
-.chev.d-S { bottom:3px;left:50%;margin-left:-6px; } .chev.g.d-S { transform: rotate(90deg); } .chev.r.d-S { transform: rotate(270deg); }
-.chev.g.both.d-S { margin-left:-15px; } .chev.r.both.d-S { margin-left:3px; }
-.chev.d-SW { bottom:3px;left:3px; } .chev.g.d-SW { transform: rotate(135deg); } .chev.r.d-SW { transform: rotate(315deg); }
-.chev.g.both.d-SW { left:14px; } .chev.r.both.d-SW { bottom:14px; }
-.chev.d-W { left:3px;top:50%;margin-top:-6px; } .chev.g.d-W { transform: rotate(180deg); } .chev.r.d-W { transform: rotate(360deg); }
-.chev.g.both.d-W { margin-top:-15px; } .chev.r.both.d-W { margin-top:3px; }
-.chev.d-NW { top:3px;left:3px; } .chev.g.d-NW { transform: rotate(-135deg); } .chev.r.d-NW { transform: rotate(45deg); }
-.chev.g.both.d-NW { left:14px; } .chev.r.both.d-NW { top:14px; }
-.chev.d-N { top:3px;left:50%;margin-left:-6px; } .chev.g.d-N { transform: rotate(-90deg); } .chev.r.d-N { transform: rotate(90deg); }
-.chev.g.both.d-N { margin-left:-15px; } .chev.r.both.d-N { margin-left:3px; }
-.chev.d-NE { top:3px;right:3px; } .chev.g.d-NE { transform: rotate(-45deg); } .chev.r.d-NE { transform: rotate(135deg); }
-.chev.g.both.d-NE { right:14px; } .chev.r.both.d-NE { top:14px; }
+.cell.legal:hover .chev, .cell.drophover .chev { opacity: 1; }
+.chev.d-E { right:3px;top:50%;margin-top:-10px; } .chev.g.d-E { transform: rotate(0deg); } .chev.r.d-E { transform: rotate(180deg); }
+.chev.g.both.d-E { margin-top:-22px; } .chev.r.both.d-E { margin-top:2px; }
+.chev.d-SE { bottom:1px;right:8px; } .chev.g.d-SE { transform: rotate(45deg); } .chev.r.d-SE { transform: rotate(225deg); }
+.chev.g.both.d-SE { right:2px;bottom:6px; } .chev.r.both.d-SE { right:14px;bottom:-4px; }
+.chev.d-S { bottom:-4px;left:50%;margin-left:-3px; } .chev.g.d-S { transform: rotate(90deg); } .chev.r.d-S { transform: rotate(270deg); }
+.chev.g.both.d-S { margin-left:-15px; } .chev.r.both.d-S { margin-left:9px; }
+.chev.d-SW { bottom:1px;left:8px; } .chev.g.d-SW { transform: rotate(135deg); } .chev.r.d-SW { transform: rotate(315deg); }
+.chev.g.both.d-SW { left:2px;bottom:6px; } .chev.r.both.d-SW { left:14px;bottom:-4px; }
+.chev.d-W { left:3px;top:50%;margin-top:-10px; } .chev.g.d-W { transform: rotate(180deg); } .chev.r.d-W { transform: rotate(360deg); }
+.chev.g.both.d-W { margin-top:-22px; } .chev.r.both.d-W { margin-top:2px; }
+.chev.d-NW { top:1px;left:8px; } .chev.g.d-NW { transform: rotate(-135deg); } .chev.r.d-NW { transform: rotate(45deg); }
+.chev.g.both.d-NW { left:14px;top:-4px; } .chev.r.both.d-NW { left:2px;top:6px; }
+.chev.d-N { top:-4px;left:50%;margin-left:-3px; } .chev.g.d-N { transform: rotate(-90deg); } .chev.r.d-N { transform: rotate(90deg); }
+.chev.g.both.d-N { margin-left:-15px; } .chev.r.both.d-N { margin-left:9px; }
+.chev.d-NE { top:1px;right:8px; } .chev.g.d-NE { transform: rotate(-45deg); } .chev.r.d-NE { transform: rotate(135deg); }
+.chev.g.both.d-NE { right:14px;top:-4px; } .chev.r.both.d-NE { right:2px;top:6px; }
 /* the suit wheel */
 .wheelbox { max-width: 460px; }
 .suitwheel { width: 100%; max-width: 420px; display: block; margin: 4px auto; color: var(--text); }
