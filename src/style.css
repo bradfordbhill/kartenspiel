@@ -26,9 +26,11 @@
 }
 *, *::before, *::after { box-sizing: border-box; }
 html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+/* Text is DotGothic16, whose digits are easy to tell apart. Its ● is an oversized full-width glyph, so build.sh
+   loads Tiny5 with just that one character (text=●), listed first so only ● comes from it. */
 body {
   height: 100%; margin: 0; background: var(--desk); color: var(--text);
-  font-family: "Pixelify Sans", Tahoma, "MS Sans Serif", Geneva, sans-serif; font-size: 13px; line-height: 1.3;
+  font-family: "Tiny5", "DotGothic16", Tahoma, "MS Sans Serif", Geneva, sans-serif; font-size: 13px; line-height: 1.3;
 }
 button, input, select, textarea { font: inherit; color: var(--text); }
 
