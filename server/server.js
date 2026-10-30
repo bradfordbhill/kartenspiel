@@ -47,11 +47,21 @@ function createServer(opts) {
       history: s.history
     };
   }
+  // Sign-up and sign-in attempts per address: at most AUTH_LIMIT a minute (slows password guessing and account spam).
+  const AUTH_LIMIT = opts.authLimit || 10, attempts = new Map();
+  function clientIp(req) { return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?'; }
+  function limited(ip) {
+    const now = Date.now(), a = (attempts.get(ip) || []).filter(t => now - t < 60000);
+    a.push(now); attempts.set(ip, a);
+    if (attempts.size > 5000) attempts.clear();   // never let the table grow without bound
+    return a.length > AUTH_LIMIT;
+  }
   async function api(req, res, url) {
     if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain');
     try {
       if (url.pathname === '/api/health') return send(res, 200, { ok: true, rooms: rooms.size, online: clients.size });
       if (req.method === 'POST' && (url.pathname === '/api/register' || url.pathname === '/api/login')) {
+        if (limited(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' });
         const b = await readJSON(req), name = String(b.name || '').trim(), pw = String(b.password || '');
         if (url.pathname === '/api/register') {
           if (!NAME_RE.test(name)) return send(res, 400, { error: 'Names are 3–16 letters, digits, _ or -.' });
@@ -245,10 +255,15 @@ function createServer(opts) {
     }
   }
 
+  // Per-socket message budget: MSG_RATE a second on average, bursts up to MSG_BURST; over that, messages are dropped.
+  const MSG_RATE = 20, MSG_BURST = 60;
   wss.on('connection', ws => {
-    ws.user = null; ws.alive = true; clients.add(ws);
+    ws.user = null; ws.alive = true; clients.add(ws); ws.budget = MSG_BURST; ws.budgetAt = Date.now();
     ws.on('pong', () => { ws.alive = true; });
-    ws.on('message', data => { let m; try { m = JSON.parse(data); } catch (e) { return; } if (m && typeof m.t === 'string') { try { handle(ws, m); } catch (e) { console.error(e); tell(ws, { t: 'error', msg: 'Server error.' }); } } });
+    ws.on('message', data => {
+      const now = Date.now(); ws.budget = Math.min(MSG_BURST, ws.budget + (now - ws.budgetAt) / 1000 * MSG_RATE); ws.budgetAt = now;
+      if (ws.budget < 1) return; ws.budget--;
+      let m; try { m = JSON.parse(data); } catch (e) { return; } if (m && typeof m.t === 'string') { try { handle(ws, m); } catch (e) { console.error(e); tell(ws, { t: 'error', msg: 'Server error.' }); } } });
     ws.on('close', () => { clients.delete(ws); if (ws.user && !online(ws.user)) dropped(ws.user); });
   });
   // Drop sockets that stop answering pings (closed laptops, lost Wi-Fi).

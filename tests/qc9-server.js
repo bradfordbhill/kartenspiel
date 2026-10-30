@@ -18,7 +18,7 @@ function client(token) {
 }
 
 (async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')), app = createServer({ dataDir: dir, gameGrace: 300, lobbyGrace: 300 });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')), app = createServer({ dataDir: dir, gameGrace: 1500, lobbyGrace: 300 });
   base = 'http://localhost:' + await app.listen(0);
   try {
     // accounts
@@ -74,7 +74,14 @@ function client(token) {
     a.send({ t: 'act', a: { t: 'endTurn' } }); await b.until(() => b.last.state.cur === 1);
 
     // Bob closes his tab mid-game and doesn't come back: he resigns, Ann wins, stats are saved
-    b.ws.close(); await a.until(() => a.last.room.status === 'over', 3000);
+    // Bob reloads the page mid-game: within the grace period he's back in his seat with his own hand
+    b.ws.close(); await new Promise(r => setTimeout(r, 100));
+    const b2 = client(bob.token); await b2.ready; await b2.until(() => b2.last.state && b2.last.defs && b2.last.room);
+    chk('Reconnect', b2.last.room.status === 'playing' && b2.last.state.players[1].hand.every(u => b2.last.state.cards[u].def !== '__hidden'), 'a player who reloads mid-game gets their seat and hand back');
+    chk('Reconnect', await a.until(() => a.last.room.players[1].connected, 2000).then(() => true, () => false), 'others see them back online');
+
+    // Bob closes his tab mid-game and doesn't come back: he resigns, Ann wins, stats are saved
+    b2.ws.close(); await a.until(() => a.last.room.status === 'over', 5000);
     chk('Resign', a.last.state.winner === 0 && a.last.state.log.some(l => /Bob leaves the game/.test(l)), 'a player gone too long resigns');
     const pa = await (await fetch(base + '/api/profile/ann')).json(), pb = await (await fetch(base + '/api/profile/Bob')).json();
     chk('Stats', pa.wins === 1 && pa.losses === 0 && pb.losses === 1 && pb.games === 1, 'win/loss records');
@@ -86,6 +93,22 @@ function client(token) {
     a.ws.close(); cc.ws.close();
   } catch (e) { R.push(['Server', 'FAIL', 'threw ' + e.message + ' ' + (e.stack.split('\n')[1] || '')]); }
   await app.close();
+
+  // abuse limits: sign-in attempts per address, sessions per account, messages per second
+  const app2 = createServer({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')), authLimit: 3 });
+  base = 'http://localhost:' + await app2.listen(0);
+  const tries = []; for (let i = 0; i < 5; i++) tries.push(await post('/api/login', { name: 'Nobody', password: 'wrongpass' }));
+  chk('Limits', tries.slice(0, 3).every(r => /Wrong/.test(r.error)) && tries.slice(3).every(r => /Too many/.test(r.error)), 'more than the limit of sign-ins a minute is refused');
+  const fl = client(null); await fl.ready; let got = 0; fl.ws.on('message', d => { if (JSON.parse(d).t === 'lobbies') got++; });
+  for (let i = 0; i < 200; i++) fl.send({ t: 'list' });
+  await new Promise(r => setTimeout(r, 400));
+  chk('Limits', got > 30 && got < 120, 'a flood of messages is cut off (' + got + ' of 200 answered)');
+  fl.ws.close(); await app2.close();
+  const st2 = require('../server/store.js').open(fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')));
+  await st2.register('Tok', 'secret12'); const firstTok = (await st2.login('Tok', 'secret12')).token; let lastTok;
+  for (let i = 0; i < 24; i++) lastTok = (await st2.login('Tok', 'secret12')).token;
+  chk('Limits', st2.who(firstTok) === null && st2.who(lastTok) === 'Tok', 'an account keeps its 20 newest sessions; older ones end');
+
   const saved = JSON.parse(fs.readFileSync(path.join(dir, 'db.json'), 'utf8'));
   chk('Storage', saved.users.ann.stats.games === 1 && !JSON.stringify(saved).includes('secret1'), 'stats saved to disk; no plain-text passwords');
   R.forEach(r => console.log(r[1], '|', r[0], '|', r[2]));

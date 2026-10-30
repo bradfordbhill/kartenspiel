@@ -24,9 +24,12 @@ function open(dir) {
   function hash(password, salt) {
     return new Promise((res, rej) => crypto.scrypt(password, salt, 32, (e, k) => e ? rej(e) : res(k.toString('hex'))));
   }
+  const TOKENS_KEEP = 20;   // sessions per account; signing in again past this ends the oldest
   function newToken(name) {
     const t = crypto.randomBytes(24).toString('hex');
     db.tokens[t] = { name, at: Date.now() };
+    const mine = Object.keys(db.tokens).filter(k => db.tokens[k].name === name).sort((a, b) => db.tokens[a].at - db.tokens[b].at);
+    mine.slice(0, Math.max(0, mine.length - TOKENS_KEEP)).forEach(k => { delete db.tokens[k]; });
     save(); return t;
   }
   function blankStats() { return { games: 0, wins: 0, losses: 0, arch: {}, cards: {}, history: [] }; }
