@@ -438,7 +438,7 @@
   // What the board bar shows while an overlay is on: each player's ● per turn and ◇, or the War key.
   function overlayTotal(ctx) {
     var st = ctx.state, mode = ctx.ui.overlay;
-    if (mode === 'quick') { var sc = E.scores(st); return st.players.map(function (pl, i) { return pl.out ? '' : '<b style="color:' + pl.color + '">' + esc(pl.name) + ' +' + E.income(st, i) + '● · ' + sc[i].total + '◇</b>'; }).join(' ') + ' <span class="muted">(◇ totals include banked tokens; unclaimed cards in grey)</span>'; }
+    if (mode === 'quick') { var sc = E.scores(st); return st.players.map(function (pl, i) { return pl.out ? '' : '<b class="qtot" style="color:' + pl.color + '">' + esc(pl.name) + ' +' + E.income(st, i) + '● · ' + sc[i].total + '◇</b>'; }).join(' ') + ' <span class="muted">(◇ totals include banked tokens; unclaimed cards in grey)</span>'; }
     if (mode === 'war') return '<span class="muted">Each strip is one enemy-suit neighbour needed to Overwhelm the card, filled in its owner’s colour (grey = unclaimed). Red outline: one away.</span>';
     return '';
   }
@@ -465,7 +465,7 @@
       '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
       '<label>Overlay <select data-sel="overlay">' + [['none', 'None'], ['quick', 'Quickview (● and ◇)'], ['war', 'War (Overwhelm)']].map(function (o) { return '<option value="' + o[0] + '"' + ((u.overlay || 'none') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       overlayTotal(ctx) +
-      '<span class="muted">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
+      '<span class="muted legend">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
   }
 
   /* ---------------- inspector ---------------- */

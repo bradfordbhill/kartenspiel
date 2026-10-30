@@ -426,6 +426,20 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .mhand .hcard { width: 78px; height: 106px; }
   .mhand .card .txt.mid, .mhand .row.small { display: none; }
 }
+
+/* ---------- QC fixes ---------- */
+/* short desktop windows: the left column scrolls instead of spilling past the window */
+.gamegrid > .left { overflow: auto; }
+.gamegrid > .left .log { min-height: 120px; }
+/* Quickview totals: a light chip so each player's colour reads in dark mode too */
+.qtot { background: #fff; border: 1px solid #000; padding: 0 5px; }
+/* short desktop screens: give the board the room (the highlight legend is on the Help page) */
+@media (min-width: 901px) and (max-height: 800px) {
+  .boardbar .legend { display: none; }
+  .bottom .hand { min-height: 0; }
+  .bottom .hcard { width: 128px; height: 176px; }
+  .bottom .card .txt.mid { font-size: 10.5px; }
+}
 </style></head><body><div id="app"></div><script>
 /* Kartenspiel — starter data. Card definitions are plain JSON so they can live in a db later. */
 var KData = (function () {
@@ -4221,7 +4235,7 @@ var KEngine = (function () {
     if (r.kind === 'replay') { var rd = def(st, r.uid); if (!top(st, r.key) || top(st, r.key) !== r.uid) return runReactions(st); log(st, rd.name + '’s placement effect triggers again.');
       st.res = { kind: 'reaction', src: r.uid, srcKey: r.key, player: r.p, steps: JSON.parse(JSON.stringify(rd.onPlay || [])), i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     if (r.kind === 'repent') { ctx0.ownerIs = r.target;
-      st.res = { kind: 'reaction', src: r.uid, srcKey: null, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Repent to Ruin a card of ' + st.players[r.target].name + '’s next to one of yours? Your next turn starts with 3● less.' }, { do: 'payDebt', n: 3, discard: true }, { do: 'ruin', area: 'adjacentToOwn', ownerIs: 'ctx' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
+      st.res = { kind: 'reaction', src: r.uid, srcKey: null, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Repent to Ruin a card of ' + st.players[r.target].name + '’s next to one of yours? Your next turn starts with 3● less.' }, { do: 'ruin', area: 'adjacentToOwn', ownerIs: 'ctx' }, { do: 'payDebt', n: 3, discard: true, requires: 'ruined' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     if (r.kind === 'brambles') { var bu = top(st, r.key); if (!bu || st.players[r.p].hand.indexOf(r.uid) < 0) return runReactions(st);
       st.res = { kind: 'reaction', src: r.uid, srcKey: r.key, player: r.p, steps: [{ do: 'confirm', prompt: st.players[r.p].name + ': play Brambles on top of ' + rawDef(st, bu).name + ' (one away from being Overwhelmed)? It and everything under it get buried. Your next turn starts with 3● less.' }, { do: 'brambles' }], i: 0, sub: null, ctx: ctx0, phase: null }; runRes(st); return; }
     var steps = r.kind === 'regret'
@@ -4344,10 +4358,10 @@ var KEngine = (function () {
         if (s.ownAdjacentAtLeast) { var own = n4(res.srcKey).filter(function (k) { return ownedBy(st, k, res.player); }).length; if (own < s.ownAdjacentAtLeast) { log(st, 'Condition not met: own ' + s.ownAdjacentAtLeast + ' adjacent cards.'); return 'done'; } }
         var t = targets(st, res, s, 'ruin');
         if (!t.length) { log(st, 'No card to Ruin.'); return 'done'; }
-        if (s.auto && t.length === 1) { ruinAt(st, t[0], res.player, 'ruin'); affect(res, t[0]); return 'done'; }
+        if (s.auto && t.length === 1) { ruinAt(st, t[0], res.player, 'ruin'); affect(res, t[0]); res.ctx.ruined = true; return 'done'; }
         return pend(res, { kind: 'cell', options: t, prompt: 'Choose a card to Ruin.', verb: 'ruin', optional: !!s.optional });
       }
-      if (ans) { ruinAt(st, ans, res.player, 'ruin'); affect(res, ans); if (s.asCurse) res.ctx.curseTarget = ans; }
+      if (ans) { ruinAt(st, ans, res.player, 'ruin'); affect(res, ans); res.ctx.ruined = true; if (s.asCurse) res.ctx.curseTarget = ans; }
       return 'done';
     },
     setSuit: function (st, res, s, ans) {
@@ -5693,7 +5707,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
   // What the board bar shows while an overlay is on: each player's ● per turn and ◇, or the War key.
   function overlayTotal(ctx) {
     var st = ctx.state, mode = ctx.ui.overlay;
-    if (mode === 'quick') { var sc = E.scores(st); return st.players.map(function (pl, i) { return pl.out ? '' : '<b style="color:' + pl.color + '">' + esc(pl.name) + ' +' + E.income(st, i) + '● · ' + sc[i].total + '◇</b>'; }).join(' ') + ' <span class="muted">(◇ totals include banked tokens; unclaimed cards in grey)</span>'; }
+    if (mode === 'quick') { var sc = E.scores(st); return st.players.map(function (pl, i) { return pl.out ? '' : '<b class="qtot" style="color:' + pl.color + '">' + esc(pl.name) + ' +' + E.income(st, i) + '● · ' + sc[i].total + '◇</b>'; }).join(' ') + ' <span class="muted">(◇ totals include banked tokens; unclaimed cards in grey)</span>'; }
     if (mode === 'war') return '<span class="muted">Each strip is one enemy-suit neighbour needed to Overwhelm the card, filled in its owner’s colour (grey = unclaimed). Red outline: one away.</span>';
     return '';
   }
@@ -5720,7 +5734,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
       '<label>Overlay <select data-sel="overlay">' + [['none', 'None'], ['quick', 'Quickview (● and ◇)'], ['war', 'War (Overwhelm)']].map(function (o) { return '<option value="' + o[0] + '"' + ((u.overlay || 'none') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       overlayTotal(ctx) +
-      '<span class="muted">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
+      '<span class="muted legend">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
   }
 
   /* ---------------- inspector ---------------- */

@@ -52,7 +52,7 @@ Then open http://localhost:8080. The server hosts the site itself, so this is th
 for t in tests/*.js; do node "$t"; done
 ```
 
-Every line should read PASS (`qc3.js` prints only its failures, then a pass count). One check currently fails: `qc5.js`, "You’ll Regret That | Trebuchet cursed". `qc9-server.js` needs `npm install` first. The browser test needs Playwright: `node tests/e2e/online.js`.
+Every line should read PASS (`qc3.js` prints only its failures, then a pass count). `qc9-server.js` needs `npm install` first. The browser test needs Playwright: `node tests/e2e/online.js`.
 
 ```
 mkdir -p tools/simout
@@ -139,6 +139,7 @@ The server is `server/server.js`, built on Node's `http` module plus the `ws` pa
 
 - **Disconnects.** A player who disconnects keeps their seat for 2 minutes (20 seconds in a lobby). After that they resign: the engine's `resign` action puts them out, as if their Foundation had been Overwhelmed. Leaving a game in progress counts as a loss.
 - **Stats.** These are recorded when a game ends, for everyone who played: wins and losses, games per archetype, how many times each card was played, and the last 30 games. Passwords are stored as salted scrypt hashes.
+- **Limits.** Sign-up and sign-in allow 10 attempts a minute per address; an account keeps its 20 newest sessions; each connection may send about 20 messages a second. Games live in the server's memory, so restarting the server ends any games in progress (accounts and stats are on disk).
 
 ## Deploying
 
