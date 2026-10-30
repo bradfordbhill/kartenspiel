@@ -1,0 +1,4 @@
+node_modules/
+tools/simout/
+tools/analysis2.json
+.DS_Store
