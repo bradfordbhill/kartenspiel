@@ -28,10 +28,10 @@ H
   echo '</script></body></html>'
 }
 
-page 'Kartenspiel — playtest table' src/data.js src/engine.js src/ui.js > index.html
+page 'Kartenspiel — playtest table' src/data.js src/engine.js src/bots.js src/ui.js > index.html
 
 mkdir -p site
 server=$(node -e 'process.stdout.write(JSON.stringify(process.env.KARTENSPIEL_SERVER || ""))')
 echo "var KConfig = { edition: 'online', server: $server };" > site/config.js.tmp
-page 'Kartenspiel' site/config.js.tmp src/data.js src/engine.js src/net.js src/ui.js > site/index.html
+page 'Kartenspiel' site/config.js.tmp src/data.js src/engine.js src/bots.js src/net.js src/ui.js > site/index.html
 rm site/config.js.tmp

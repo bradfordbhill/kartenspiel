@@ -5094,6 +5094,104 @@ var KEngine = (function () {
   };
 })();
 if (typeof module !== 'undefined') module.exports = KEngine;
+/* Kartenspiel bots, shared by the single-player game (ui.js) and the balance simulator (tools/sim2.js).
+   Bot styles:
+     greedy    – best short-term gain for itself
+     tactician – greedy, plus uses every ready ability every turn (Tithing Hall, Funeral Pyre, Confessional, University, ...)
+     raider    – values damage to opponents highly; aims Ruins and Curses at opponents' biggest ● and ◇ producers; also uses abilities
+     warlord   – plays for War and Conquest: values every Ruin and Overwhelm it causes, Reserves, and pressure on rival cards
+                 (enemy-suit neighbours piling up toward their Overwhelm number); uses every ability, aims like a raider
+   Every bot move is tried on a copy of the state with KEngine.apply and scored with evalState; the best one is kept.
+   The bots see the whole state, including other players' hands, though they only look at their own. */
+var KBots = (function () {
+  const E = typeof KEngine !== 'undefined' ? KEngine : require('./engine.js');
+  const MAIN = { Archbishop: 'Sceptre', Hedonist: 'Goblet', Warmonger: 'Sword', Cryptkeeper: 'Bone', Gardener: 'Leaf', Philosopher: 'Tome' };
+
+  // Apply an action, or null if it's illegal. While planning (st._botLog exists), each state remembers the actions that led to it.
+  function ap(st,a){const r=E.apply(st,a); if(r.error) return null; if(st._botLog) r._botLog=st._botLog.concat([a]); return r;}
+  function tot(st,p){return E.scores(st)[p].total;}
+  function oppSum(st,p,f){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m+=f(st,i)});return m;}
+  function oppBest(st,p){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m=Math.max(m,tot(st,i))});return m;}
+  // Ruins and Overwhelms credited to player p so far (from the log).
+  function ruinsBy(st,p){ const me=' by '+st.players[p].name+'.'; return st.log.filter(l=>(/ is (Ruined|Overwhelmed) by /.test(l))&&l.endsWith(me)).length; }
+  // How close rival cards are to being Overwhelmed: each enemy-suit neighbour counts, one away from the number counts triple.
+  function pressure(st,p){ let s=0; E.keys(st).forEach(k=>{ const u=E.top(st,k), c=st.cards[u]; if(c.ruined||!c.claimants.length||c.claimants.includes(p)||E.untargetable(st,u)) return;
+    const oc=E.overwhelmCount(st,k); if(!oc||!oc.n) return; s+= oc.n>=oc.th-1 ? 3 : oc.n/oc.th; }); return s; }
+  function cardWorth(st,k){ const u=E.top(st,k), c=st.cards[u]; if(!c.claimants.length) return 0; return E.cardValue(st,k,c.claimants[0])+2*E.cardIncome(st,k); }
+
+  // The answer this bot (player `me`, style `strat`) gives to the pending prompt, whoever it is addressed to.
+  function choose(st,me,strat){ const pd=st.pending, p=pd.player; let v;
+    if(pd.kind==='cell'){ const opts=pd.options;
+      if(strat==='warlord'&&p===me&&pd.verb!=='bury'&&opts.length<=12){ v=trial(st,me,strat,opts.concat(pd.optional?[null]:[])); }
+      else if(pd.verb==='ruin'||pd.verb==='curse'||(pd.verb==='target'&&p===me)){
+        let best=null,bv=-1e9; opts.forEach(k=>{const u=E.top(st,k); if(!u){ if(bv<-1e8){bv=-1e8;best=k;} return;} const c=st.cards[u]; const own=c.claimants.includes(p); const s=own?-100:(strat==='raider'||strat==='warlord'?cardWorth(st,k):(c.claimants.length?E.cardValue(st,k,c.claimants[0])+E.cardIncome(st,k):0)); if(s>bv){bv=s;best=k}});
+        v=(pd.optional&&bv<=0&&pd.verb!=='target')?null:best; }
+      else if(pd.verb==='suit'){ let best=opts[0]; for(const k of opts){ if(st.cards[E.top(st,k)].claimants.includes(p)){best=k;break;} } v=best; }
+      else if(pd.verb==='bury'){ let best=opts[0]; for(const k of opts){ if(E.kingdom(st,p).includes(k)){best=k;break;} } v=best; }
+      else v=opts[0]; }
+    else if(pd.kind==='hand'){ const pool=(pd.options||st.players[p].hand).slice().sort((a,b)=>(+st.defs[st.cards[a].def].cost)-(+st.defs[st.cards[b].def].cost)); v=pool.slice(0,pd.count); }
+    else if(pd.kind==='suit'&&strat==='warlord'&&p===me){ v=trial(st,me,strat,pd.options); }
+    else if(pd.kind==='suit'){ v=MAIN[st.players[p].arch]; if(!pd.options.includes(v)) v=pd.options[0];
+      // when recolouring an opponent's card, a raider picks a suit that is an enemy of its neighbours' owners
+      if(strat==='raider'&&st.res&&st.res.sub&&st.res.sub.picked&&st.res.sub.picked.length){ const t=E.top(st,st.res.sub.picked[0]); if(t&&!st.cards[t].claimants.includes(p)) v=pd.options.includes('Sword')?'Sword':pd.options[0]; } }
+    else if(pd.kind==='player'){ v=pd.options.length?pd.options[0]:null; }
+    else if(pd.kind==='confirm'){ v = (st.res&&st.res.kind==='reaction') ? true : (p===me); }
+    else v=true;
+    return v; }
+  // Answer every pending prompt the way this bot would. Returns the new state, or null if it got stuck.
+  function resolve(st,me,strat){
+    let g=0; while(st&&st.pending&&g++<16){ const pd=st.pending, v=choose(st,me,strat);
+      const n=ap(st,{t:'answer',v}); if(!n) { const n2=ap(st,{t:'answer',v:pd.kind==='cell'?(pd.options[0]||null):v}); if(!n2) return null; st=n2; } else st=n; }
+    if(st&&st.reveal) st=ap(st,{t:'closeReveal'}); return st; }
+  // Warlord: answer a prompt by trying each option and keeping the one that scores best (a quick look ahead).
+  function trial(st,me,strat,opts){ let best=opts[0],bv=-1e9; for(const o of opts){ const n=ap(st,{t:'answer',v:o}); if(!n) continue; const v=evalState(st,n,me,strat); if(v>bv){bv=v;best=o;} } return best; }
+  // How much better st is than st0 for player p: own ◇ and ● gained, minus what opponents gained.
+  function evalState(st0,st,p,strat){ const rem=6;
+    const mine=(tot(st,p)-tot(st0,p)) + 0.5*(E.income(st,p)-E.income(st0,p))*rem/3;
+    if(strat==='warlord') return mine + 3*(ruinsBy(st,p)-ruinsBy(st0,p)) + 1.5*(pressure(st,p)-pressure(st0,p)) + 0.25*((st.players[p].reserve||0)-(st0.players[p].reserve||0))
+      - 0.5*(oppSum(st,p,tot)-oppSum(st0,p,tot));
+    if(strat==='raider') return mine - 1.0*(oppSum(st,p,tot)-oppSum(st0,p,tot)) - 0.4*(oppSum(st,p,E.income)-oppSum(st0,p,E.income))*rem/3;
+    return mine - 0.6*(oppBest(st,p)-oppBest(st0,p)); }
+  // Try every possible claim and keep the best one, if any is worth it.
+  function bestClaim(st,p,strat){ let best=null,bv=0.01; for(const k of E.claimOptions(st,p)){ const s=ap(st,{t:'claim',k}); if(!s) continue; const v=evalState(st,s,p,strat); if(v>bv){bv=v;best=s;} } return best; }
+  // Use ready abilities. Greedy bots only use ●-for-◇ exchanges.
+  function useAbilities(st,p,strat,stats){
+    for(let pass=0;pass<3;pass++){ let used=false;
+      for(const k of E.keys(st)){ if(!E.abilityReady(st,k)) continue; const d=E.def(st,E.top(st,k));
+        if(strat==='greedy' && !(d.ability&&d.ability.kind==='exchange')) continue;
+        const s=resolve(ap(st,{t:'ability',k}),p,strat); if(!s||s.pending) continue;
+        if(strat!=='raider' && strat!=='warlord' && d.ability.kind!=='exchange' && evalState(st,s,p,strat) < -0.5) continue;
+        st=s; used=true; stats.abil[d.id]=(stats.abil[d.id]||0)+1; }
+      if(!used) break; }
+    return st; }
+  function newStats(){ return {played:{},abil:{},left:[],inc:[]}; }
+  // One whole bot turn for st.cur (strats[seat] = style): start, Foundation, abilities, then up to 6 best plays
+  // (each with its best claim), then end. A turn already started is carried on from where it is.
+  function turn(st,stats,strats){ const p=st.cur, strat=strats[p]; let s0=st.turn&&st.turn.started?st:ap(st,{t:'startTurn'}); if(!s0) return null; st=s0; const pl=()=>st.players[p];
+    if(!pl().foundationPlaced){ const L=E.legalCells(st,pl().foundationUid); const k=Object.keys(L)[0]; const s=resolve(ap(st,{t:'play',uid:pl().foundationUid,k}),p,strat); if(s) st=s; }
+    if(strat!=='greedy') st=useAbilities(st,p,strat,stats);
+    for(let it=0; it<6; it++){ let best=null,bv=0.5;
+      for(const u of pl().hand){ const d=st.defs[st.cards[u].def]; if(E.playBlock(st,p,u)) continue;
+        if(!E.needsPlacement(d)){ if((E.isFree(st,u)?0:+d.cost)>pl().ap) continue; let s=resolve(ap(st,{t:'cast',uid:u}),p,strat); if(!s||s.pending) continue; const v=evalState(st,s,p,strat)+0.8-0.12*d.cost; if(v>bv){bv=v;best={s,u,d}} continue; }
+        const L=E.legalCells(st,u); const ks=Object.keys(L).filter(k=>L[k]<=pl().ap).slice(0,14);
+        for(const k of ks){ let s=resolve(ap(st,{t:'play',uid:u,k}),p,strat); if(!s||s.pending) continue; const c=st.turn.claimed?s:(bestClaim(s,p,strat)||s); const v=evalState(st,c,p,strat)-0.12*L[k]; if(v>bv){bv=v;best={s,u,d,k}} } }
+      if(!best) break; st=best.s; stats.played[best.d.id]=(stats.played[best.d.id]||0)+1;
+      if(!st.turn.claimed){ const c=bestClaim(st,p,strat); if(c) st=c; } }
+    if(!st.turn.claimed){ const c=bestClaim(st,p,strat); if(c) st=c; }
+    if(strat!=='greedy') st=useAbilities(st,p,strat,stats); else st=useAbilities(st,p,'greedy',stats);
+    stats.left.push(pl().ap); stats.inc.push(E.income(st,p));
+    let e=ap(st,{t:'endTurn'}); if(e&&e.pending) e=resolve(e,p,strat); if(e) st=e; else return null;
+    return st; }
+
+  // The rest of the current player's turn as a list of actions, for replaying one at a time (single player).
+  // It ends with endTurn and any answers given right after it; replay stops early at a prompt meant for someone else.
+  function plan(st0,style){
+    const st=Object.assign({},st0,{_botLog:[]}), end=turn(st,newStats(),st0.players.map(()=>style));
+    return end&&end._botLog.length ? end._botLog : [{t:st0.turn&&st0.turn.started?'endTurn':'startTurn'}]; }
+
+  return { STYLES: ['greedy', 'tactician', 'raider', 'warlord'], plan: plan, choose: choose, resolve: resolve, turn: turn, newStats: newStats, evalState: evalState };
+})();
+if (typeof module !== 'undefined') module.exports = KBots;
 /* Kartenspiel playtest UI. All game logic lives in KEngine; this file only renders state and dispatches actions. */
 (function () {
   var E = KEngine, D = KData;
@@ -5237,9 +5335,22 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (a.t === 'play' || a.t === 'cast' || a.t === 'answer' || a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.hand = null; ctx.ui.picked = []; }
     if (a.t === 'endTurn' || a.t === 'reclaim') { ctx.ui.passOK = false; ctx.ui.mode = null; ctx.ui.sel = null; ctx.ui.swap = null; }
   }
-  // Whose eyes the game is drawn through: online, always your own seat; on one shared screen, whoever's turn it is.
-  function viewer(ctx) { return ctx.online ? ctx.me : ctx.state.cur; }
-  function myTurn(ctx) { return !ctx.online || ctx.state.cur === ctx.me; }
+  // Bots: a player whose state carries `bot` (a KBots style) is played by the computer (see "bots" below).
+  function isBot(st, p) { return !!(st.players[p] && st.players[p].bot); }
+  function hasBots(st) { return st.players.some(function (q) { return q.bot; }); }
+  // A seat the screen always shows: yours online, or the only human's in a game against bots. null = pass the device.
+  function fixedSeat(ctx) {
+    if (ctx.online) return ctx.me;
+    if (ctx.kind !== 'game') return null;
+    var humans = ctx.state.players.map(function (q, i) { return q.bot ? -1 : i; }).filter(function (i) { return i >= 0; });
+    return humans.length === 1 ? humans[0] : null;
+  }
+  // Whose eyes the game is drawn through: the fixed seat if there is one, otherwise whoever's turn it is.
+  function viewer(ctx) { var f = fixedSeat(ctx); return f != null ? f : ctx.state.cur; }
+  // Can the people at this screen act now? Not online on someone else's turn, and never on a bot's turn.
+  function myTurn(ctx) { var f = fixedSeat(ctx); return f != null ? ctx.state.cur === f : !isBot(ctx.state, ctx.state.cur); }
+  // Can the people at this screen answer prompt pd? (Bots answer their own.)
+  function canAnswer(ctx, pd) { return ctx.kind === 'sandbox' || (ctx.online ? pd.player === ctx.me : !isBot(ctx.state, pd.player)); }
   /* ---- auto end turn when out of ● with nothing free to do ---- */
   function canAfford(st, u) {
     var d = E.rawDef(st, u); if (E.playBlock(st, st.cur, u)) return false;
@@ -5266,7 +5377,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     maybeAutoEnd.t = setTimeout(function () { if (ctx.ui.autoEnding && ctx.state.log.length === mark && stuck(ctx.state)) { ctx.ui.autoEnding = false; dispatch(ctx, { t: 'endTurn' }); } }, 1600);
   }
   // Go back to the previous state in the history.
-  function undo(ctx) { if (ctx.online || !ctx.hist.length) return; ctx.state = ctx.hist.pop(); ctx.err = null; ctx.ui.hand = null; ctx.ui.picked = []; lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state); render(); }
+  function undo(ctx) { if (ctx.online || !ctx.hist.length) return; ctx.state = ctx.hist.pop();
+    if (hasBots(ctx.state)) { while (ctx.hist.length && botToAct(ctx.state) != null) ctx.state = ctx.hist.pop(); clearTimeout(ctx.botTimer); ctx.botTimer = null; ctx.botQueue = null; } ctx.err = null; ctx.ui.hand = null; ctx.ui.picked = []; lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state); render(); }
   // The context for the page on screen.
   function cur() { return app.page === 'sandbox' ? app.sandbox : app.page === 'online' ? (N.room && N.room.status !== 'lobby' ? N.ctx : null) : app.page === 'game' ? app.game : null; }
 
@@ -5459,7 +5571,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var legal = {}, pd = st.pending, optSet = {};
     var buryingSuit = pd && pd.kind === 'cell' && pd.verb === 'bury' && st.res && st.res.src ? E.suitOf(st, st.res.src) : null;
     if (ctx.kind === 'game' && myTurn(ctx) && ui.hand && st.turn && st.turn.started && !st.pending && !st.res && E.needsPlacement(E.rawDef(st, ui.hand))) legal = E.legalCells(st, ui.hand);
-    if (pd && pd.kind === 'cell' && (ctx.online ? pd.player === ctx.me : pd.player === st.cur || ctx.kind === 'sandbox')) pd.options.forEach(function (k) { optSet[k] = 1; });
+    if (pd && pd.kind === 'cell' && canAnswer(ctx, pd)) pd.options.forEach(function (k) { optSet[k] = 1; });
     Object.keys(legal).concat(Object.keys(optSet)).forEach(function (k) { var p = E.XY(k); b.minX = Math.min(b.minX, p[0]); b.maxX = Math.max(b.maxX, p[0]); b.minY = Math.min(b.minY, p[1]); b.maxY = Math.max(b.maxY, p[1]); });
     var cols = b.maxX - b.minX + 1, rows = b.maxY - b.minY + 1, W = cols * (CW + GAP) + GAP, Hh = rows * (CH + GAP) + GAP;
     var see = {}, counted = {}, seenBy = {};
@@ -5669,7 +5781,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var st = ctx.state, sc = E.scores(st), h = '<div class="plist">';
     st.players.forEach(function (pl, i) {
       var isCur = ctx.kind === 'game' && i === st.cur;
-      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + (ctx.online && i === ctx.me ? ' (you)' : '') + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + (ctx.online && !isConnected(pl.name) ? ' · offline' : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
+      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + (i === fixedSeat(ctx) ? ' (you)' : '') + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + (ctx.online && !isConnected(pl.name) ? ' · offline' : '') + (pl.bot ? ' · ' + esc(BOT_NAMES[pl.bot] || pl.bot) : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
         '<div class="pbody"><span data-fx="pile-' + i + '">' + jewelPile(sc[i].total) + '</span><div class="pstats"><div class="bignum" title="Victory points: cards ' + sc[i].cards + ' + tokens ' + sc[i].tokens + '">' + sc[i].total + '<span class="unit">◇</span></div>' +
         '<div class="small">♟ ' + pl.meeples + ' meeples' + (ctx.kind === 'game' ? ' · ' + pl.hand.length + ' in hand' : '') + (pl.reserve > 0 ? ' · ' + pl.reserve + '● Reserves' : '') + '</div></div></div></div>';
     });
@@ -5710,7 +5822,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var scrollLog = $('.log'); var atBottom = !scrollLog || scrollLog.scrollTop + scrollLog.clientHeight >= scrollLog.scrollHeight - 20;
     var bw = $('.boardwrap'), bsx = bw ? bw.scrollLeft : 0, bsy = bw ? bw.scrollTop : 0;
     var focusSel = document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-focus-key');
-    var tabs = ONLINE ? [['home', 'Home'], ['new', 'Pass-and-Play'], ['game', 'Local game'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
+    var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['game', 'Local game'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
       : [['new', 'New game'], ['game', 'Game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
     var h = '<div class="win raised"><div class="titlebar"><span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? 'Signed in as ' + N.user : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
     h += '<div class="menubar" role="tablist">' + tabs.map(function (t) { var dis = t[0] === 'game' && !app.game; return '<button class="tab' + (app.page === t[0] ? ' on' : '') + '" role="tab" data-page="' + t[0] + '"' + (dis ? ' disabled style="opacity:.5"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
@@ -5721,6 +5833,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     root.innerHTML = h;
     var lg = $('.log'); if (lg && atBottom) lg.scrollTop = lg.scrollHeight;
     var bw2 = $('.boardwrap'); if (bw2) { applyZoom(cur()); if (!cur().ui.fit) { bw2.scrollLeft = bsx; bw2.scrollTop = bsy; } }
+    if (app.page === 'game') botDriver(app.game);
     if (focusSel) { var f = document.querySelector('[data-focus-key="' + focusSel + '"]'); if (f) { f.focus(); if (f.setSelectionRange && f.value != null) { try { f.setSelectionRange(f.value.length, f.value.length); } catch (e) { } } } }
   }
   function statusText() {
@@ -5732,6 +5845,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       if (c.err) return c.err;
       if (st.winner != null) return st.players[st.winner].name + ' wins.';
       if (c.online) return (N.room ? N.room.name + ' — ' : '') + 'round ' + st.round + ', ' + (st.cur === c.me ? 'your turn' : st.players[st.cur].name + '’s turn') + (N.status === 'on' ? '' : ' (reconnecting…)');
+      if (isBot(st, st.cur)) return st.players[st.cur].name + ' is playing — round ' + st.round;
       if (app.page === 'game') return st.players[st.cur].name + ' — round ' + st.round + (st.turn.started ? ', ' + st.players[st.cur].ap + '● to spend' + (st.turn.claimed ? ', claim used' : ', claim available') : ', waiting to start the turn');
       return 'Sandbox: free placement, no costs or turns.';
     }
@@ -5759,7 +5873,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   function archetypes() { return sortLib(app.lib.filter(function (c) { return c.type === 'Foundation' && c.archetype; })); }
   function ensureSetup() {
     var A = archetypes().map(function (c) { return c.archetype; });
-    for (var i = 0; i < 5; i++) { if (!setup.players[i]) setup.players[i] = { name: 'Player ' + (i + 1), arch: A[i] || A[0] }; }
+    for (var i = 0; i < 5; i++) { if (!setup.players[i]) setup.players[i] = { name: 'Player ' + (i + 1), arch: A[i] || A[0], kind: 'human' }; }
   }
   function newGamePage() {
     ensureSetup();
@@ -5767,10 +5881,13 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var h = '<div class="page scroll"><div class="pane" style="max-width:720px">';
     if (saved && saved.players && saved.winner == null && !app.game) h += '<div class="banner row" style="margin-bottom:8px">A game in progress was saved in this browser (round ' + saved.round + ', ' + esc(saved.players.map(function (p) { return p.name; }).join(', ')) + '). <button class="btn" data-act="resume">Resume it</button></div>';
     if (app.game) h += '<div class="banner row" style="margin-bottom:8px">A game is running. Starting a new one replaces it. <button class="btn" data-page="game">Back to the game</button></div>';
-    h += '<fieldset><legend>Players</legend><div class="row" style="margin-bottom:6px">Number of players <select data-set="n">' + [2, 3, 4, 5].map(function (n) { return '<option' + (n === setup.n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><span class="muted small">Each archetype can be taken by only one player. Turn order goes top to bottom.</span></div>';
+    h += '<fieldset><legend>Players</legend><div class="row" style="margin-bottom:6px">Number of players <select data-set="n">' + [2, 3, 4, 5].map(function (n) { return '<option' + (n === setup.n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><span class="muted small">Each archetype can be taken by only one player. Turn order goes top to bottom.</span></div>' +
+      '<p class="small muted" style="margin:0 0 6px">Bots: <b>Greedy</b> takes the best move for itself right now. <b>Tactician</b> also uses every card ability. <b>Warlord</b> plays for War and Conquest, aiming Ruins and Overwhelms at rivals.</p>';
     for (var i = 0; i < setup.n; i++) {
       var p = setup.players[i], taken = setup.players.slice(0, setup.n).map(function (q, j) { return j !== i ? q.arch : null; });
-      h += '<div class="row" style="margin:3px 0"><span class="swatch" style="background:' + COLORS[i] + ';width:14px;height:14px"></span><input type="text" data-focus-key="pn' + i + '" data-pname="' + i + '" value="' + esc(p.name) + '" style="width:150px">' +
+      h += '<div class="row" style="margin:3px 0"><span class="swatch" style="background:' + COLORS[i] + ';width:14px;height:14px"></span>' +
+        '<select data-pkind="' + i + '" title="Who plays this seat">' + [['human', 'Human']].concat(BOT_CHOICES.map(function (b) { return [b, BOT_NAMES[b]]; })).map(function (o) { return '<option value="' + o[0] + '"' + ((p.kind || 'human') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+        '<input type="text" data-focus-key="pn' + i + '" data-pname="' + i + '" value="' + esc(p.name) + '" style="width:150px">' +
         '<select data-parch="' + i + '">' + A.map(function (c) { return '<option value="' + esc(c.archetype) + '"' + (c.archetype === p.arch ? ' selected' : '') + (taken.indexOf(c.archetype) >= 0 ? ' disabled' : '') + '>' + esc(c.archetype + ' (' + c.name + ', ' + c.suit + ')') + '</option>'; }).join('') + '</select>' +
         '<span class="small muted">' + (function () { var f = A.find(function (c) { return c.archetype === p.arch; }); return f ? 'Weak to ' + esc(f.weakTo) : ''; })() + '</span></div>';
     }
@@ -5803,7 +5920,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var st = ctx.state, ui = ctx.ui, pl = st.players[st.cur];
     var h = '<div class="page"><div class="gamegrid">';
     h += '<div class="left"><div class="pane raised" style="flex:0 0 auto">' + playersPanel(ctx) + '</div>';
-    h += '<div class="pane raised col" style="flex:0 0 auto"><div class="apbox"><span data-fx="jar">' + apJar(st.turn.started ? pl.ap : 0) + '</span><div><div class="bignum">' + (st.turn.started ? pl.ap : '—') + '<span class="unit">●</span></div><div class="small">' + (st.turn.started ? 'Aktion points left' : 'Turn not started') + '</div>' + (pl.debt > 0 ? '<div class="reserve" title="Owed for reactions; taken from your next turn">− ' + pl.debt + '● owed next turn</div>' : '') + (pl.reserve > 0 ? '<div class="reserve" title="Reserves are spent like ● after your ● runs out, and stay between turns">+ ' + pl.reserve + '● Reserves</div>' : '') +
+    h += '<div class="pane raised col" style="flex:0 0 auto"><div class="apbox"><span data-fx="jar">' + apJar(st.turn.started ? pl.ap : 0) + '</span><div><div class="bignum">' + (st.turn.started ? pl.ap : '—') + '<span class="unit">●</span></div><div class="small">' + (st.turn.started ? (myTurn(ctx) ? 'Aktion points left' : esc(pl.name) + '’s ● left') : 'Turn not started') + '</div>' + (pl.debt > 0 ? '<div class="reserve" title="Owed for reactions; taken from your next turn">− ' + pl.debt + '● owed next turn</div>' : '') + (pl.reserve > 0 ? '<div class="reserve" title="Reserves are spent like ● after your ● runs out, and stay between turns">+ ' + pl.reserve + '● Reserves</div>' : '') +
       (st.turn.started ? (function () { var co = E.claimOptions(st, st.cur).length; return '<div class="claimstate' + (co ? ' avail' : '') + '">' + (st.turn.claimed ? 'Claim used' : co ? '♟ Claim available' : 'Claim: nothing to claim yet') + '</div>'; })() : '') + '</div></div>' +
       '<div class="row"><button class="btn def big" data-act="endTurn"' + (myTurn(ctx) && st.turn.started && !st.pending && !st.res && st.winner == null ? '' : ' disabled') + '>End turn</button>' +
       (ctx.online ? '' : '<button class="btn big" data-act="undo"' + (ctx.hist.length ? '' : ' disabled') + ' title="Undo the last action">Undo</button>') + '</div>' +
@@ -5824,7 +5941,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       return '';
     }
     if (st.winner != null) return '<div class="prompt"><b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm" data-page="new">New game</button>') + '</div>';
-    if (ctx.online) { var ow = onlineWaiting(ctx); if (ow) return ow; }
+    if (ctx.online || hasBots(st)) { var ow = waitingPrompt(ctx); if (ow) return ow; }
     if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' Click an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res && !ctx.online ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
     if (ui.autoEnding) return '<div class="prompt"><b>Out of ●.</b> Nothing left to play, claim or use, so your turn ends in a moment. <button class="btn sm" data-act="holdTurn">Wait, I’m not done</button></div>';
     if (ui.mode === 'reclaim') return '<div class="prompt">Click one of your claimed cards to take its meeple back. This ends your turn. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
@@ -5839,8 +5956,9 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   // The current player's hand. A green border means it can be afforded right now.
   function handHTML(ctx) {
     var st = ctx.state, ui = ctx.ui, pl = st.players[viewer(ctx)];
-    if ((!ctx.online && !st.turn.started) || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
-    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + (ctx.online ? 'Your hand' : esc(pl.name) + '’s hand') + '</b> <span class="muted">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
+    var fixed = fixedSeat(ctx) != null;
+    if ((!fixed && (!st.turn.started || isBot(st, st.cur))) || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : isBot(st, st.cur) ? esc(st.players[st.cur].name) + ' is playing.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
+    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + (fixed ? 'Your hand' : esc(pl.name) + '’s hand') + '</b> <span class="muted">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
       '<button class="btn sm" data-act="startSwap"' + (pl.hand.filter(function (x) { return E.rawDef(st, x).type !== 'Foundation'; }).length >= 2 && !st.pending && !ui.swap && myTurn(ctx) ? '' : ' disabled') + '>Discard 2, draw 1…</button>' +
       (st.turn.played === 0 && !st.turn.claimed ? '' : '') + '</div><div class="hand">';
     pl.hand.forEach(function (u) {
@@ -5863,21 +5981,22 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (app.modal) return app.modal();
     var ctx = cur(); if (!ctx || (app.page !== 'game' && app.page !== 'sandbox' && app.page !== 'online')) return '';
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
-    if (st.reveal && (!ctx.online || st.reveal.to === ctx.me)) {
+    if (st.reveal && (ctx.online ? st.reveal.to === ctx.me : !isBot(st, st.reveal.to))) {
       var rv = st.reveal;
       return modal(st.players[rv.of].name + '’s hand', '<p>Shown to ' + esc(st.players[rv.to].name) + ' only.</p><div class="hand">' + rv.cards.map(function (u) { return '<div class="hcard">' + defFace(E.rawDef(st, u), { mid: true }) + '</div>'; }).join('') + (rv.cards.length ? '' : '<span class="muted">Their hand is empty.</span>') + '</div>', '<button class="btn def" data-act="closeReveal">Close</button>');
     }
     if (ctx.kind !== 'game') { if (pd && pd.kind !== 'cell') return pendingModal(ctx); return ''; }
-    if (ctx.online) {
-      if (st.winner == null && myTurn(ctx) && !st.turn.started && ui.mode !== 'reclaim' && !st.players[ctx.me].out) {
-        var mine = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(ctx.me) >= 0; });
-        return modal('Your turn', '<p style="font-size:15px">It’s your turn, ' + esc(st.players[ctx.me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
-          '<button class="btn" data-act="reclaimMode"' + (mine ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start my turn</button>');
+    var me = fixedSeat(ctx);
+    if (me != null) {
+      if (st.winner == null && myTurn(ctx) && !st.turn.started && ui.mode !== 'reclaim' && !st.players[me].out) {
+        var mine = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(me) >= 0; });
+        return modal('Your turn', '<p style="font-size:15px">It’s your turn, ' + esc(st.players[me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
+          (!ctx.online && ctx.hist.length ? '<button class="btn" data-act="undo">Undo my last action</button>' : '') + '<button class="btn" data-act="reclaimMode"' + (mine ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start my turn</button>');
       }
       return pd && pd.kind !== 'cell' && st.winner == null ? pendingModal(ctx) : '';
     }
     if (st.winner != null) return '';
-    if (!st.turn.started && ui.mode !== 'reclaim') {
+    if (!st.turn.started && ui.mode !== 'reclaim' && !isBot(st, st.cur)) {
       var pl = st.players[st.cur];
       var hasClaims = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(st.cur) >= 0; });
       return modal('Next turn', '<p style="font-size:15px"><span class="swatch" style="background:' + pl.color + ';width:14px;height:14px"></span> Pass the device to <b>' + esc(pl.name) + '</b> (' + esc(pl.arch) + ').</p><p class="small muted">Starting the turn gains ● and draws ' + (st.opts.drawPerTurn != null ? st.opts.drawPerTurn : 1) + ' card' + ((st.opts.drawPerTurn != null ? +st.opts.drawPerTurn : 1) === 1 ? '' : 's') + '. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
@@ -5889,8 +6008,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   // Dialog for an engine prompt: choose cards, a suit, a player, yes/no, or resolve by hand. Asks to pass the device first if someone else must answer.
   function pendingModal(ctx) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending, who = st.players[pd.player];
-    if (ctx.online && pd.player !== ctx.me) return '';
-    if (!ctx.online && pd.kind !== 'cell' && pd.player !== st.cur && ui.passFor !== pd.player + ':' + st.log.length)
+    if (!canAnswer(ctx, pd)) return '';
+    if (fixedSeat(ctx) == null && pd.kind !== 'cell' && pd.player !== st.cur && ui.passFor !== pd.player + ':' + st.log.length)
       return modal('Pass the device', '<p>Pass the device to <b>' + esc(who.name) + '</b> for a decision.</p>', '<button class="btn def" data-act="passOK" data-v="' + pd.player + ':' + st.log.length + '">I’m ' + esc(who.name) + '</button>');
     if (pd.kind === 'hand') {
       var hand = pd.options || who.hand, picked = ui.picked;
@@ -6120,11 +6239,51 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   // The public site has no sandbox or card builder: swap the first paragraph and drop the builder section.
   function helpEdition(h) {
     if (!ONLINE) return h;
-    return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
+    return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Single player</b> puts you against bots: on the Play locally page, set any seat to a greedy, tactician or warlord bot. <b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
         'Pick an archetype in the table’s lobby (first come, first served); the host starts the game. Your <b>Profile</b> keeps your win/loss record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</p>' +
         '<p>Online, you only ever see your own hand. If you lose your connection you have two minutes to come back before you forfeit; leaving a game in progress counts as a loss.</p>')
       .replace(/<h2>Card builder<\/h2><p>.*?<\/p>/, '')
       .replace(/<p>Every card on the board has <b>Referee tools<\/b>.*?<\/p>/, '<p>In a pass-and-play game, every card on the board has <b>Referee tools</b> (Ruin or flip back, change suit, move, remove, bury, tokens, claims) and <b>Undo</b> steps back one action. Online games have neither: the server enforces the rules.</p>');
+  }
+
+  /* ---------------- bots (single player) ---------------- */
+  // Bot styles a seat can be given on the New game page (KBots also has 'raider', used by the simulator).
+  var BOT_CHOICES = ['greedy', 'tactician', 'warlord'];
+  var BOT_NAMES = { greedy: 'Greedy bot', tactician: 'Tactician bot', warlord: 'Warlord bot', raider: 'Raider bot' };
+  // The bot that must act now, or null: whoever a prompt or a revealed hand waits on, else the current player.
+  function botToAct(st) {
+    if (st.winner != null) return null;
+    var p = st.pending ? st.pending.player : st.reveal ? st.reveal.to : st.cur;
+    return isBot(st, p) ? p : null;
+  }
+  // Keep the bots moving: one action per tick, so each play shows up on the board and in the log.
+  // window.ksBotDelay (ms) overrides the pause, e.g. 0 in tests.
+  function botDriver(ctx) {
+    if (!ctx || ctx.online || ctx.kind !== 'game' || ctx !== app.game || ctx.botTimer || botToAct(ctx.state) == null) return;
+    ctx.botTimer = setTimeout(function () { botStep(ctx); }, typeof window.ksBotDelay === 'number' ? window.ksBotDelay : 650);
+  }
+  // A bot plans its whole turn once (KBots.plan), then plays it out an action at a time. The plan is dropped when
+  // anything else changed the game in between (a human answered a prompt), and the bot plans again from there.
+  function botStep(ctx) {
+    ctx.botTimer = null;
+    if (app.game !== ctx || app.page !== 'game') return;
+    var st = ctx.state, p = botToAct(st); if (p == null) { ctx.botQueue = null; return; }
+    var pd = st.pending, a = null;
+    if (ctx.botQueue && ctx.botQueue.length && ctx.botExpect === st) a = ctx.botQueue.shift();
+    if (a && a.t === 'answer' && !(pd && isBot(st, pd.player))) a = null;      // the plan answered for a human: they answer themselves
+    if (!a) {
+      ctx.botQueue = null;
+      if (st.reveal && !pd) a = { t: 'closeReveal' };
+      else if (pd) a = { t: 'answer', v: KBots.choose(st, pd.player, st.players[pd.player].bot) };
+      else { ctx.botQueue = KBots.plan(st, st.players[p].bot); a = ctx.botQueue.shift(); }
+    }
+    if (E.apply(st, a).error) {          // shouldn't happen; fall back to something legal rather than stall
+      ctx.botQueue = null;
+      a = pd ? { t: 'answer', v: pd.kind === 'cell' ? (pd.options[0] || null) : pd.kind === 'confirm' ? false : pd.kind === 'hand' ? (pd.options || st.players[pd.player].hand).slice(0, pd.count) : pd.options ? pd.options[0] : true }
+        : { t: st.turn.started ? 'endTurn' : 'startTurn' };
+      if (E.apply(st, a).error) { ctx.err = st.players[p].name + ' is stuck. Use the referee tools or Undo.'; render(); return; }
+    }
+    dispatch(ctx, a); ctx.botExpect = ctx.state;
   }
 
   /* ---------------- online play (public site only) ---------------- */
@@ -6220,7 +6379,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var saved = !app.game && lsGet('ks.game'), resume = app.game ? '<button class="btn big" data-page="game">Back to your game</button>' : saved && saved.players && saved.winner == null ? '<button class="btn big" data-act="resume">Resume saved game</button>' : '';
     return '<div class="page scroll"><div class="home"><h1>Kartenspiel</h1>' +
       '<p>An asymmetric tableau-building card game for 2–5 players. Six archetypes share one board: build your Kingdom, claim cards with your meeples, and Overwhelm your rivals. First to the victory target wins.</p>' +
-      '<div class="choices"><div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-page="new">New game</button>' + resume + '</div></div>' +
+      '<div class="choices"><div class="choice raised"><h2>Single player</h2><p>Play against the computer. Choose each opponent: greedy, tactician or warlord bot.</p><div class="row"><button class="btn def big" data-act="soloSetup">Play vs bots</button>' + resume + '</div></div>' +
+      '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
       '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>.</p></div></div>';
   }
@@ -6306,12 +6466,12 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     return N.room && N.room.host === N.user ? '<button class="btn sm def" data-act="netAgain">Back to the lobby</button> <button class="btn sm" data-act="netLeave">Leave table</button>'
       : '<span class="muted">The host can reopen the table for another game.</span> <button class="btn sm" data-act="netLeave">Leave table</button>';
   }
-  // Prompt bar text while someone else is acting, or '' when it's up to you.
-  function onlineWaiting(ctx) {
-    var st = ctx.state, pd = st.pending, nm = function (i) { return '<b>' + esc(st.players[i].name) + '</b>'; };
-    if (pd && pd.player !== ctx.me) return '<div class="prompt">Waiting for ' + nm(pd.player) + ' to decide…</div>';
-    if (st.reveal && st.reveal.to !== ctx.me) return '<div class="prompt">' + nm(st.reveal.to) + ' is looking at ' + nm(st.reveal.of) + '’s hand…</div>';
-    if (!myTurn(ctx)) return '<div class="prompt">' + (st.players[ctx.me].out ? 'You’re out of this game. ' : '') + nm(st.cur) + '’s turn' + (st.turn.started ? '.' : ': starting…') + '</div>';
+  // Prompt bar text while someone else (another player online, or a bot) is acting, or '' when it's up to you.
+  function waitingPrompt(ctx) {
+    var st = ctx.state, pd = st.pending, me = fixedSeat(ctx), nm = function (i) { return '<b>' + esc(st.players[i].name) + '</b>'; };
+    if (pd && !canAnswer(ctx, pd)) return '<div class="prompt">' + (isBot(st, pd.player) ? nm(pd.player) + ' is deciding…' : 'Waiting for ' + nm(pd.player) + ' to decide…') + '</div>';
+    if (st.reveal && (ctx.online ? st.reveal.to !== ctx.me : isBot(st, st.reveal.to))) return '<div class="prompt">' + nm(st.reveal.to) + ' is looking at ' + nm(st.reveal.of) + '’s hand…</div>';
+    if (!myTurn(ctx)) return '<div class="prompt">' + (me != null && st.players[me].out ? 'You’re out of this game. ' : '') + nm(st.cur) + (isBot(st, st.cur) ? ' is playing…' : '’s turn' + (st.turn.started ? '.' : ': starting…')) + '</div>';
     return '';
   }
 
@@ -6368,7 +6528,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   // or just select it. In the sandbox it places or buries the chosen card.
   function cellClick(ctx, k) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
-    if (pd && pd.kind === 'cell' && pd.options.indexOf(k) >= 0 && (!ctx.online || pd.player === ctx.me)) { dispatch(ctx, { t: 'answer', v: k }); return; }
+    if (pd && pd.kind === 'cell' && pd.options.indexOf(k) >= 0 && canAnswer(ctx, pd)) { dispatch(ctx, { t: 'answer', v: k }); return; }
     if (ui.mode === 'move') { if (!E.top(st, k)) { ui.mode = null; dispatch(ctx, { t: 'sbMove', from: ui.moveFrom, to: k }); ui.sel = k; } else { ui.sel = k; render(); } return; }
     if (ctx.kind === 'game') {
       if (ui.mode === 'reclaim') { ui.mode = null; if (!dispatch(ctx, { t: 'reclaim', k: k })) ui.mode = 'reclaim'; return; }
@@ -6398,7 +6558,15 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       case 'start': {
         var players = []; for (var i = 0; i < setup.n; i++) players.push({ name: setup.players[i].name.trim() || ('Player ' + (i + 1)), arch: setup.players[i].arch, color: COLORS[i] });
         var st = E.newGame(app.lib, { players: players, handSize: +setup.handSize || 4, meeples: +setup.meeples || 8, target: +setup.target || 48, enforceWeak: setup.enforceWeak, foundationBy: +setup.foundationBy, drawPerTurn: setup.drawPerTurn === '' || setup.drawPerTurn == null ? 2 : +setup.drawPerTurn, autoEnd: setup.autoEnd, seatStart: setup.seatStart, burySuitOW: setup.burySuitOW, defense: setup.defense, adjDiscount: setup.adjDiscount, noWander: setup.noWander, ascension: setup.ascension });
+        st.players.forEach(function (pl, i) { var kind = setup.players[i].kind; if (kind && kind !== 'human') pl.bot = kind; });
         app.game = newCtx(st, 'game'); lsSet('ks.game', st); app.page = 'game'; render(); return;
+      }
+      case 'soloSetup': case 'hotseatSetup': {   // home page shortcuts: preset the seats, then the New game page
+        ensureSetup(); var solo = a === 'soloSetup';
+        setup.players.forEach(function (sp, i) { var kind = solo && i > 0 ? (sp.kind && sp.kind !== 'human' ? sp.kind : 'tactician') : 'human';
+          if (/^Player \d$/.test(sp.name) || sp.name === BOT_NAMES[sp.kind]) sp.name = kind === 'human' ? 'Player ' + (i + 1) : BOT_NAMES[kind];
+          sp.kind = kind; });
+        app.page = 'new'; render(); return;
       }
       case 'resume': { var sv = lsGet('ks.game'); if (sv) { app.game = newCtx(sv, 'game'); app.page = 'game'; render(); } return; }
       case 'startTurn': dispatch(ctx, { t: 'startTurn' }); return;
@@ -6554,6 +6722,11 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (t.hasAttribute('data-sbn')) { sbSetup.n = +t.value; render(); return; }
     if (t.hasAttribute('data-sbarch')) { sbSetup.arch[+t.getAttribute('data-sbarch')] = t.value; return; }
     if (t.hasAttribute('data-set')) { var f = t.getAttribute('data-set'); setup[f] = t.type === 'checkbox' ? t.checked : (f === 'n' ? +t.value : t.value); render(); return; }
+    if (t.hasAttribute('data-pkind')) {   // picking a bot renames a default-named seat after it
+      var pk = setup.players[+t.getAttribute('data-pkind')], was = pk.kind || 'human', named = /^Player \d$/.test(pk.name) || pk.name === BOT_NAMES[was];
+      pk.kind = t.value; if (named) pk.name = t.value === 'human' ? 'Player ' + (+t.getAttribute('data-pkind') + 1) : BOT_NAMES[t.value];
+      render(); return;
+    }
     if (t.hasAttribute('data-parch')) { setup.players[+t.getAttribute('data-parch')].arch = t.value; render(); return; }
     if (t.hasAttribute('data-lib')) { app.libUI[t.getAttribute('data-lib')] = t.value; render(); return; }
     if (t.hasAttribute('data-b')) { if (builderChange(t.getAttribute('data-b'), t.value) || t.tagName === 'SELECT') render(); else render(); return; }

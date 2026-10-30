@@ -5,7 +5,7 @@ An asymmetric tableau-building card game for 2–5 players, with six archetypes 
 This repo builds two apps from the same source:
 
 - **The playtest table** (`index.html`): for designing the game. It has the card builder, sandbox and referee tools. Open it in any browser; nothing to install.
-- **The public site** (`site/index.html`, published to GitHub Pages): for playing. It has **Pass-and-Play** on one device and **Online Multiplayer** with a server list, public and private tables, first-come-first-served archetypes, and player profiles (win/loss record, most played archetypes and cards, recent games). The card library is fixed: there's no card builder or sandbox.
+- **The public site** (`site/index.html`, published to GitHub Pages): for playing. It has **Single player** against bots, **Pass-and-Play** on one device, and **Online Multiplayer** with a server list, public and private tables, first-come-first-served archetypes, and player profiles (win/loss record, most played archetypes and cards, recent games). The card library is fixed: there's no card builder or sandbox.
 
 Online play needs the game server in `server/`, which you host yourself (see [Deploying](#deploying)).
 
@@ -18,14 +18,15 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `src/data.js` | The card library: all 87 starter cards |
 | `src/engine.js` | The rules engine: a pure `apply(state, action) → state`, no DOM. Also `redact()`, which hides other players' cards for online play |
 | `src/ui.js` | The interface for both apps. `KConfig.edition === 'online'` switches on the public site's pages |
+| `src/bots.js` | The bots (greedy, tactician, raider, warlord): single player in both apps, and the simulator |
 | `src/net.js` | Public site only: the connection to the game server |
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `e2e/online.js` two browsers playing online |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots |
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
-| `tools/sim2.js` | Bot self-play for balance analysis (greedy, tactician and raider bots) |
+| `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
 
 ## Build, test, simulate
@@ -56,6 +57,7 @@ Every line should read PASS (`qc3.js` prints only its failures, then a pass coun
 ```
 mkdir -p tools/simout
 node tools/sim2.js 2 0 100 tools/simout/p2.json   # players, first game, last game, output
+node tools/sim2.js 3 0 100 tools/simout/w3.json "Warmonger=warlord,*=greedy"   # fixed styles; Warmonger in every game
 node tools/analyze2.js
 ```
 
@@ -111,6 +113,15 @@ The game page and the sandbox are each a *context*: `{ state, hist (undo history
 The file runs top to bottom like this: helpers and icons → app state and library loading → dispatch and undo → animations (`FX`) → card faces → board → inspector panel → players and log → one function per page → event handlers → hover magnifier.
 
 Saved in the browser's localStorage: `ks.lib` (the card library), `ks.game` and `ks.sandbox`; on the public site also `ks.token` (your sign-in) and `ks.server` (a server address you chose).
+
+### Single player
+
+Any seat on the New game page (Play locally on the public site) can be a **Greedy**, **Tactician** or **Warlord** bot. Bots are players whose state carries `bot: '<style>'`; `src/bots.js` decides their moves, the same code the simulator uses.
+
+- **Visible moves.** A bot plans its whole turn at once (`KBots.plan`), then the UI plays it out one action per tick (`botDriver` / `botStep` in `ui.js`), so each move animates and lands in the log like a person's.
+- **Your decisions stay yours.** If a bot's move asks you something, it waits for your answer, then plans again from the new position.
+- **One human at the table** gets the online-style view: your hand always shows, and there are no pass-the-device screens. Undo steps back past the bots' moves to your own last action.
+- **Fair play, mostly.** Bots judge moves by trying them on a copy of the game, which holds everything. They don't read your hand, but a look-ahead can touch hidden cards: the warlord's suit guess for Fortune Teller effectively sees the top card of the deck.
 
 ### Online play
 
