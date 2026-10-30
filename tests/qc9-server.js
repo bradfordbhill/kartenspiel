@@ -104,6 +104,30 @@ function client(token) {
   await new Promise(r => setTimeout(r, 400));
   chk('Limits', got > 30 && got < 120, 'a flood of messages is cut off (' + got + ' of 200 answered)');
   fl.ws.close(); await app2.close();
+  // guests: one tap, a made-up name, no profile or stats; their opponents' stats still count the game
+  const gdir = fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')), app3 = createServer({ dataDir: gdir, gameGrace: 300 });
+  base = 'http://localhost:' + await app3.listen(0);
+  const g = await post('/api/guest', {});
+  chk('Guests', /^Guest-[A-Z2-9]{4}$/.test(g.name) && g.token && g.guest, 'one tap gives a guest name and a session (' + g.name + ')');
+  chk('Guests', /kept for guests/.test((await post('/api/register', { name: 'Guest-ABCD', password: 'secret12' })).error), 'names starting with Guest can’t be registered');
+  chk('Guests', /without a profile/.test((await (await fetch(base + '/api/profile/' + g.name)).json()).error), 'a guest has no profile page');
+  const eve = await post('/api/register', { name: 'Eve', password: 'secret12' });
+  const ge = client(g.token), ev = client(eve.token); await ge.ready; await ev.ready;
+  chk('Guests', ge.last.welcome.user === g.name && ge.last.welcome.guest === true && ev.last.welcome.guest === false, 'the server knows who is a guest');
+  ev.send({ t: 'create', name: 'Mixed table' }); await ev.until(() => ev.last.room);
+  ge.send({ t: 'join', id: ev.last.room.id }); await ev.until(() => ev.last.room.players.length === 2);
+  ev.send({ t: 'pick', arch: 'Gardener' }); ge.send({ t: 'pick', arch: 'Hedonist' }); await ev.until(() => ev.last.room.players.every(q => q.arch));
+  ev.send({ t: 'start' }); await ge.until(() => ge.last.state && ge.last.defs);
+  chk('Guests', ge.last.state.players[1].name === g.name, 'a guest plays like anyone else');
+  ge.send({ t: 'leave' }); await ev.until(() => ev.last.room.status === 'over');
+  const pe = await (await fetch(base + '/api/profile/Eve')).json();
+  chk('Guests', pe.wins === 1 && pe.history[0].players.some(q => q.name === g.name), 'the account’s stats count the game against the guest');
+  await post('/api/logout', { token: g.token }); const ge2 = client(g.token); await ge2.ready;
+  chk('Guests', ge2.last.welcome.user === null, 'signing out ends the guest session');
+  ge.ws.close(); ge2.ws.close(); ev.ws.close(); await app3.close();
+  const saved3 = JSON.parse(fs.readFileSync(path.join(gdir, 'db.json'), 'utf8'));
+  chk('Guests', !Object.keys(saved3.users).some(k => /^guest/.test(k)) && !Object.values(saved3.tokens).some(t => /^Guest-/.test(t.name)), 'no account or session is saved for a guest (only their name in Eve’s history)');
+
   const st2 = require('../server/store.js').open(fs.mkdtempSync(path.join(os.tmpdir(), 'ks-')));
   await st2.register('Tok', 'secret12'); const firstTok = (await st2.login('Tok', 'secret12')).token; let lastTok;
   for (let i = 0; i < 24; i++) lastTok = (await st2.login('Tok', 'secret12')).token;

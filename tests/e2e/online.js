@@ -92,6 +92,18 @@ const out = []; const ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m);
   await c.fill('[data-nf="code"]', code.toLowerCase()); await c.click('[data-act="netJoinCode"]');
   await c.waitForSelector('text=Private table'); ok(true, 'Bob joins with code ' + code);
 
+  // a guest: one tap, then joins Ann's private table with its code
+  const gst = await page('guest'); await gst.goto(url); await gst.click('[data-page="online"]');
+  await gst.waitForSelector('[data-act="netGuest"]'); await gst.click('[data-act="netGuest"]');
+  await gst.waitForSelector('text=Playing as guest');
+  const gname = (await gst.textContent('.online .row.spread b')).trim();
+  ok(/^Guest-[A-Z2-9]{4}$/.test(gname), 'Log in as guest: straight to the server list as ' + gname);
+  await gst.fill('[data-nf="code"]', code); await gst.click('[data-act="netJoinCode"]');
+  await a.waitForSelector('text=' + gname);
+  ok(true, 'the guest joins a table, and the host sees them');
+  await gst.click('[data-page="profile"]');
+  ok(/playing as a guest/.test(await gst.textContent('.online')) && !!(await gst.$('[data-act="netGuest"]')) === false, 'a guest’s Profile tab invites them to create a profile');
+
   // pass-and-play on the site
   const pp = await page('local'); await pp.goto(url); await pp.click('[data-page="new"]'); await pp.click('[data-act="start"]'); await pp.click('[data-act="startTurn"]');
   ok(await pp.$('[data-act="undo"]'), 'pass-and-play has undo and works offline-style');

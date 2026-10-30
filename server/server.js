@@ -49,6 +49,18 @@ function createServer(opts) {
   }
   // Sign-up and sign-in attempts per address: at most AUTH_LIMIT a minute (slows password guessing and account spam).
   const AUTH_LIMIT = opts.authLimit || 10, attempts = new Map();
+  // Guests: a one-tap session with a made-up name (Guest-K7QX), no password, no profile or stats. Kept in memory
+  // for a day; names starting with "Guest" can't be registered, so a guest can't be mistaken for an account.
+  const GUEST_TTL = 24 * 3600 * 1000, guests = new Map();   // token -> { name, at }
+  const GUEST_RE = /^guest/i;
+  function newGuest() {
+    const now = Date.now(); guests.forEach((g, t) => { if (now - g.at > GUEST_TTL) guests.delete(t); });
+    const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', taken = new Set([...guests.values()].map(g => g.name));
+    let name; do { name = 'Guest-' + Array.from(crypto.randomBytes(4), x => ABC[x % ABC.length]).join(''); } while (taken.has(name));
+    const token = 'g' + crypto.randomBytes(24).toString('hex'); guests.set(token, { name, at: now });
+    return { name, token, guest: true };
+  }
+  function guestName(token) { const g = token && guests.get(token); if (!g || Date.now() - g.at > GUEST_TTL) return null; return g.name; }
   function clientIp(req) { return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || '?'; }
   function limited(ip) {
     const now = Date.now(), a = (attempts.get(ip) || []).filter(t => now - t < 60000);
@@ -60,18 +72,24 @@ function createServer(opts) {
     if (req.method === 'OPTIONS') return send(res, 204, '', 'text/plain');
     try {
       if (url.pathname === '/api/health') return send(res, 200, { ok: true, rooms: rooms.size, online: clients.size });
+      if (req.method === 'POST' && url.pathname === '/api/guest') {
+        if (limited(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' });
+        return send(res, 200, newGuest());
+      }
       if (req.method === 'POST' && (url.pathname === '/api/register' || url.pathname === '/api/login')) {
         if (limited(clientIp(req))) return send(res, 429, { error: 'Too many attempts. Wait a minute and try again.' });
         const b = await readJSON(req), name = String(b.name || '').trim(), pw = String(b.password || '');
         if (url.pathname === '/api/register') {
           if (!NAME_RE.test(name)) return send(res, 400, { error: 'Names are 3–16 letters, digits, _ or -.' });
+          if (GUEST_RE.test(name)) return send(res, 400, { error: 'Names starting with “Guest” are kept for guests.' });
           if (pw.length < 6 || pw.length > 200) return send(res, 400, { error: 'Passwords need at least 6 characters.' });
           return send(res, 200, await db.register(name, pw));
         }
         return send(res, 200, await db.login(name, pw));
       }
-      if (req.method === 'POST' && url.pathname === '/api/logout') { const b = await readJSON(req); db.logout(b.token); return send(res, 200, { ok: true }); }
+      if (req.method === 'POST' && url.pathname === '/api/logout') { const b = await readJSON(req); db.logout(b.token); guests.delete(b.token); return send(res, 200, { ok: true }); }
       const m = url.pathname.match(/^\/api\/profile\/([^/]+)$/);
+      if (m && GUEST_RE.test(decodeURIComponent(m[1])) && !db.user(decodeURIComponent(m[1]))) return send(res, 404, { error: 'Guests play without a profile.' });
       if (m) { const p = profile(decodeURIComponent(m[1])); return p ? send(res, 200, p) : send(res, 404, { error: 'No such player.' }); }
       return send(res, 404, { error: 'Not found.' });
     } catch (e) { return send(res, 400, { error: e.message }); }
@@ -199,9 +217,9 @@ function createServer(opts) {
   function handle(ws, m) {
     if (m.t === 'hello') {
       const before = ws.user;
-      ws.user = db.who(m.token);
+      ws.user = db.who(m.token) || guestName(m.token); ws.guest = !!ws.user && !db.who(m.token);
       if (before && before !== ws.user && !online(before)) dropped(before);   // signed out in this tab
-      tell(ws, { t: 'welcome', user: ws.user, archetypes: ARCHETYPES });
+      tell(ws, { t: 'welcome', user: ws.user, guest: ws.guest, archetypes: ARCHETYPES });
       const r = ws.user && rooms.get(memberOf.get(ws.user));
       if (r) { const p = r.players.find(q => q.name === ws.user); if (p) clearTimeout(p.timer); joinRoom(ws, r); }
       else tell(ws, { t: 'lobbies', list: [...rooms.values()].filter(x => !x.private).map(listing) });

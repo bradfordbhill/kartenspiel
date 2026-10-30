@@ -140,6 +140,7 @@ The server is `server/server.js`, built on Node's `http` module plus the `ws` pa
 
 - **Disconnects.** A player who disconnects keeps their seat for 2 minutes (20 seconds in a lobby). After that they resign: the engine's `resign` action puts them out, as if their Foundation had been Overwhelmed. Leaving a game in progress counts as a loss.
 - **Stats.** These are recorded when a game ends, for everyone who played: wins and losses, games per archetype, how many times each card was played, and the last 30 games. Passwords are stored as salted scrypt hashes.
+- **Guests.** **Log in as guest** (`POST /api/guest`) gives a one-tap session under a made-up name like Guest-K7QX. Guests play fully but have no profile or saved stats; their opponents' records still count the game. Guest sessions live in the server's memory for a day, and names starting with "Guest" can't be registered.
 - **Limits.** Sign-up and sign-in allow 10 attempts a minute per address; an account keeps its 20 newest sessions; each connection may send about 20 messages a second. Games live in the server's memory, so restarting the server ends any games in progress (accounts and stats are on disk).
 
 ## Deploying

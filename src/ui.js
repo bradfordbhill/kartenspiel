@@ -654,7 +654,7 @@
     var hs = $('.bottom .hand, .mhand .hand'), hsl = hs ? hs.scrollLeft : 0;
     var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['game', 'Local game'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
       : [['new', 'New game'], ['game', 'Game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
-    var h = '<div class="win raised' + (isMobile() && inGame() ? ' mwin' : '') + '"><div class="titlebar"><span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? 'Signed in as ' + N.user : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
+    var h = '<div class="win raised' + (isMobile() && inGame() ? ' mwin' : '') + '"><div class="titlebar"><span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? (N.guest ? 'Playing as ' + N.user + ' (guest)' : 'Signed in as ' + N.user) : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
     h += '<div class="menubar" role="tablist">' + tabs.map(function (t) { var dis = t[0] === 'game' && !app.game; return '<button class="tab' + (app.page === t[0] ? ' on' : '') + '" role="tab" data-page="' + t[0] + '"' + (dis ? ' disabled style="opacity:.5"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
     h += '<div class="content">' + pageHTML() + '</div>';
     var st = cur() && cur().state;
@@ -1139,7 +1139,7 @@
       case '_open': N.status = 'on'; KNet.send({ t: 'hello', token: N.token }); break;
       case '_close': N.status = 'down'; break;
       case 'welcome':
-        N.user = m.user; N.room = null;          // the server re-sends the room if we're still in one
+        N.user = m.user; N.guest = !!m.guest; N.room = null;          // the server re-sends the room if we're still in one
         if (!m.user && N.token) { N.token = null; lsDel('ks.token'); }
         if (m.user && N.joinCode) { KNet.send({ t: 'join', code: N.joinCode }); N.joinCode = null; }
         break;
@@ -1183,6 +1183,7 @@
     var f = N.form;
     switch (a) {
       case 'netLogin': case 'netRegister': netAuth(a === 'netLogin' ? 'login' : 'register'); return;
+      case 'netGuest': netAuth('guest'); return;
       case 'netLogout':
         if (N.room) KNet.send({ t: 'leave' });
         KNet.api('/api/logout', { token: N.token }).catch(function () { });
@@ -1243,10 +1244,11 @@
       '<label>Password</label><input type="password" data-nf="pw" data-focus-key="nf-pw" autocomplete="current-password" value="' + esc(f.pw) + '"></div>' +
       (N.authErr ? '<p class="err">' + esc(N.authErr) + '</p>' : '') +
       '<div class="row" style="margin-top:8px"><button class="btn def" data-act="netLogin">Sign in</button><button class="btn" data-act="netRegister">Create profile</button>' +
-      '<span class="small muted">Names: 3–16 letters, digits, _ or -. Passwords: 6 or more characters.</span></div>';
+      '<span class="small muted">Names: 3–16 letters, digits, _ or -. Passwords: 6 or more characters.</span></div>' +
+      '<div class="row guestrow"><button class="btn" data-act="netGuest">Log in as guest</button><span class="small muted">No sign-up: jump straight in under a made-up name. Guests don’t get a profile or saved stats.</span></div>';
   }
   function serverListHTML() {
-    var f = N.form, h = '<div class="row spread"><h2>Server list</h2><span class="small">Signed in as <button class="linkbtn" data-act="viewProfile" data-name="' + esc(N.user) + '">' + esc(N.user) + '</button> · <button class="linkbtn" data-act="netLogout">Sign out</button></span></div>';
+    var f = N.form, h = '<div class="row spread"><h2>Server list</h2><span class="small">' + (N.guest ? 'Playing as guest <b>' + esc(N.user) + '</b>' : 'Signed in as <button class="linkbtn" data-act="viewProfile" data-name="' + esc(N.user) + '">' + esc(N.user) + '</button>') + ' · <button class="linkbtn" data-act="netLogout">Sign out</button></span></div>';
     h += '<table class="list small"><thead><tr><th>Table</th><th>Host</th><th>Players</th><th>Status</th><th><button class="btn sm" data-act="netRefresh">Refresh</button></th></tr></thead><tbody>';
     if (!N.lobbies.length) h += '<tr><td colspan="5" class="muted">No public tables right now. Start one below.</td></tr>';
     N.lobbies.forEach(function (r) {
@@ -1317,6 +1319,8 @@
     netStart();
     var who = N.viewing || N.user, h = '<div class="page scroll"><div class="pane online">', end = '</div></div>';
     if (N.status === 'none') return h + '<h2>Profile</h2><p>Profiles live on the game server, and this copy of the site isn’t connected to one.</p>' + end;
+    if (N.guest && !N.viewing) return h + '<h2>You’re playing as a guest</h2><p>Guests don’t have a profile, so ' + esc(N.user) + '’s games aren’t saved. Create a profile to keep your win/loss record, favourite archetypes and cards, and game history from now on.</p>' +
+      (N.room ? '<p class="small muted">Finish or leave your current table first: creating a profile signs you in afresh.</p>' : authForm().replace(/<div class="row guestrow">[\s\S]*$/, '')) + end;
     if (!who) return h + '<h2>Your profile</h2>' + (N.status === 'on' ? '<p class="muted">Sign in or create a profile to play online and track your games.</p>' + authForm() : '<p>Connecting to the game server…</p>') + end;
     if (N.profileFor !== who) {
       N.profileFor = who; N.profile = null;
