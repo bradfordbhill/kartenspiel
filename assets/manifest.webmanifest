@@ -1,0 +1,17 @@
+{
+  "name": "Kartenspiel",
+  "short_name": "Kartenspiel",
+  "description": "An asymmetric tableau-building card game for 2–5 players: single player against bots, pass-and-play, or online.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#008080",
+  "theme_color": "#000080",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

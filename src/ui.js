@@ -1047,6 +1047,7 @@
       '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
       '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm. A coloured bar on a card’s edge shows where an enemy-suit neighbour is pressing, in that neighbour’s owner’s colour (grey if unclaimed; corners for a Foundation’s diagonals). One away from Overwhelm, the bars glow red and the open sides are dashed red: that’s where the last enemy would go.</p>' +
       '<p><b>Hover</b> over any card to see a magnified copy with its rules text. A card with a <b>bright green border</b> has a once-per-turn ability you can use right now (and afford); select it and use the button in the right panel. The <b>Overlay</b> menu covers every card with one kind of information. <b>Quickview</b> shows each card’s ● production and ◇ value in its owner’s colour (unclaimed cards’ ● in grey), with each player’s totals above the board. <b>War</b> splits each card into one strip per enemy neighbour it takes to Overwhelm it, filled in its owner’s colour as enemies gather; a red outline means one more will do it. Log lines are color-coded: blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, gray card movement, italic gray referee edits.</p>' +
+      (ONLINE ? '<h2>Install as an app</h2><p>Add Kartenspiel to your home screen to play full screen with no browser bars: <b>Install app</b> on the Home page (Android, or Chrome and Edge on a computer), or on iPhone and iPad tap Share, then <b>Add to Home Screen</b>. Single player and pass-and-play then work offline too.</p>' : '') +
       '<h2>Drag and drop, and phones</h2><p>Drag a card from your hand onto a green space to play it, or anywhere on the board for cards played straight from hand. Drag your meeple (shown while a claim is available) onto an orange-outlined card to claim it, and drop two cards on the discard pile to discard 2 and draw 1. Clicking still works for all of it.</p><p>On a phone the game screen rearranges: your numbers and <b>End turn</b> along the top, the board in the middle, your hand along the bottom, and <b>Players</b>, <b>Log</b>, <b>Card</b> and <b>Menu</b> as tabs. Pinch to zoom, drag the board to move around, tap a card for its details, and press and hold any card to read it.</p>' +
       '<h2>A turn</h2><ol><li>Pass the device. The next player clicks <b>Start turn</b>: they gain ● from their Kingdom (3● before their Foundation is down) and draw cards (2 by default; set on the New game page). Or they take back one meeple instead, which is their whole turn.</li>' +
       '<li>Click a card in hand, then a green space. The green number is the cost there (Watchtower adds to it). Play as many cards as your ● allows.</li>' +
@@ -1217,6 +1218,7 @@
       '<div class="choices"><div class="choice raised"><h2>Single player</h2><p>Play against the computer. Choose each opponent: greedy, tactician or warlord bot.</p><div class="row"><button class="btn def big" data-act="soloSetup">Play vs bots</button>' + resume + '</div></div>' +
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
+      appBox() +
       '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>.</p></div></div>';
   }
 
@@ -1377,6 +1379,7 @@
     var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
       : [['new', 'New game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
     return '<div class="panelhead">Go to</div><div class="row">' + tabs.map(function (t) { return '<button class="btn" data-page="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      (document.fullscreenEnabled && !isStandalone() ? '<div class="row" style="margin-top:6px"><button class="btn" data-act="fullscreen">' + (document.fullscreenElement ? 'Leave full screen' : 'Full screen') + '</button></div>' : '') +
       '<div class="panelhead" style="margin-top:8px">Board</div>' + boardBar(ctx) +
       '<p class="small muted">Drag a card from your hand onto a green space to play it, and your meeple onto an orange-outlined card to claim it. Pinch to zoom, drag the board to move around, and press and hold any card to read it.</p>';
   }
@@ -1549,6 +1552,27 @@
   }
 
 
+  /* ---------------- installable app (public site) ---------------- */
+  // build.sh gives the public site a manifest, icons and a service worker (src/sw.js), so it installs as an app
+  // that opens full screen and works offline. Android and desktop Chrome hand us an install prompt to show from a
+  // button; iPhones and iPads install only from Share → Add to Home Screen, so there the Home page says how.
+  var installPrompt = null;
+  function isStandalone() { return !!(window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true; }
+  var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ONLINE && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { }); });
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installPrompt = e; render(); });
+  window.addEventListener('appinstalled', function () { installPrompt = null; toast('Kartenspiel is installed: open it from your home screen or app list.'); });
+  document.addEventListener('fullscreenchange', function () { render(); });
+  // Home page box: install (or how to, on iPhone), and full screen in the browser. Hidden once running as the app.
+  function appBox() {
+    if (!ONLINE || isStandalone()) return '';
+    var how = installPrompt ? '<button class="btn def big" data-act="installApp">Install app</button>'
+      : isIOS ? '<span>On iPhone or iPad, in Safari: tap <b>Share</b> (the square with an arrow), then <b>Add to Home Screen</b>.</span>'
+      : '<span class="small muted">In Chrome or Edge, use the install icon in the address bar, or the browser menu’s <b>Install app</b> / <b>Add to Home screen</b>.</span>';
+    var fs = document.fullscreenEnabled ? '<button class="btn big" data-act="fullscreen">' + (document.fullscreenElement ? 'Leave full screen' : 'Full screen') + '</button>' : '';
+    return '<div class="choice raised appbox"><h2>Play it like an app</h2><p>Install Kartenspiel to open it full screen from your home screen, with no browser bars. Single player and pass-and-play then work offline too.</p><div class="row">' + how + fs + '</div></div>';
+  }
+
   /* ---------------- keyboard shortcuts ---------------- */
   // Most keys press the same on-screen button a click would, so they follow its rules (a disabled button = no effect).
   var KEYS = [['Space', 'Start your turn, or the highlighted button in a dialog or the prompt bar'], ['E', 'End turn'], ['1–9', 'Pick a card in your hand, or an option in a dialog'],
@@ -1713,6 +1737,11 @@
       case 'sbReset': app.modal = null; app._sbReset = true; lsDel('ks.sandbox'); newSandbox(); render(); return;
       case 'closeModal': app.modal = null; render(); return;
       case 'keys': keysModal(); return;
+      case 'installApp': if (installPrompt) { installPrompt.prompt(); installPrompt.userChoice.then(function () { installPrompt = null; render(); }); } return;
+      case 'fullscreen':
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(function () { toast('This browser won’t go full screen here. Installing the app does it instead.'); });
+        return;
       case 'sheet': { var sh = t.getAttribute('data-sheet'); app.sheet = app.sheet === sh ? null : sh; render(); return; }
       case 'ovQuick': case 'ovWar': { var ov = a === 'ovQuick' ? 'quick' : 'war'; ctx.ui.overlay = ctx.ui.overlay === ov ? 'none' : ov; render(); return; }
       case 'newCard': openBuilder(D.make({ name: 'New card', id: '', suit: 'Sceptre', type: 'Structure', cost: 6 })); return;

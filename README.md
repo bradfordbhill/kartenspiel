@@ -20,11 +20,12 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `src/ui.js` | The interface for both apps. `KConfig.edition === 'online'` switches on the public site's pages |
 | `src/bots.js` | The bots (greedy, tactician, raider, warlord): single player in both apps, and the simulator |
 | `src/net.js` | Public site only: the connection to the game server |
+| `src/sw.js`, `assets/` | Public site only: the service worker (offline play) and the app manifest and icons, which `build.sh` copies into `site/` |
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure bars |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure bars, `e2e/app.js` installing as an app and playing offline |
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
@@ -144,6 +145,8 @@ The server is `server/server.js`, built on Node's `http` module plus the `ws` pa
 ## Deploying
 
 The site and the server deploy separately: GitHub Pages can only host static files, so the server needs a host that runs Node.
+
+**Installing as an app.** The public site is a Progressive Web App: players can add it to their home screen (Android and desktop Chrome: the Home page's **Install app** button; iPhone and iPad: Share → Add to Home Screen) and it then opens full screen with its own icon. Single player and pass-and-play work offline; online play needs the server as usual. The page is fetched fresh whenever there's a connection, so updates arrive on the next launch.
 
 **The site (GitHub Pages).** `.github/workflows/pages.yml` builds and publishes it on every push to `main`. It's served at https://bradfordbhill.github.io/kartenspiel/. Pass-and-Play works there with no server.
 

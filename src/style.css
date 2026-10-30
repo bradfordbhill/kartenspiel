@@ -439,3 +439,4 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .press .po { background: repeating-linear-gradient(90deg, #d00 0 6px, transparent 6px 10px); opacity: .9; }
 .press .po.pe-W, .press .po.pe-E { background: repeating-linear-gradient(180deg, #d00 0 6px, transparent 6px 10px); }
 .press .po.pe-NE, .press .po.pe-SE, .press .po.pe-SW, .press .po.pe-NW { background: repeating-linear-gradient(45deg, #d00 0 4px, transparent 4px 7px); }
+.appbox { margin: 0 0 12px; }

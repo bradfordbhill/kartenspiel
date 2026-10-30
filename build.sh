@@ -6,9 +6,9 @@
 set -e
 cd "$(dirname "$0")"
 
-# page TITLE SCRIPTS... : the HTML shell, style.css inline, then the scripts in load order.
+# page TITLE HEAD SCRIPTS... : the HTML shell (HEAD = extra tags for <head>), style.css inline, then the scripts in load order.
 page() {
-  local title="$1"; shift
+  local title="$1" head="$2"; shift 2
 cat <<H
 <!DOCTYPE html>
 <html lang="en">
@@ -16,6 +16,7 @@ cat <<H
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>$title</title>
+$head
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
@@ -28,10 +29,25 @@ H
   echo '</script></body></html>'
 }
 
-page 'Kartenspiel — playtest table' src/data.js src/engine.js src/bots.js src/ui.js > index.html
+page 'Kartenspiel — playtest table' '' src/data.js src/engine.js src/bots.js src/ui.js > index.html
 
 mkdir -p site
 server=$(node -e 'process.stdout.write(JSON.stringify(process.env.KARTENSPIEL_SERVER || ""))')
 echo "var KConfig = { edition: 'online', server: $server };" > site/config.js.tmp
-page 'Kartenspiel' site/config.js.tmp src/data.js src/engine.js src/bots.js src/net.js src/ui.js > site/index.html
+# the public site is an installable app: manifest, icons, and a service worker for offline play
+app_head='<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#000080">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kartenspiel">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/favicon-32.png">'
+page 'Kartenspiel' "$app_head" site/config.js.tmp src/data.js src/engine.js src/bots.js src/net.js src/ui.js > site/index.html
 rm site/config.js.tmp
+mkdir -p site/icons
+cp assets/icons/*.png site/icons/
+cp assets/manifest.webmanifest site/
+# a new page means a new cache: the service worker's version is a hash of the page
+version=$(node -e 'process.stdout.write(require("crypto").createHash("sha1").update(require("fs").readFileSync("site/index.html")).digest("hex").slice(0, 12))')
+sed "s/__VERSION__/$version/" src/sw.js > site/sw.js

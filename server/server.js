@@ -82,7 +82,7 @@ function createServer(opts) {
     const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
     const full = path.join(SITE, file);
     if (!full.startsWith(SITE) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) return send(res, 404, 'Not found', 'text/plain');
-    const type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml' }[path.extname(full)] || 'application/octet-stream';
+    const type = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.json': 'application/json' }[path.extname(full)] || 'application/octet-stream';
     send(res, 200, fs.readFileSync(full), type);
   });
 
