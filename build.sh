@@ -1,4 +1,6 @@
 #!/bin/bash
+# Builds index.html: the HTML shell, then style.css inline, then the three scripts in load order.
+# data.js and engine.js must come before ui.js.
 {
 cat <<'H'
 <!DOCTYPE html>

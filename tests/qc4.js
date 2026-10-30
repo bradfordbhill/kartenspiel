@@ -1,3 +1,6 @@
+// Rule variants from the New game page: burial raises Overwhelm, Defense tokens, building discount,
+// no wandering, Ascension. Each is checked switched on and, where it matters, switched off.
+// Run: node tests/qc4.js
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a){const r=E.apply(st,a); if(r.error) throw new Error(a.t+': '+r.error); st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]);

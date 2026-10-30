@@ -1,3 +1,5 @@
+// Curse cards (Mildew, Intoxicate, Fortune Teller, Tunnel, Usurp, ...) and You’ll Regret That.
+// Run: node tests/qc5.js
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a){const r=E.apply(st,a); if(r.error) throw new Error(a.t+': '+r.error); st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]);

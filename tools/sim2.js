@@ -2,6 +2,8 @@
 //  greedy    – best short-term gain for itself (as in the first analysis)
 //  tactician – greedy, plus uses every ready ability every turn (Tithing Hall, Funeral Pyre, Confessional, University, ...)
 //  raider    – values damage to opponents highly; aims Ruins and Curses at opponents' biggest ● and ◇ producers; also uses abilities
+// Usage: node tools/sim2.js <players> <first game> <last game> <output.json>
+// Every bot move is tried on a copy of the state with E.apply and scored with evalState; the best one is kept.
 const D=require('../src/data.js'), E=require('../src/engine.js'), fs=require('fs');
 const ARCH=['Archbishop','Hedonist','Warmonger','Cryptkeeper','Gardener','Philosopher'], STRATS=['greedy','tactician','raider'];
 const MAIN={Archbishop:'Sceptre',Hedonist:'Goblet',Warmonger:'Sword',Cryptkeeper:'Bone',Gardener:'Leaf',Philosopher:'Tome'};
@@ -10,6 +12,7 @@ function tot(st,p){return E.scores(st)[p].total;}
 function oppSum(st,p,f){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m+=f(st,i)});return m;}
 function oppBest(st,p){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m=Math.max(m,tot(st,i))});return m;}
 function cardWorth(st,k){ const u=E.top(st,k), c=st.cards[u]; if(!c.claimants.length) return 0; return E.cardValue(st,k,c.claimants[0])+2*E.cardIncome(st,k); }
+// Answer every pending prompt the way this bot would. Returns the new state, or null if it got stuck.
 function resolve(st,me,strat){
   let g=0; while(st&&st.pending&&g++<16){ const pd=st.pending, p=pd.player; let v;
     if(pd.kind==='cell'){ const opts=pd.options;
@@ -29,11 +32,14 @@ function resolve(st,me,strat){
     else v=true;
     const n=ap(st,{t:'answer',v}); if(!n) { const n2=ap(st,{t:'answer',v:pd.kind==='cell'?(pd.options[0]||null):v}); if(!n2) return null; st=n2; } else st=n; }
   if(st&&st.reveal) st=ap(st,{t:'closeReveal'}); return st; }
+// How much better st is than st0 for player p: own ◇ and ● gained, minus what opponents gained.
 function evalState(st0,st,p,strat){ const rem=6;
   const mine=(tot(st,p)-tot(st0,p)) + 0.5*(E.income(st,p)-E.income(st0,p))*rem/3;
   if(strat==='raider') return mine - 1.0*(oppSum(st,p,tot)-oppSum(st0,p,tot)) - 0.4*(oppSum(st,p,E.income)-oppSum(st0,p,E.income))*rem/3;
   return mine - 0.6*(oppBest(st,p)-oppBest(st0,p)); }
+// Try every possible claim and keep the best one, if any is worth it.
 function bestClaim(st,p,strat){ let best=null,bv=0.01; for(const k of E.claimOptions(st,p)){ const s=ap(st,{t:'claim',k}); if(!s) continue; const v=evalState(st,s,p,strat); if(v>bv){bv=v;best=s;} } return best; }
+// Use ready abilities. Greedy bots only use ●-for-◇ exchanges.
 function useAbilities(st,p,strat,stats){
   for(let pass=0;pass<3;pass++){ let used=false;
     for(const k of E.keys(st)){ if(!E.abilityReady(st,k)) continue; const d=E.def(st,E.top(st,k));
@@ -43,6 +49,7 @@ function useAbilities(st,p,strat,stats){
       st=s; used=true; stats.abil[d.id]=(stats.abil[d.id]||0)+1; }
     if(!used) break; }
   return st; }
+// One whole bot turn: start, Foundation, abilities, then up to 6 best plays (each with its best claim), then end.
 function turn(st,stats,strats){ const p=st.cur, strat=strats[p]; let s0=ap(st,{t:'startTurn'}); if(!s0) return null; st=s0; const pl=()=>st.players[p];
   if(!pl().foundationPlaced){ const L=E.legalCells(st,pl().foundationUid); const k=Object.keys(L)[0]; const s=resolve(ap(st,{t:'play',uid:pl().foundationUid,k}),p,strat); if(s) st=s; }
   if(strat!=='greedy') st=useAbilities(st,p,strat,stats);
@@ -58,6 +65,7 @@ function turn(st,stats,strats){ const p=st.cur, strat=strats[p]; let s0=ap(st,{t
   stats.left.push(pl().ap); stats.inc.push(E.income(st,p));
   let e=ap(st,{t:'endTurn'}); if(e&&e.pending) e=resolve(e,p,strat); if(e) st=e; else return null;
   return st; }
+// Game g for n players. Archetypes and strategies rotate with g so every combination gets played.
 function game(n,g,stats){
   const combos=[]; (function rec(s,a){ if(a.length===n){combos.push(a);return;} for(let i=s;i<6;i++) rec(i+1,a.concat(ARCH[i])); })(0,[]);
   const c=combos[g%combos.length], rot=Math.floor(g/combos.length)%n; const archs=c.slice(rot).concat(c.slice(0,rot));
@@ -65,6 +73,7 @@ function game(n,g,stats){
   let st=E.newGame(D.STARTER,{players:archs.map((a,i)=>({name:'P'+i,arch:a})),seed:5000+g+n*1000}); let guard=0;
   while(st.winner==null && st.round<=30 && guard++<400){ if(st.pending) { st=resolve(st,st.cur,strats[st.cur]); if(!st) break; continue; } const s=turn(st,stats,strats); if(!s) break; st=s; }
   return {st,archs,strats}; }
+// Command line: play games [from, to) (stopping after ~255 s) and save results for analyze2.js.
 if(require.main===module){
   const n=+process.argv[2], from=+process.argv[3], to=+process.argv[4], out=process.argv[5];
   const stats={played:{},abil:{},left:[],inc:[]}, games=[], cards={};

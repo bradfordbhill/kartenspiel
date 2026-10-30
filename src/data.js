@@ -4,6 +4,7 @@ var KData = (function () {
   var TYPES = ['Foundation', 'Structure', 'Grounds', 'Action', 'Blessing', 'Curse'];
   var ALL4 = ['N', 'E', 'S', 'W'];
 
+  // Every card gets every field: defaults first, then the card's own values on top.
   function c(o) {
     var d = {
       id: '', name: '', suit: 'Sceptre', type: 'Structure', cost: 0, copies: 1,
@@ -16,6 +17,23 @@ var KData = (function () {
     return d;
   }
 
+  // The starter library (87 cards). Card fields:
+  //   id                    unique; used in saves and to look the card up
+  //   name, suit, type      type is one of TYPES above
+  //   cost, income          ● to place it; ● it gives its owner each turn
+  //   copies                how many go in the deck (Foundations start in hand instead)
+  //   text, note            rules text shown on the card; designer note shown in the library
+  //   place                 sides that may touch existing cards: some of N/E/S/W, or 'diag' for corners only
+  //   overwhelm             enemy neighbours needed to Overwhelm it; null = default (3, Foundations 8)
+  //   score                 how it is worth ◇: { kind, n, m, suit }. Formulas: cardValue0 in engine.js
+  //   sees                  what the UI highlights when the card is selected
+  //   onPlay                effect steps run when it's played. Handlers: H in engine.js
+  //   ability               once-per-turn ability: { kind, pay, gain, ... }
+  //   curse                 Curse cards only: { mode: 'under' | 'top', effect, releasedBy }
+  //   perTurn, incomePerToken   token growth and ● per token (Acorn)
+  //   mods                  special rule flags the engine looks for (adjacentCost, multiClaim, reaction, ...)
+  //   archetype, weakTo     Foundations only: the archetype it belongs to, and the suit that archetype can't play
+  //   art                   image as a data URL ('' for none)
   var STARTER = [
    {
     "id": "mausoleum",

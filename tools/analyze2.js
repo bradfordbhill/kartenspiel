@@ -1,3 +1,6 @@
+// Reads every tools/simout/*.json written by sim2.js, prints a balance summary (win rates by
+// archetype, bot strategy and seat; ● usage; strongest and weakest cards) and writes tools/analysis2.json.
+// Run: node tools/analyze2.js
 const fs=require('fs'); const files=fs.readdirSync(__dirname + '/simout').filter(f=>f.endsWith('.json'));
 let G=[], played={}, abil={}, left=[], inc=[], cards={};
 files.forEach(f=>{ const o=JSON.parse(fs.readFileSync(__dirname + '/simout/'+f)); G=G.concat(o.games); for(const k in o.stats.played) played[k]=(played[k]||0)+o.stats.played[k]; for(const k in o.stats.abil) abil[k]=(abil[k]||0)+o.stats.abil[k]; left=left.concat(o.stats.left); inc=inc.concat(o.stats.inc);

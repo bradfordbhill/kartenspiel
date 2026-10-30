@@ -1,3 +1,5 @@
+// Seat start, Foundation scoring (Mausoleum, Palace), Obelisk, Warcamp Reserves, Confessional.
+// Run: node tests/qc6.js
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a,soft){const r=E.apply(st,a); if(r.error){ if(soft) return; throw new Error(a.t+': '+r.error);} st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]); const ans=v=>A({t:'answer',v});

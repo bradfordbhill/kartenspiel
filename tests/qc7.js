@@ -1,3 +1,5 @@
+// Abilities, reactions and burial effects: Royal Seal, Artillery, Scrying Pool, Repent, Brambles,
+// Standard Bearer, Destroying Angel, Decay, and others. Run: node tests/qc7.js
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a){const r=E.apply(st,a); if(r.error) throw new Error(a.t+': '+r.error); st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]); const ans=v=>A({t:'answer',v});

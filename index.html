@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+/* Kartenspiel styles: a Windows 95 look. Colors are variables here, redefined for dark mode below. */
+/* Rules later in the file override earlier ones, so the newer tweaks sit near the bottom. */
 :root {
   --desk: #008080; --face: #c0c0c0; --hi: #ffffff; --lo: #808080; --dk: #000000;
   --text: #000000; --field: #ffffff; --title1: #000080; --title2: #1084d0; --titletext: #ffffff;
@@ -19,6 +21,7 @@
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* Dark mode follows the system unless data-theme="light"; data-theme="dark" forces it. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --desk: #0c3434; --face: #4b4b4b; --hi: #757575; --lo: #2a2a2a; --dk: #0a0a0a;
@@ -53,6 +56,7 @@ button, input, select, textarea { font: inherit; color: var(--text); }
 .btn:focus-visible, .cellbtn:focus-visible, .tab:focus-visible { outline: 1px dotted var(--text); outline-offset: -5px; }
 .btn.sm { padding: 0 6px; min-height: 20px; }
 .btn.def { outline: 1px solid var(--dk); }
+/* form fields */
 input[type=text], input[type=number], select, textarea { background: var(--field); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); padding: 2px 4px; min-height: 22px; }
 textarea { width: 100%; resize: vertical; }
 input[type=number] { width: 64px; }
@@ -99,6 +103,7 @@ legend { padding: 0 3px; }
   .gamegrid > .center { min-height: 70vh; }
   .boardwrap { min-height: 60vh; }
 }
+/* players panel and log */
 .players { width: 100%; border-collapse: collapse; }
 .players td, .players th { padding: 2px 3px; text-align: left; white-space: nowrap; }
 .players th { font-weight: 400; color: var(--muted); }
@@ -108,6 +113,7 @@ legend { padding: 0 3px; }
 .log div { padding: 1px 0; border-bottom: 1px dotted var(--lo); }
 .log div.turn { font-weight: 700; border-bottom: none; padding-top: 4px; }
 
+/* board */
 .boardbar { padding: 2px 4px; }
 .boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: #f4f4ee; background-image: radial-gradient(#d4d4c8 1px, transparent 1px); background-size: 12px 12px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); } }
@@ -158,6 +164,7 @@ legend { padding: 0 3px; }
 .suitico { width: 13px; height: 13px; vertical-align: -2px; }
 .card.big .suitico { width: 18px; height: 18px; }
 
+/* hand */
 .hand { display: flex; gap: 6px; padding: 6px; overflow-x: auto; min-height: 134px; align-items: flex-start; }
 .hcard { position: relative; width: 88px; height: 118px; flex: 0 0 auto; }
 .hcard .cellbtn { z-index: 3; }
@@ -179,6 +186,7 @@ table.list td { padding: 2px 6px; white-space: nowrap; border-bottom: 1px dotted
 table.list tr.sel td { background: var(--sel); color: var(--seltext); }
 table.list tr { cursor: default; }
 
+/* two-column pages (library, card builder) and forms */
 .split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 4px; }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
 .form { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 5px 8px; align-items: center; }
@@ -257,12 +265,14 @@ body { font-size: 13px; }
 .hcard.afford .card { box-shadow: 0 0 0 3px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }
 .hcard.afford.sel .card { box-shadow: 0 0 0 3px #19e619, 0 0 0 6px var(--focus); outline: none; }
 .boardsizer.aiming, .boardsizer.aiming .cellbtn { cursor: var(--sword), crosshair; }
+/* cracks that grow as a card nears Overwhelm */
 .card.crack1::after, .card.crack2::after, .card.crack3::after { content: ""; position: absolute; inset: 0; pointer-events: none; background-repeat: no-repeat; background-size: 100% 100%; }
 .card.crack1::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40' fill='none' stroke='%23333' stroke-width='1.6'/%3E%3C/svg%3E"); }
 .card.crack2::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40 L64 52 M0 70 L16 64 L22 74 L36 70 L42 82' fill='none' stroke='%23333' stroke-width='1.8'/%3E%3C/svg%3E"); }
 .card.crack3::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 118'%3E%3Cpath d='M70 0 L62 18 L68 26 L58 40 L64 52 L52 64 L58 78 M0 70 L16 64 L22 74 L36 70 L42 82 L52 64 M88 96 L74 92 L70 104 L58 100 L50 118 M30 0 L34 14 L26 24 L32 36' fill='none' stroke='%23b00' stroke-width='2'/%3E%3C/svg%3E"); animation: tremble .9s steps(2) infinite; }
 @keyframes tremble { 50% { transform: translate(.6px, -.4px); } }
 @media (prefers-reduced-motion: reduce) { .card.crack3::after { animation: none; } }
+/* animation layer (FX in ui.js) */
 .fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
 .fx { position: fixed; left: 0; top: 0; }
 .fx.shard { border: 1px solid rgba(0, 0, 0, .35); }
@@ -331,6 +341,7 @@ var KData = (function () {
   var TYPES = ['Foundation', 'Structure', 'Grounds', 'Action', 'Blessing', 'Curse'];
   var ALL4 = ['N', 'E', 'S', 'W'];
 
+  // Every card gets every field: defaults first, then the card's own values on top.
   function c(o) {
     var d = {
       id: '', name: '', suit: 'Sceptre', type: 'Structure', cost: 0, copies: 1,
@@ -343,6 +354,23 @@ var KData = (function () {
     return d;
   }
 
+  // The starter library (87 cards). Card fields:
+  //   id                    unique; used in saves and to look the card up
+  //   name, suit, type      type is one of TYPES above
+  //   cost, income          ● to place it; ● it gives its owner each turn
+  //   copies                how many go in the deck (Foundations start in hand instead)
+  //   text, note            rules text shown on the card; designer note shown in the library
+  //   place                 sides that may touch existing cards: some of N/E/S/W, or 'diag' for corners only
+  //   overwhelm             enemy neighbours needed to Overwhelm it; null = default (3, Foundations 8)
+  //   score                 how it is worth ◇: { kind, n, m, suit }. Formulas: cardValue0 in engine.js
+  //   sees                  what the UI highlights when the card is selected
+  //   onPlay                effect steps run when it's played. Handlers: H in engine.js
+  //   ability               once-per-turn ability: { kind, pay, gain, ... }
+  //   curse                 Curse cards only: { mode: 'under' | 'top', effect, releasedBy }
+  //   perTurn, incomePerToken   token growth and ● per token (Acorn)
+  //   mods                  special rule flags the engine looks for (adjacentCost, multiClaim, reaction, ...)
+  //   archetype, weakTo     Foundations only: the archetype it belongs to, and the suit that archetype can't play
+  //   art                   image as a data URL ('' for none)
   var STARTER = [
    {
     "id": "mausoleum",
@@ -3655,15 +3683,29 @@ if (typeof module !== 'undefined') module.exports = KData;
 /* Kartenspiel rules engine.
    Pure: apply(state, action) mutates a deep clone and returns it. No DOM.
    Every player decision is a `pending` object in state, answered with an
-   {t:'answer'} action, so the same engine can later run on a server. */
+   {t:'answer'} action, so the same engine can later run on a server.
+
+   Shorthand used throughout:
+     st        the whole game state (plain JSON, so it can be saved and undone)
+     uid / u   one physical card, e.g. "c12"; st.cards[uid] holds its in-play state
+     def       a card definition from the library; st.defs[id]
+     k         a board cell key "x,y"; st.board[k] is the stack of uids there
+     p         a player index into st.players
+     ●         Aktion points (AP), spent to play cards
+     ◇         victory points (VP)
+     claimants the players with a meeple on a card, i.e. its owners
+     res       the card effect currently resolving (see "effect resolution") */
 var KEngine = (function () {
+  // Cells are "x,y" strings. x grows east, y grows south (north is up).
   var DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
   var DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
   var SUITS = ['Sceptre', 'Goblet', 'Sword', 'Bone', 'Leaf', 'Tome'];
 
+  // K / XY convert between [x, y] and the "x,y" key used by st.board.
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function K(x, y) { return x + ',' + y; }
   function XY(k) { var a = k.split(','); return [+a[0], +a[1]]; }
+  // Seeded shuffle (uses st.seed), so the same seed always deals the same game.
   function shuffle(a, st) {
     for (var i = a.length - 1; i > 0; i--) {
       st.seed = (st.seed * 1103515245 + 12345) % 2147483648;
@@ -3674,6 +3716,8 @@ var KEngine = (function () {
   function log(st, msg) { st.log.push(msg); if (st.log.length > 400) st.log.shift(); }
 
   /* ---------- lookups ---------- */
+  // rawDef: the card's printed definition.
+  // def: the same, except a card copying another (Topiary) takes the copied card's rules.
   function rawDef(st, uid) { return st.defs[st.cards[uid].def]; }
   function def(st, uid) {
     var c = st.cards[uid], d = st.defs[c.def];
@@ -3685,18 +3729,23 @@ var KEngine = (function () {
     }
     return d;
   }
+  // Effects can change a card's suit (stored on the card); otherwise it is the printed suit.
   function suitOf(st, uid) { var c = st.cards[uid]; return c.suit || rawDef(st, uid).suit; }
   // an Ascended card counts as every suit
   function hasSuit(st, uid, s) { var c = st.cards[uid]; return !!(c && c.ascended && !c.ruined) || suitOf(st, uid) === s; }
   function suitsOf(st, uid) { var c = st.cards[uid]; return c.ascended && !c.ruined ? SUITS.slice() : [suitOf(st, uid)]; }
+  // How many cards buried at k share the top card's suit.
   function onSuitBuried(st, k) { var s = st.board[k], u = s && s[0]; if (!u) return 0; var t = suitOf(st, u); return s.slice(1).filter(function (x) { return suitOf(st, x) === t; }).length; }
+  // st.board[k] is a stack: [0] is the visible top card, the rest are buried under it.
   function top(st, k) { var s = st.board[k]; return s && s.length ? s[0] : null; }
   function keys(st) { return Object.keys(st.board).filter(function (k) { return st.board[k] && st.board[k].length; }); }
+  // Neighbouring cells: n4 = the 4 orthogonal ones, n8 = those plus the diagonals.
   function n4(k) { var p = XY(k); return ['N', 'E', 'S', 'W'].map(function (d) { return K(p[0] + DIRS[d][0], p[1] + DIRS[d][1]); }); }
   function n8(k) { var p = XY(k); return n4(k).concat(DIAG.map(function (d) { return K(p[0] + d[0], p[1] + d[1]); })); }
   function cellOf(st, uid) { var ks = keys(st); for (var i = 0; i < ks.length; i++) if (st.board[ks[i]][0] === uid) return ks[i]; return null; }
   function isFoundation(st, uid) { return rawDef(st, uid).type === 'Foundation'; }
   function owners(st, k) { var u = top(st, k); return u ? st.cards[u].claimants : []; }
+  // Does player p own the card at k? Ruined or covered cards belong to no one.
   function ownedBy(st, k, p) {
     var u = top(st, k); if (!u) return false; var c = st.cards[u]; if (c.ruined || isCovered(st, k)) return false;
     if (c.claimants.indexOf(p) >= 0) return true;
@@ -3706,14 +3755,19 @@ var KEngine = (function () {
   // Foundations and immune cards (The Wise Old Tree) can never be targeted by card effects
   function untargetable(st, uid) { return isFoundation(st, uid) || !!(rawDef(st, uid).mods || {}).immune || !!(st.cards[uid] && st.cards[uid].ascended); }
   function unburiable(st, uid) { var m = rawDef(st, uid).mods || {}; return untargetable(st, uid) || !!m.unburiable; }
+  // Foundations, Curses and kingdomOf cards (The Wise Old Tree) never take meeples.
   function unclaimable(st, uid) { var d = def(st, uid); return d.type === 'Foundation' || d.type === 'Curse' || !!(d.mods && d.mods.kingdomOf); }
+  // A player's Kingdom: every cell whose top card they own.
   function kingdom(st, p) { return keys(st).filter(function (k) { return ownedBy(st, k, p); }); }
+  // Curses have two modes: "under" (tucked beneath the target) and "top" (covers it, like Sarcophagus).
   function curseCardsUnder(st, k) {
     return (st.board[k] || []).slice(1).filter(function (u) { var d = rawDef(st, u); return d.curse && d.curse.mode === 'under'; });
   }
   function isCovered(st, k) { var u = top(st, k); if (!u) return false; var d = rawDef(st, u); return d.type === 'Curse' && d.curse && d.curse.mode === 'top' && st.board[k].length > 1; }
   function isCursed(st, k) { return curseCardsUnder(st, k).length > 0 || isCovered(st, k); }
+  // Standard Bearer buried in a stack protects it from Ruin and Overwhelm.
   function protectedStack(st, k) { var s = st.board[k]; return !!s && s.slice(1).some(function (x) { var m = rawDef(st, x).mods || {}; return m.burialEffect && m.burialEffect.protect; }); }
+  // Cards with a burialEffect (Flowers, Eye for an Eye, Standard Bearer) boost whatever they are buried under.
   function onBuried(st, u, k) {
     var m = (rawDef(st, u).mods || {}).burialEffect, t = top(st, k); if (!m || !t) return;
     var c = st.cards[t], nm = rawDef(st, t).name;
@@ -3721,17 +3775,23 @@ var KEngine = (function () {
     if (m.vp) { c.vpBonus = (c.vpBonus || 0) + m.vp; log(st, nm + ' is now worth ' + m.vp + '◇ more, permanently (' + rawDef(st, u).name + ').'); }
     if (m.protect) log(st, nm + ' cannot be Ruined or Overwhelmed while ' + rawDef(st, u).name + ' stays buried under it.');
   }
+  // With the weak-to rule on, a player can't use a reaction card of their weak suit.
   function canReact(st, q, uid) { var a = archInfo(st)[st.players[q].arch]; return !(st.opts.enforceWeak && a && a.weakTo === rawDef(st, uid).suit); }
+  // Number of Curses with effect e tucked under the stack at k.
   function curseFx(st, k, e) { return curseCardsUnder(st, k).filter(function (u) { return rawDef(st, u).curse.effect === e; }).length; }
+  // Extra cost to place at k from "tax" Curses (Eye of Newt): 3● each.
   function taxAt(st, k) { var n = 0; keys(st).forEach(function (x) { curseCardsUnder(st, x).forEach(function (u) { var c = st.cards[u]; if (rawDef(st, u).curse.effect === 'tax' && c.taxCells && c.taxCells.indexOf(k) >= 0) n++; }); }); return n * 3; }
   function noIncome(st, k) { return curseCardsUnder(st, k).some(function (u) { return rawDef(st, u).curse.effect === 'noIncome'; }); }
+  // A card works only if it is on top, not Ruined and not covered by a Curse.
   function active(st, k) { var u = top(st, k); return u && !st.cards[u].ruined && !isCovered(st, k); }
 
+  // Archetype table, read off the Foundation cards: name -> { foundation id, suit, weakTo }.
   function archInfo(st) {
     var a = {};
     Object.keys(st.defs).forEach(function (id) { var d = st.defs[id]; if (d.type === 'Foundation' && d.archetype) a[d.archetype] = { foundation: id, suit: d.suit, weakTo: d.weakTo }; });
     return a;
   }
+  // Suits that count against a card for Overwhelm: its archetype's weak suit, plus Sword (except for Sword cards).
   function enemies(st, suit) {
     var a = archInfo(st), out = [];
     Object.keys(a).forEach(function (n) { if (a[n].suit === suit && a[n].weakTo) out.push(a[n].weakTo); });
@@ -3740,27 +3800,33 @@ var KEngine = (function () {
   }
 
   /* ---------- deck ---------- */
+  // Draw for player p, shuffling the discard pile back in when the deck runs out.
   function drawOne(st, p) {
     if (!st.deck.length && st.discard.length) { st.deck = shuffle(st.discard, st); st.discard = []; log(st, 'Discard pile shuffled into the deck.'); }
     if (!st.deck.length) return null;
     var u = st.deck.shift(); st.players[p].hand.push(u); return u;
   }
   function draw(st, p, n) { var got = 0; for (var i = 0; i < n; i++) if (drawOne(st, p)) got++; return got; }
+  // Wipe a card's in-play state and put it on the discard pile.
   function toDiscard(st, uid) { var c = st.cards[uid]; c.banked = {}; c.free = null; c.ruined = false; c.suit = null; c.claimants = []; c.tokens = 0; c.copyOf = null; st.discard.push(uid); }
   // bank ◇ tokens for player p, remembering which card they came from (for the VP overlay)
   function bank(st, p, amt, uid) {
     if (!amt || !st.players[p]) return; st.players[p].tokens += amt;
     if (uid && st.cards[uid]) { var c = st.cards[uid]; c.banked = c.banked || {}; c.banked[p] = (c.banked[p] || 0) + amt; }
   }
+  // Cards in hand that can be discarded: everything except the Foundation.
   function discardable(st, p) { return st.players[p].hand.filter(function (u) { return rawDef(st, u).type !== 'Foundation'; }); }
   function removeFromHand(st, p, uid) { var h = st.players[p].hand, i = h.indexOf(uid); if (i >= 0) h.splice(i, 1); return i >= 0; }
 
   /* ---------- scoring ---------- */
+  // Full ◇ value of the card at k for player p: base value, Ascension and permanent bonuses, then halving Curses.
   function cardValue(st, k, p) {
     var u0 = top(st, k), v = cardValue0(st, k, p) + (u0 && st.cards[u0].ascended && !st.cards[u0].ruined ? 8 : 0) + (u0 && !st.cards[u0].ruined ? st.cards[u0].vpBonus || 0 : 0);
     for (var h = curseFx(st, k, 'halveValue'); h > 0; h--) v = Math.floor(v / 2);
     return v;
   }
+  // Base ◇ value from the card's `score` rule. Each `kind` is one scoring formula;
+  // the card builder's labels for them are SCORE_KINDS in ui.js.
   function cardValue0(st, k, p) {
     var u = top(st, k), c = st.cards[u], d = def(st, u), s = d.score || { kind: 'none' }, n = +s.n || 0, m = +s.m || 0;
     if (c.ruined || isCovered(st, k)) return 0;
@@ -3790,7 +3856,9 @@ var KEngine = (function () {
       default: return 0;
     }
   }
+  // Occupied cells north of k in the same column.
   function northKeys(st, k) { var p = XY(k); return keys(st).filter(function (x) { var q = XY(x); return q[0] === p[0] && q[1] < p[1]; }); }
+  // Size of the largest connected group of cells in p's Kingdom (flood fill).
   function largestRegion(st, p) {
     var kd = kingdom(st, p), seen = {}, best = 0;
     kd.forEach(function (s) {
@@ -3800,6 +3868,7 @@ var KEngine = (function () {
     });
     return best;
   }
+  // Extra ◇ for k from active northBonus cards south of it in the same column: n per card in k's stack.
   function volcanicBonus(st, k) {
     var p = XY(k), b = 0;
     keys(st).forEach(function (x) {
@@ -3821,6 +3890,7 @@ var KEngine = (function () {
     Object.keys(st.cards).forEach(function (u) { var c = st.cards[u]; var n = c.banked && c.banked[p]; if (n) { var nm = rawDef(st, u).name; by[nm] = (by[nm] || 0) + n; attributed += n; } });
     return { by: by, other: st.players[p].tokens - attributed };
   }
+  // Every player's score: card values across their Kingdom plus banked ◇ tokens.
   function scores(st) {
     return st.players.map(function (pl, p) {
       var rows = kingdom(st, p).map(function (k) { var v = cardValue(st, k, p) + volcanicBonus(st, k); return { k: k, v: v }; });
@@ -3828,13 +3898,16 @@ var KEngine = (function () {
       return { cards: cards, tokens: pl.tokens, total: cards + pl.tokens, rows: rows };
     });
   }
+  // ● available = this turn's ● plus Reserves (Warcamp). spend() uses ● first, then Reserves.
   function funds(pl) { return (pl.ap || 0) + (pl.reserve || 0); }
   function spend(pl, n) { var a = Math.min(pl.ap || 0, n); pl.ap -= a; pl.reserve = (pl.reserve || 0) - (n - a); }
+  // ● a player gets at the start of each turn. A flat 3 until their Foundation is down.
   function income(st, p) {
     var pl = st.players[p];
     if (!pl.foundationPlaced) return 3;
     return kingdom(st, p).reduce(function (a, k) { return a + cardIncome(st, k); }, 0);
   }
+  // ● one card produces per turn: printed income, tokens, Ascension and bonuses, adjusted by Curses.
   function cardIncome(st, k) {
     if (!active(st, k) || noIncome(st, k)) return 0;
     var u = top(st, k), d = def(st, u);
@@ -3844,6 +3917,7 @@ var KEngine = (function () {
   }
 
   /* ---------- placement ---------- */
+  // Why player p can't play this card at all, as a message, or null if they can.
   function playBlock(st, p, uid) {
     var d = rawDef(st, uid), pl = st.players[p], a = archInfo(st)[pl.arch];
     if (st.opts.sandbox) return null;
@@ -3854,7 +3928,9 @@ var KEngine = (function () {
     if (lim) { var own = kingdom(st, p).filter(function (k) { return hasSuit(st, top(st, k), lim.suit); }).length; if (own > lim.n) return 'You own more than ' + lim.n + ' ' + lim.suit + ' cards.'; }
     return null;
   }
+  // A card set aside by Last Will and Testament is free on the turn it comes back to hand.
   function isFree(st, uid) { var c = st.cards[uid], pl = st.players[st.cur]; return c.free != null && pl && c.free === pl.turns && pl.hand.indexOf(uid) >= 0; }
+  // Cost to place a card at k: printed cost + neighbours' adjacentCost (Watchtower) + tax Curses - building discount.
   function placeCost(st, uid, k) {
     if (isFree(st, uid)) return 0;
     var d = rawDef(st, uid), extra = 0;
@@ -3863,6 +3939,8 @@ var KEngine = (function () {
     if (st.opts.adjDiscount && st.cur != null && n4(k).some(function (x) { return ownedBy(st, x, st.cur); })) total = Math.max(0, total - 3);
     return total;
   }
+  // Every empty cell where the card may go, mapped to its cost. A cell is legal when it touches
+  // at least one card and every touching side is in the card's `place` list. "diag" = corners only.
   function legalCells(st, uid) {
     var occ = keys(st), out = {};
     if (!occ.length) { out[K(0, 0)] = placeCost(st, uid, K(0, 0)); return out; }
@@ -3882,12 +3960,15 @@ var KEngine = (function () {
   }
 
   /* ---------- ruin / overwhelm / elimination ---------- */
+  // Send the meeples on a card home (a Foundation's fixed claim stays).
   function returnMeeples(st, uid) {
     var c = st.cards[uid];
     if (!c.fixed) c.claimants.forEach(function (o) { if (st.players[o]) st.players[o].meeples++; });
     c.claimants = c.fixed ? c.claimants : [];
     if (c.parked) { Object.keys(c.parked).forEach(function (o) { if (st.players[o]) st.players[o].meeples += c.parked[o]; }); c.parked = null; }
   }
+  // Ruin the card at k (or Overwhelm it, when how is "overwhelm"), credited to player `actor`.
+  // In order: protection, Defense tokens, Rear Guard swap, queue reactions, flip, Foundation payouts.
   function ruinAt(st, k, actor, how) {
     var u = top(st, k); if (!u) return; var c = st.cards[u]; if (c.ruined) return;
     if (protectedStack(st, k)) { log(st, rawDef(st, u).name + ' is protected by a Standard Bearer buried under it.'); return; }
@@ -3905,6 +3986,7 @@ var KEngine = (function () {
       var srcK = st.res.srcKey;
       ownersBefore.forEach(function (o) { var rg = st.players[o] && !st.players[o].out && o !== actor && st.players[o].hand.filter(function (h) { return (rawDef(st, h).mods || {}).reaction === 'ruinedByStructure'; })[0]; if (rg) (st.reactions = st.reactions || []).push({ p: o, uid: rg, key: srcK, kind: 'regret' }); });
     }
+    // The Ruin itself: flip the card and send its meeples home.
     var wasFoundation = isFoundation(st, u), owner = c.claimants[0];
     c.ruined = true; if (how === 'overwhelm') c.overwhelmed = true;
     returnMeeples(st, u);
@@ -3923,6 +4005,7 @@ var KEngine = (function () {
     giantsReact(st, k);
     if (wasFoundation && how === 'overwhelm' && owner != null && !st.opts.sandbox) eliminate(st, owner);
   }
+  // A player whose Foundation is Overwhelmed is out: their cards are Ruined. Last one standing wins.
   function eliminate(st, p) {
     var pl = st.players[p]; if (pl.out) return; pl.out = true;
     log(st, pl.name + '’s Foundation was Overwhelmed. ' + pl.name + ' is out of the game.');
@@ -3931,6 +4014,8 @@ var KEngine = (function () {
     var alive = st.players.map(function (q, i) { return q.out ? -1 : i; }).filter(function (i) { return i >= 0; });
     if (alive.length === 1) { st.winner = alive[0]; log(st, st.players[alive[0]].name + ' wins: last player standing.'); }
   }
+  // n = enemy-suit neighbours; th = how many it takes to Overwhelm (3 by default,
+  // 8 for Foundations, which also count diagonals), adjusted by burials and Curses.
   function overwhelmCount(st, k) {
     var u = top(st, k); if (!u) return null;
     var fd = isFoundation(st, u), d = def(st, u), en = enemies(st, suitOf(st, u));
@@ -3940,6 +4025,7 @@ var KEngine = (function () {
     var minus = curseFx(st, k, 'owMinus') + curseFx(st, k, 'intoxicate');
     return { n: n, th: Math.max(1, th + bonus - minus), bonus: bonus, minus: minus };
   }
+  // Overwhelm every card at or past its threshold. Repeats, since one Overwhelm can set off another.
   function checkOverwhelm(st, actor) {
     var again = true, guard = 0;
     while (again && guard++ < 50) {
@@ -3950,6 +4036,7 @@ var KEngine = (function () {
       });
     }
   }
+  // Watchmaker's Shop: the moment all 4 sides fill, its neighbours rotate clockwise.
   function checkWatchmakers(st) {
     keys(st).forEach(function (k) {
       var u = top(st, k); if (!active(st, k)) return; var d = def(st, u); var c = st.cards[u];
@@ -3964,6 +4051,7 @@ var KEngine = (function () {
       c.wasSurrounded = full;
     });
   }
+  // Placing the right suit next to a covering Curse destroys it and returns the card beneath to its owners.
   function checkSarcophagusRelease(st, placedKey) {
     var u = top(st, placedKey); if (!u) return; var s = suitOf(st, u);
     n4(placedKey).forEach(function (x) {
@@ -3978,6 +4066,7 @@ var KEngine = (function () {
     });
   }
   // ---- movement triggers (Ballroom, Sleeping Giant) ----
+  // After a card moves into toKey: Ballroom draws and Sleeping Giant. _depth stops chains of moves looping forever.
   function moved(st, toKey) {
     st._depth = (st._depth || 0) + 1; if (st._depth > 8) { st._depth--; return; }
     var mover = top(st, toKey);
@@ -3988,6 +4077,7 @@ var KEngine = (function () {
     giantsReact(st, toKey);
     st._depth--;
   }
+  // A Sleeping Giant next to k moves onto it, burying it.
   function giantsReact(st, k) {
     n4(k).forEach(function (gk) { var g = top(st, gk); if (!g || !active(st, gk) || !mods(st, g).giant || !top(st, k)) return; giantMove(st, gk, k); });
   }
@@ -4001,6 +4091,7 @@ var KEngine = (function () {
     log(st, rawDef(st, g).name + ' moves onto ' + rawDef(st, tu).name + ' at ' + tk + ' and buries it (its claims end).');
     moved(st, tk);
   }
+  // Everything that happens when the current player ends their turn.
   function endOfTurnEffects(st) {
     // Acorn-style tokens that grow at the end of every turn
     var me = st.cur;
@@ -4019,6 +4110,7 @@ var KEngine = (function () {
       moved(st, to);
     });
   }
+  // Alchemy Lab: when three neighbours share a suit, its owner may give them three different suits.
   function checkAlchemy(st) {
     keys(st).forEach(function (k) {
       var u = top(st, k); if (!active(st, k) || !mods(st, u).alchemy) return; var c = st.cards[u], o = c.claimants[0];
@@ -4028,6 +4120,8 @@ var KEngine = (function () {
       c.alchemyFired = !!hit;
     });
   }
+  // Start the next queued reaction, unless an effect is already resolving. Each reaction becomes its own
+  // st.res with a short list of steps, usually starting with a yes/no confirm for the reacting player.
   function runReactions(st) {
     if (st.res || !st.reactions || !st.reactions.length || st.winner != null) return;
     var r = st.reactions.shift();
@@ -4046,6 +4140,7 @@ var KEngine = (function () {
     st.res = { kind: 'reaction', src: r.uid, srcKey: r.key, player: r.p, steps: steps, i: 0, sub: null, ctx: { affected: [] }, phase: null };
     runRes(st);
   }
+  // Brambles: offered to other players once when a card gets one enemy away from Overwhelm.
   function checkOneAway(st) {
     if (st.opts.sandbox) return;
     keys(st).forEach(function (k) {
@@ -4056,6 +4151,7 @@ var KEngine = (function () {
       st.players.forEach(function (q, qi) { if (qi === st.cur || q.out) return; var b = q.hand.filter(function (h) { return (rawDef(st, h).mods || {}).reaction === 'oneAway'; })[0]; if (b && canReact(st, qi, b)) (st.reactions = st.reactions || []).push({ p: qi, uid: b, key: k, kind: 'brambles' }); });
     });
   }
+  // Defense tokens (one per two same-suit burials) and Ascension (five suits in one stack).
   function checkDefenseAndAscension(st) {
     keys(st).forEach(function (k) {
       var u = top(st, k), c = st.cards[u]; if (!u || c.ruined || isCovered(st, k)) return;
@@ -4066,6 +4162,7 @@ var KEngine = (function () {
       }
     });
   }
+  // All the automatic rule checks, run after anything changes the board. The order matters.
   function afterBoardChange(st, actor) {
     (st.moves || []).splice(0).forEach(function (k) { if (top(st, k)) moved(st, k); });
     checkDefenseAndAscension(st);
@@ -4073,6 +4170,7 @@ var KEngine = (function () {
   }
 
   /* ---------- targeting ---------- */
+  // Cells an effect step can reach, from step.area: around the source card, the player's Kingdom, the whole board, ...
   function area(st, res, step) {
     var p = res.player, src = res.srcKey, out = [];
     var a = step.area || 'adjacent';
@@ -4087,6 +4185,7 @@ var KEngine = (function () {
     else out = keys(st);
     return out.filter(function (k, i) { return out.indexOf(k) === i && k !== src && top(st, k); });
   }
+  // area() narrowed down to the legal targets for one kind of effect ("ruin", "curse", "copy", ...).
   function targets(st, res, step, kind) {
     return area(st, res, step).filter(function (k) {
       var u = top(st, k), c = st.cards[u], d = rawDef(st, u);
@@ -4106,8 +4205,18 @@ var KEngine = (function () {
   }
 
   /* ---------- effect resolution (resumable) ---------- */
+  // How effects work. A card's onPlay is a list of steps, e.g. [{ do: "ruin", area: "adjacent" }].
+  // st.res is the effect being resolved: its steps, the current step index i, the source card (src, srcKey),
+  // res.ctx (notes shared between steps) and res.sub (one step's progress across several prompts).
+  // Each step runs through its handler in H below: H[step.do](st, res, step, ans).
+  //   - First call: ans is undefined. If a choice is needed, return a prompt object; it becomes st.pending.
+  //   - Once the player answers, the handler is called again with ans. Return "done" to go to the next step.
+  //
+  // pend fills in which player answers a prompt (the effect's player unless set).
   function pend(res, o) { o.player = o.player != null ? o.player : res.player; return o; }
+  // Note a cell this effect touched. Actions are later buried under one of these.
   function affect(res, k) { if (k && res.ctx.affected.indexOf(k) < 0) res.ctx.affected.push(k); }
+  // Reveal cards until one of `suit` turns up and draw it. The rest go to the discard pile or the bottom of the deck.
   function revealUntil(st, res, suit, rest) {
     var shown = [], found = null, guard = st.deck.length + st.discard.length + 1;
     while (guard-- > 0) {
@@ -4122,10 +4231,12 @@ var KEngine = (function () {
     log(st, 'Revealed ' + (shown.length ? shown.map(function (u) { return rawDef(st, u).name; }).join(', ') + ', then ' : '') + (found ? rawDef(st, found).name + ' (drawn)' : 'no ' + suit + ' card') + '.');
   }
 
+  // Step handlers, keyed by the `do` name used in the card data. Cards that use each are noted where it isn't obvious.
   var H = {
     draw: function (st, res, s) { draw(st, res.player, +s.n || 1); log(st, st.players[res.player].name + ' draws ' + (s.n || 1) + '.'); return 'done'; },
     gainAP: function (st, res, s) { st.players[res.player].ap += +s.n || 0; log(st, st.players[res.player].name + ' gains ' + s.n + '●.'); return 'done'; },
     discardHand: function (st, res) { var pl = st.players[res.player]; var keep = pl.hand.filter(function (u) { return rawDef(st, u).type === 'Foundation'; }); discardable(st, res.player).forEach(function (u) { st.discard.push(u); }); pl.hand = keep; log(st, pl.name + ' discards their hand' + (keep.length ? ' (keeping their Foundation)' : '') + '.'); return 'done'; },
+    // Turn the Soil: draw up to hand size (+ plus).
     drawTo: function (st, res, s) { var pl = st.players[res.player], extra = +s.plus || 0;
       if (s.plusPer) extra += Math.floor(kingdom(st, res.player).filter(function (k) { return hasSuit(st, top(st, k), s.plusPer.suit); }).length / (+s.plusPer.per || 1));
       var want = st.opts.handSize + extra; draw(st, res.player, Math.max(0, want - pl.hand.length)); return 'done'; },
@@ -4235,6 +4346,7 @@ var KEngine = (function () {
       if (!t.length) return 'done';
       return pend(res, { kind: 'cell', options: t, prompt: 'Choose a card to draw a buried card from (' + (sub.got + 1) + ' of ' + n + ').', verb: 'dig', optional: true });
     },
+    // Portcullis: the owner of a chosen card discards down to n.
     discardDownTo: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = {});
       if (sub.stage === 'hand') {
@@ -4252,6 +4364,7 @@ var KEngine = (function () {
       if (extra <= 0) { log(st, st.players[v].name + ' already has ' + s.n + ' or fewer cards.'); return 'done'; }
       sub.stage = 'hand'; return { kind: 'hand', player: v, count: extra, options: vopts, prompt: st.players[v].name + ': discard ' + extra + ' card' + (extra > 1 ? 's' : '') + ' (Portcullis).' };
     },
+    // Topiary: become a copy of an adjacent card (see def()).
     copy: function (st, res, s, ans) {
       if (ans === undefined) {
         var t = targets(st, res, s, 'copy');
@@ -4261,6 +4374,7 @@ var KEngine = (function () {
       st.cards[res.src].copyOf = st.cards[top(st, ans)].copyOf || st.cards[top(st, ans)].def; affect(res, ans);
       log(st, rawDef(st, res.src).name + ' now copies ' + rawDef(st, top(st, ans)).name + '.'); return 'done';
     },
+    // Volcanic Soil: owners of cards north of it bank ◇ once.
     northBonusOnce: function (st, res, s) {
       if (!res.srcKey) return 'done';
       var q = XY(res.srcKey), any = false;
@@ -4275,7 +4389,9 @@ var KEngine = (function () {
       if (!any) log(st, 'No owned cards north of ' + rawDef(st, res.src).name + '.');
       return 'done';
     },
+    // Reactions cost ● from the player's next turn.
     payDebt: function (st, res, s) { var pl = st.players[res.player]; pl.debt = (pl.debt || 0) + (+s.n || 0); if (s.discard) { removeFromHand(st, res.player, res.src); toDiscard(st, res.src); } log(st, pl.name + ' plays ' + rawDef(st, res.src).name + '; their next turn starts with ' + s.n + '● less.'); return 'done'; },
+    // Brambles: grows on top of the threatened card, burying it, and is claimed by the reacting player.
     brambles: function (st, res, s) {
       var k = res.srcKey, u = top(st, k), p = res.player, pl = st.players[p]; if (!u || st.cards[u].ruined) return 'done';
       removeFromHand(st, p, res.src); returnMeeples(st, u); st.board[k].unshift(res.src);
@@ -4284,6 +4400,7 @@ var KEngine = (function () {
       log(st, pl.name + ' grows Brambles over ' + rawDef(st, u).name + ': it and everything under it are buried' + (st.cards[res.src].claimants.length ? ', and ' + pl.name + ' claims the Brambles' : '') + '. Next turn starts with 3● less.');
       return 'done';
     },
+    // Royal Seal: claim any unclaimed card; a Structure's onPlay runs again.
     royalClaim: function (st, res, s, ans) {
       var p = res.player;
       if (ans === undefined) {
@@ -4298,6 +4415,7 @@ var KEngine = (function () {
       if (d.type === 'Structure' && (d.onPlay || []).length) (st.reactions = st.reactions || []).push({ p: p, uid: u, key: ans, kind: 'replay' });
       return 'done';
     },
+    // Scrying Pool: re-run the onPlay of a Structure you own.
     scry: function (st, res, s, ans) {
       var p = res.player;
       if (ans === undefined) {
@@ -4307,15 +4425,18 @@ var KEngine = (function () {
       }
       (st.reactions = st.reactions || []).push({ p: p, uid: top(st, ans), key: ans, kind: 'replay' }); return 'done';
     },
+    // Bread and Circuses: 1◇ per unbroken card east of the chosen one.
     eastChain: function (st, res, s, ans) {
       if (ans === undefined) return pend(res, { kind: 'cell', options: keys(st), prompt: 'Choose a card. You earn 1◇ for each unbroken non-Ruined card east of it.', verb: 'target' });
       var q = XY(ans), n = 0, x = q[0] + 1; for (;;) { var t = top(st, K(x, q[1])); if (!t || st.cards[t].ruined) break; n++; x++; }
       if (n) bank(st, res.player, n, res.src); log(st, st.players[res.player].name + ' banks ' + n + '◇ from the crowd east of ' + rawDef(st, top(st, ans)).name + '.'); affect(res, ans); return 'done';
     },
+    // Decay: tokens have no effect yet.
     decayToken: function (st, res, s, ans) {
       if (ans === undefined) { var t = n4(res.srcKey).filter(function (k) { return top(st, k) && !untargetable(st, top(st, k)); }); if (!t.length) return 'done'; return pend(res, { kind: 'cell', options: t, prompt: 'Place a Decay token on an adjacent card.', verb: 'target' }); }
       var c = st.cards[top(st, ans)]; c.decay = (c.decay || 0) + 1; log(st, rawDef(st, c.uid).name + ' gets a Decay token (' + c.decay + ').'); return 'done';
     },
+    // Fortune Teller: name a suit; sets ctx.fortuneOk, which later steps can `require`.
     fortune: function (st, res, s, ans) {
       if (ans === undefined) return pend(res, { kind: 'suit', options: SUITS, prompt: 'Name a suit, then the top card of the deck is revealed.' });
       if (!st.deck.length && st.discard.length) { st.deck = shuffle(st.discard, st); st.discard = []; }
@@ -4324,6 +4445,7 @@ var KEngine = (function () {
       log(st, 'The top card is ' + rawDef(st, tc).name + ' (' + rawDef(st, tc).suit + '): ' + (hit ? 'the fortune holds.' : 'the fortune fails.'));
       return 'done';
     },
+    // Extra effects for some Curses once they land: Tunnel, Exile, Usurp, Eye of Newt (tax).
     curseExtra: function (st, res, s) {
       var k = res.ctx.curseTarget; if (!k || res.ctx.curseBlocked || !top(st, k)) return 'done';
       var u = top(st, k), c = st.cards[u], nm = rawDef(st, u).name;
@@ -4333,6 +4455,7 @@ var KEngine = (function () {
       if (s.kind === 'tax') { st.cards[res.src].taxCells = n4(k).filter(function (x) { return !top(st, x); }); log(st, 'The spaces around ' + nm + ' now cost 3● more.'); }
       return 'done';
     },
+    // Overwhelming Evidence: offer to claim the card just affected.
     offerClaim: function (st, res, s, ans) {
       var k = res.ctx.affected[res.ctx.affected.length - 1], u = k && top(st, k), p = res.player;
       if (!u || st.cards[u].ruined || st.cards[u].claimants.indexOf(p) >= 0 || st.players[p].meeples <= 0 || unclaimable(st, u)) return 'done';
@@ -4340,6 +4463,7 @@ var KEngine = (function () {
       if (ans) { st.cards[u].claimants.push(p); st.players[p].meeples--; log(st, st.players[p].name + ' claims ' + rawDef(st, u).name + '.'); }
       return 'done';
     },
+    // Overgrowth: replace a Ruined card next to a Leaf card.
     overgrow: function (st, res, s, ans) {
       var me = res.src;
       if (ans === undefined) {
@@ -4359,6 +4483,7 @@ var KEngine = (function () {
       res.srcKey = ans; if (st.turn) st.turn.lastKey = ans; (st.moves = st.moves || []).push(ans); affect(res, ans);
       return 'done';
     },
+    // You'll Regret That: Curse the Structure that Ruined your card.
     regretCurse: function (st, res, s) {
       var k = res.srcKey, u = top(st, k); if (!u) return 'done';
       removeFromHand(st, res.player, res.src);
@@ -4367,18 +4492,21 @@ var KEngine = (function () {
       st.board[k].splice(1, 0, res.src); log(st, st.players[res.player].name + ' reveals You’ll Regret That: ' + rawDef(st, u).name + ' is Cursed and produces no ●.');
       return 'done';
     },
+    // Yes/no gate. "No" skips the rest of the steps.
     confirm: function (st, res, s, ans) {
       if (ans === undefined) return pend(res, { kind: 'confirm', prompt: s.prompt || 'Use this effect?' });
       if (!ans) { res.i = res.steps.length - 1; log(st, st.players[res.player].name + ' declines.'); return 'done'; }
       if (s.consume) { removeFromHand(st, res.player, res.src); toDiscard(st, res.src); log(st, st.players[res.player].name + ' reveals ' + rawDef(st, res.src).name + '.'); }
       return 'done';
     },
+    // Alchemy Lab: pick a different suit for each of three cards.
     alchemy: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = { i: 0, used: [] }), cells = s.cells.filter(function (k) { var t = top(st, k); return t && !untargetable(st, t); });
       if (ans !== undefined) { var t0 = top(st, cells[sub.i]); st.cards[t0].suit = ans; sub.used.push(ans); log(st, rawDef(st, t0).name + ' is now ' + ans + ' (Alchemy Lab).'); sub.i++; }
       if (sub.i >= cells.length) return 'done';
       return pend(res, { kind: 'suit', options: SUITS.filter(function (x) { return sub.used.indexOf(x) < 0; }), prompt: 'Alchemy Lab: new suit for ' + rawDef(st, top(st, cells[sub.i])).name + ' at ' + cells[sub.i] + ' (each must differ).' });
     },
+    // Last Will and Testament: keep a card for a free play next turn.
     setAside: function (st, res, s, ans) {
       var pl = st.players[res.player], opts = discardable(st, res.player);
       if (!opts.length) return 'done';
@@ -4386,12 +4514,14 @@ var KEngine = (function () {
       removeFromHand(st, res.player, ans[0]); (pl.aside = pl.aside || []).push(ans[0]);
       log(st, pl.name + ' sets a card aside for next turn.'); return 'done';
     },
+    // Funeral Pyre ability.
     buryUnderSelf: function (st, res, s, ans) {
       var opts = discardable(st, res.player); if (!opts.length) return 'done';
       if (ans === undefined) return pend(res, { kind: 'hand', count: 1, options: opts, prompt: 'Bury a card from your hand under ' + rawDef(st, res.src).name + '.' });
       removeFromHand(st, res.player, ans[0]); st.board[res.srcKey].splice(1, 0, ans[0]); onBuried(st, ans[0], res.srcKey);
       log(st, st.players[res.player].name + ' buries ' + rawDef(st, ans[0]).name + ' under ' + rawDef(st, res.src).name + '.'); return 'done';
     },
+    // Proliferation: add a new copy of a card in your Kingdom to your hand.
     copyToHand: function (st, res, s, ans) {
       if (ans === undefined) {
         var t = kingdom(st, res.player).filter(function (k) { var u = top(st, k); return hasSuit(st, u, s.suit) && !isFoundation(st, u); });
@@ -4401,6 +4531,7 @@ var KEngine = (function () {
       var nu = mkCard(st, st.cards[top(st, ans)].def); st.players[res.player].hand.push(nu);
       log(st, st.players[res.player].name + ' adds a copy of ' + rawDef(st, nu).name + ' to their hand.'); return 'done';
     },
+    // Tithe: the victim offers 2 cards and you take one at random.
     tithe: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = {});
       if (sub.stage === 'hand') {
@@ -4418,6 +4549,7 @@ var KEngine = (function () {
       sub.victim = v; sub.stage = 'hand';
       return { kind: 'hand', player: v, count: n, options: discardable(st, v), prompt: st.players[v].name + ': choose ' + n + ' card' + (n > 1 ? 's' : '') + ' to offer (Tithe). One is taken at random.' };
     },
+    // Confessional: move a Curse (from the board or your hand) to the Archbishop's hand for ◇.
     confess: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = {}), p = res.player, conf = res.srcKey;
       function reward() {
@@ -4444,6 +4576,7 @@ var KEngine = (function () {
       hear(cu); affect(res, ans);
       return reward();
     },
+    // Errata: move one of your meeples to another card.
     moveMeeple: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = {}), p = res.player;
       if (sub.stage === 'to') {
@@ -4462,6 +4595,7 @@ var KEngine = (function () {
       if (!to.length) { log(st, 'No claimable card to move to.'); return 'done'; }
       return pend(res, { kind: 'cell', options: to, prompt: 'Choose a claimable card to move the meeple to.', verb: 'claim', optional: true });
     },
+    // University: offer to swap meeples with an opponent. If they refuse, you park a meeple on University.
     uniSwap: function (st, res, s, ans) {
       var sub = res.sub || (res.sub = {}), p = res.player;
       if (sub.stage === 'ask') {
@@ -4489,6 +4623,7 @@ var KEngine = (function () {
     },
     payAP: function (st, res, s) { spend(st.players[res.player], +s.n || 0); return 'done'; },
     tokens: function (st, res, s) { bank(st, res.player, +s.n || 0, res.src); log(st, st.players[res.player].name + ' banks ' + s.n + '◇.'); return 'done'; },
+    // Move the source card to an empty adjacent cell (Choreography and Merriment).
     move: function (st, res, s, ans) {
       if (ans === undefined) {
         var t = n4(res.srcKey).filter(function (k) { return !top(st, k) && n4(k).some(function (x) { return x !== res.srcKey && top(st, x); }); });
@@ -4498,13 +4633,17 @@ var KEngine = (function () {
       if (ans) { st.board[ans] = st.board[res.srcKey]; delete st.board[res.srcKey]; log(st, rawDef(st, res.src).name + ' moves to ' + ans + '.'); res.srcKey = ans; (st.moves = st.moves || []).push(ans); }
       return 'done';
     },
+    // Anything not automated: show the text and let the players resolve it by hand.
     manual: function (st, res, s, ans) {
       if (ans === undefined) return pend(res, { kind: 'manual', prompt: s.text || 'Resolve this effect by hand, then click Done.' });
       return 'done';
     }
   };
+  // Indexes of the other players still in the game.
   function others(st, p) { return st.players.map(function (q, i) { return i; }).filter(function (i) { return i !== p && !st.players[i].out; }); }
 
+  // Step through st.res until it finishes or stops on a prompt. `ans` answers the prompt that was pending.
+  // A step with `requires` is skipped unless an earlier step set that flag in ctx.
   function runRes(st, ans) {
     var res = st.res;
     while (res) {
@@ -4516,6 +4655,8 @@ var KEngine = (function () {
       st.pending = r; return;
     }
   }
+  // Effect done: decide where the played card goes. Actions and Blessings are buried under a card
+  // (the player picks if there's a choice), Curses attach to their target, everything else stays put.
   function finishRes(st) {
     var res = st.res, d = rawDef(st, res.src), p = res.player;
     if (res.phase === 'bury') {
@@ -4547,22 +4688,26 @@ var KEngine = (function () {
     }
     endRes(st);
   }
+  // Move the resolving card from its cell (if it had one) to under the card at k.
   function buryAction(st, k) {
     var res = st.res; if (res.srcKey) { st.board[res.srcKey].shift(); if (!st.board[res.srcKey].length) delete st.board[res.srcKey]; }
     st.board[k].splice(1, 0, res.src); log(st, rawDef(st, res.src).name + ' is buried under ' + rawDef(st, top(st, k)).name + '.');
     onBuried(st, res.src, k);
   }
+  // Clear the effect and run the rule checks. If End turn was waiting on this effect, finish ending the turn.
   function endRes(st) {
     var p = st.res.player; st.res = null; st.pending = null; afterBoardChange(st, p);
     if (!st.res && st.endAfter) { st.endAfter = false; var sc = scores(st)[st.cur]; if (sc.total >= st.opts.target) { st.winner = st.cur; log(st, st.players[st.cur].name + ' ends their turn with ' + sc.total + '◇ and wins!'); } else if (st.winner == null) nextPlayer(st); }
   }
 
   /* ---------- turn flow ---------- */
+  // Fresh turn record. Nothing happens until the player starts the turn (or reclaims a meeple instead).
   function beginTurn(st) {
     var p = st.cur, pl = st.players[p];
     st.turn = { started: false, claimed: false, lastKey: null, used: {}, paid: {}, played: 0 };
     log(st, '— ' + pl.name + '’s turn (round ' + st.round + ') —');
   }
+  // Start of turn: tokens, set-aside cards back to hand, ● income (or seat-start ●), pay debt, draw.
   function startTurn(st) {
     var p = st.cur, pl = st.players[p];
     // per-turn tokens (Acorn)
@@ -4576,12 +4721,15 @@ var KEngine = (function () {
     st.turn.started = true;
     log(st, pl.name + ' gains ' + pl.ap + '● and draws ' + got + '.');
   }
+  // Pass to the next player who isn't out. Wrapping back to seat 0 starts a new round.
   function nextPlayer(st) {
     var n = st.players.length, i = st.cur;
     for (var t = 0; t < n; t++) { i = (i + 1) % n; if (i === 0) st.round++; if (!st.players[i].out) break; }
     st.cur = i; st.players[i].turns++; beginTurn(st);
   }
 
+  // Fresh game state. `defs` is the card library; `setup` holds the players and rule options
+  // (see opts). A sandbox has no deck or turns.
   function newGame(defs, setup) {
     var st = {
       v: 1, defs: {}, players: [], cur: 0, round: 1, deck: [], discard: [], board: {}, cards: {}, uid: 1,
@@ -4590,6 +4738,7 @@ var KEngine = (function () {
         burySuitOW: setup.burySuitOW !== false, defense: setup.defense !== false, adjDiscount: setup.adjDiscount !== false, noWander: setup.noWander !== false, ascension: setup.ascension !== false }
     };
     defs.forEach(function (d) { var c = clone(d); c.art = ''; st.defs[d.id] = c; });
+    // A card instance: a uid like "c12" plus its in-play state, pointing at a definition id.
     function mk(id) { var u = 'c' + (st.uid++); st.cards[u] = { uid: u, def: id, suit: null, ruined: false, overwhelmed: false, claimants: [], tokens: 0, copyOf: null, prevClaimants: null, fixed: false }; return u; }
     var arch = archInfo(st);
     setup.players.forEach(function (sp, i) {
@@ -4620,13 +4769,17 @@ var KEngine = (function () {
     var AREA = ['ruin', 'setSuit', 'curse', 'removeCurse', 'discardDownTo', 'copy'];
     return (d.onPlay || []).some(function (s) { return s.do === 'move' || (AREA.indexOf(s.do) >= 0 && (!s.area || s.area === 'adjacent' || s.area === 'east1' || s.area === 'ring3')); });
   }
+  // Start resolving `steps` for card uid at cell k (null when played from hand).
   function startRes(st, kind, uid, k, steps) {
     st.res = { kind: kind, src: uid, srcKey: k, player: st.cur, steps: clone(steps || []), i: 0, sub: null, ctx: { affected: [] }, phase: null };
     runRes(st);
   }
 
+  // Rule violations come back as st.error on the returned state; nothing is thrown.
   function err(st, m) { st.error = m; return st; }
 
+  // The one entry point: apply(state, action) returns a new state. Actions look like { t: "play", uid, k }.
+  // The UI, the tests and the simulator all play the game through this.
   function apply(st0, a) {
     var st = clone(st0); st.error = null;
     var p = a.p != null ? a.p : st.cur;
@@ -4636,6 +4789,7 @@ var KEngine = (function () {
         if (st.turn.started) return err(st, 'Turn already started.');
         startTurn(st); return st;
 
+      // Instead of starting a turn: take back a meeple. This ends the turn.
       case 'reclaim': {
         if (st.turn.started) return err(st, 'Take back a meeple instead of starting your turn.');
         var k = a.k, u = top(st, k);
@@ -4646,6 +4800,7 @@ var KEngine = (function () {
         nextPlayer(st); return st;
       }
 
+      // Place a card from hand at a.k, pay for it, then resolve its onPlay steps.
       case 'play': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started) return err(st, 'Start your turn first.');
@@ -4671,6 +4826,7 @@ var KEngine = (function () {
         return st;
       }
 
+      // Play an Action or Blessing straight from hand, without placing it.
       case 'cast': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started) return err(st, 'Start your turn first.');
@@ -4688,6 +4844,7 @@ var KEngine = (function () {
         return st;
       }
 
+      // Answer the pending prompt with a.v, after checking it fits the prompt's kind.
       case 'answer': {
         var pd = st.pending; if (!pd) return err(st, 'Nothing to answer.');
         var v = a.v;
@@ -4701,6 +4858,7 @@ var KEngine = (function () {
         runRes(st, v); return st;
       }
 
+      // Once per turn: put a meeple on the last card placed, or on an unclaimed card next to it.
       case 'claim': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started && !st.opts.sandbox) return err(st, 'Start your turn first.');
@@ -4725,6 +4883,7 @@ var KEngine = (function () {
         afterBoardChange(st, p); return st;
       }
 
+      // Use a card's once-per-turn ability. Each ability kind is turned into effect steps here.
       case 'ability': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started) return err(st, 'Start your turn first.');
@@ -4749,6 +4908,7 @@ var KEngine = (function () {
         startRes(st, 'ability', au, ak, steps); return st;
       }
 
+      // Discard 2 cards, draw 1.
       case 'swap': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started) return err(st, 'Start your turn first.');
@@ -4759,6 +4919,7 @@ var KEngine = (function () {
         var g = draw(st, p, 1); log(st, sp.name + ' discards 2 cards and draws ' + g + '.'); return st;
       }
 
+      // End-of-turn effects, then the win check, then the next player.
       case 'endTurn': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
         if (!st.turn.started) return err(st, 'Start your turn first.');
@@ -4774,6 +4935,7 @@ var KEngine = (function () {
       case 'closeReveal': st.reveal = null; return st;
 
       /* ----- referee / sandbox tools: free edits ----- */
+      // These bypass the normal rules. Used by the sandbox, the referee tools and the tests.
       case 'sbPlace': { var nu = mkCard(st, a.id); if (top(st, a.k)) st.board[a.k].unshift(nu); else st.board[a.k] = [nu]; var dd = rawDef(st, nu); if (dd.type === 'Foundation' && a.owner != null) { st.cards[nu].claimants = [a.owner]; st.cards[nu].fixed = true; st.players[a.owner].foundationPlaced = true; st.players[a.owner].foundationUid = nu; } log(st, 'Placed ' + dd.name + ' at ' + a.k + '.'); if (a.check) afterBoardChange(st, null); return st; }
       case 'sbBury': { var bu = mkCard(st, a.id); if (!top(st, a.k)) return err(st, 'No card there.'); st.board[a.k].splice(1, 0, bu); log(st, 'Buried ' + rawDef(st, bu).name + ' under ' + rawDef(st, top(st, a.k)).name + '.'); onBuried(st, bu, a.k); return st; }
       case 'sbRemove': { var ru = top(st, a.k); if (!ru) return st; returnMeeples(st, ru); st.board[a.k].shift(); if (!st.board[a.k].length) delete st.board[a.k]; if (st.opts.sandbox) delete st.cards[ru]; else toDiscard(st, ru); log(st, 'Removed the top card at ' + a.k + '.'); return st; }
@@ -4793,6 +4955,7 @@ var KEngine = (function () {
   }
 
   /* ---------- sight (for highlighting) ---------- */
+  // What a card looks at, from its `sees` field. Only used for the yellow highlight in the UI.
   function sight(st, k) {
     var u = top(st, k); if (!u) return { cells: [], counted: [] };
     var d = def(st, u), sv = d.sees || { area: 'none' }, c = st.cards[u], p = c.claimants[0], cells = [];
@@ -4812,11 +4975,13 @@ var KEngine = (function () {
     var counted = cells.filter(function (x) { var t = top(st, x); return t && (!sv.suit || hasSuit(st, t, sv.suit)); });
     return { cells: cells, counted: counted };
   }
+  // Bounding box of all occupied cells.
   function bounds(st) {
     var ks = keys(st); if (!ks.length) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     var xs = ks.map(function (k) { return XY(k)[0]; }), ys = ks.map(function (k) { return XY(k)[1]; });
     return { minX: Math.min.apply(null, xs), maxX: Math.max.apply(null, xs), minY: Math.min.apply(null, ys), maxY: Math.max.apply(null, ys) };
   }
+  // Can the current player use the ability on the card at k right now? (Drives the green glow.)
   function abilityReady(st, k) {
     var u = top(st, k); if (!u || !st.turn || !st.turn.started || st.pending || st.res || st.winner != null || st.opts.sandbox) return false;
     var d = def(st, u), ab = d.ability, p = st.cur; if (!ab) return false;
@@ -4830,6 +4995,7 @@ var KEngine = (function () {
     if (ab.kind === 'move') return n4(k).some(function (x) { return !top(st, x) && n4(x).some(function (y) { return y !== k && top(st, y); }); });
     return true;
   }
+  // Cells player p could claim right now.
   function claimOptions(st, p) {
     if (!st.turn || !st.turn.lastKey || st.turn.claimed) return [];
     return [st.turn.lastKey].concat(n4(st.turn.lastKey)).filter(function (k) {
@@ -4842,6 +5008,7 @@ var KEngine = (function () {
   }
 
   return {
+    // Public API, used by ui.js, the tests and the tools.
     newGame: newGame, apply: apply, scores: scores, income: income, cardValue: cardValue, volcanicBonus: volcanicBonus,
     legalCells: legalCells, needsPlacement: needsPlacement, protectedStack: protectedStack, funds: funds, curseFx: curseFx, hasSuit: hasSuit, onSuitBuried: onSuitBuried, valueParts: valueParts, bankedBreakdown: bankedBreakdown, abilityReady: abilityReady, isFree: isFree, untargetable: untargetable, playBlock: playBlock, sight: sight, bounds: bounds, top: top, keys: keys, def: def, rawDef: rawDef,
     suitOf: suitOf, isCursed: isCursed, isCovered: isCovered, noIncome: noIncome, overwhelmCount: overwhelmCount, enemies: enemies,
@@ -4852,8 +5019,10 @@ if (typeof module !== 'undefined') module.exports = KEngine;
 /* Kartenspiel playtest UI. All game logic lives in KEngine; this file only renders state and dispatches actions. */
 (function () {
   var E = KEngine, D = KData;
+  // Player colors by seat, and the board cell size in pixels.
   var COLORS = ['#d42020', '#1f4fd1', '#138a36', '#d39a00', '#8a2be2'];
   var CW = 88, CH = 118, GAP = 10;
+  // Small helpers: querySelector, HTML escaping, and localStorage calls that never throw.
   var $ = function (s, r) { return (r || document).querySelector(s); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -4861,6 +5030,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
 
+  // SVG paths for the six suit icons (16x16 viewBox).
   var ICON = {
     Sceptre: '<path d="M2.5 13.5 10 6"/><circle cx="11.3" cy="4.7" r="2.2"/>',
     Goblet: '<path d="M3 2h10l-1.2 4.5a3.9 3.9 0 0 1-7.6 0Z"/><path d="M8 10.5v3M5 14h6"/>',
@@ -4869,6 +5039,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     Leaf: '<path d="M8 1.5c4 2.2 4.6 7.5 0 11.5-4.6-4-4-9.3 0-11.5Z"/><path d="M8 4v11"/>',
     Tome: '<rect x="3" y="3.5" width="10" height="8.5"/><path d="M5 6.5h6M5 9h6"/><circle cx="3" cy="3.5" r="1.2"/><circle cx="13" cy="12" r="1.2"/>'
   };
+  // Custom cursors drawn as inline SVG: a meeple (claiming), a suit icon (burying), a pixel sword (aiming a Ruin).
   function meepCursor(color) {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24"><path d="M12 1.5a3.3 3.3 0 0 1 3.3 3.3c0 1-.4 1.9-1 2.5 2.7.6 6.4 1.8 6.4 3.8 0 1.2-1.6 1.4-3.5 1.1l2.6 7.8c.2.7-.3 1-1 1h-3.7L12 15.9 8.9 21H5.2c-.7 0-1.2-.3-1-1l2.6-7.8c-1.9.3-3.5.1-3.5-1.1 0-2 3.7-3.2 6.4-3.8-.6-.6-1-1.5-1-2.5A3.3 3.3 0 0 1 12 1.5Z" fill="' + color + '" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/></svg>';
     return "url('data:image/svg+xml," + encodeURIComponent(svg) + "') 13 3";
@@ -4889,6 +5060,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" shape-rendering="crispEdges">' + s + '</svg>';
     return "url('data:image/svg+xml," + encodeURIComponent(svg) + "') 2 2";
   }
+  // Pixel-art Defense token shields shown on a card.
   function shieldStack(n) {
     var show = Math.min(n, 4), w = 10 + (show - 1) * 3, h = 12 + (show - 1) * 2, s = '';
     for (var i = show - 1; i >= 0; i--) s += '<g transform="translate(' + (i * 3) + ',' + ((show - 1 - i) * 2) + ')">' + shieldPixels() + '</g>';
@@ -4896,22 +5068,28 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
   function shieldPixels() { return '<rect x="1" y="0" width="8" height="1" fill="#000"/><rect x="0" y="1" width="1" height="6" fill="#000"/><rect x="9" y="1" width="1" height="6" fill="#000"/><rect x="1" y="1" width="8" height="6" fill="#4a7bd6"/><rect x="1" y="7" width="1" height="2" fill="#000"/><rect x="8" y="7" width="1" height="2" fill="#000"/><rect x="2" y="7" width="6" height="2" fill="#4a7bd6"/><rect x="2" y="9" width="2" height="1" fill="#000"/><rect x="6" y="9" width="2" height="1" fill="#000"/><rect x="4" y="10" width="2" height="1" fill="#000"/><rect x="4" y="9" width="2" height="1" fill="#4a7bd6"/><rect x="2" y="2" width="2" height="2" fill="#bcd2ff"/><rect x="4" y="3" width="2" height="4" fill="#f2c94c"/><rect x="3" y="4" width="4" height="1" fill="#f2c94c"/>'; }
   function shieldIcon() { return '<svg viewBox="0 0 10 12" width="9" height="11" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="0" width="8" height="1" fill="#000"/><rect x="0" y="1" width="1" height="6" fill="#000"/><rect x="9" y="1" width="1" height="6" fill="#000"/><rect x="1" y="1" width="8" height="6" fill="#4a7bd6"/><rect x="1" y="7" width="1" height="2" fill="#000"/><rect x="8" y="7" width="1" height="2" fill="#000"/><rect x="2" y="7" width="6" height="2" fill="#4a7bd6"/><rect x="2" y="9" width="2" height="1" fill="#000"/><rect x="6" y="9" width="2" height="1" fill="#000"/><rect x="4" y="10" width="2" height="1" fill="#000"/><rect x="4" y="9" width="2" height="1" fill="#4a7bd6"/><rect x="2" y="2" width="2" height="2" fill="#bcd2ff"/></svg>'; }
+  // Inline suit icon.
   function icon(s) { return '<svg class="suitico si-' + esc(s) + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="' + esc(s) + '"><title>' + esc(s) + '</title>' + (ICON[s] || '') + '</svg>'; }
 
   /* ---------------- app state ---------------- */
+  // Everything the UI keeps between renders. `game` and `sandbox` are contexts (see newCtx).
   var app = {
     page: 'new', lib: [], libSource: 'built-in', db: null, dbEmpty: false, libReady: false,
     open: {}, game: null, sandbox: null, libUI: { q: '', suit: '', type: '', sort: 'suit', sel: null }, builder: null, toast: null
   };
   function libById(id) { for (var i = 0; i < app.lib.length; i++) if (app.lib[i].id === id) return app.lib[i]; return null; }
+  // Library order: by suit, Foundations first, then cost, then name.
   function sortLib(a) {
     var so = D.SUITS; return a.slice().sort(function (x, y) {
       return so.indexOf(x.suit) - so.indexOf(y.suit) || (x.type === 'Foundation' ? -1 : 0) - (y.type === 'Foundation' ? -1 : 0) || (+x.cost) - (+y.cost) || x.name.localeCompare(y.name);
     });
   }
+  // Fill in any fields missing from a stored card.
   function normalizeCard(c) { var d = D.make({}); for (var k in c) d[k] = c[k]; return d; }
 
   /* ---------------- library persistence ---------------- */
+  // Load the card library: the copy cached in this browser, else the built-in starter cards.
+  // Where a shared card database is available (window.claude), stay synced with it live.
   function initLibrary() {
     var cached = lsGet('ks.lib');
     app.lib = sortLib((cached && cached.length ? cached : D.STARTER).map(normalizeCard));
@@ -4928,6 +5106,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       }, function () { app.db = null; render(); });
     }).catch(function () { });
   }
+  // Save to this browser and, if connected, to the shared library (filling it with every card if it was empty).
   function saveCard(card) {
     var i = app.lib.findIndex(function (c) { return c.id === card.id; });
     if (i >= 0) app.lib[i] = card; else app.lib.push(card);
@@ -4944,16 +5123,21 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (app.db) return app.db.collection('cards').doc(id).delete().catch(function (e) { toast('Could not delete: ' + (e && e.message || e)); });
     return Promise.resolve();
   }
+  // Put the built-in starter cards back, keeping any artwork already added.
   function restoreStarter() {
     var ps = D.STARTER.map(function (c) { var keep = libById(c.id); var n = clone(c); if (keep && keep.art) n.art = keep.art; return n; });
     (function next(i) { if (i >= ps.length) { toast('Starter cards restored.'); render(); return; } saveCard(ps[i]).then(function () { next(i + 1); }); })(0);
   }
+  // Show a message in the status bar for 4 seconds.
   function toast(m) { app.toast = m; render(); clearTimeout(toast.t); toast.t = setTimeout(function () { app.toast = null; render(); }, 4000); }
 
   /* ---------------- contexts (game / sandbox) ---------------- */
+  // A context pairs a game state with its undo history and view settings. The game and the sandbox each have one.
   function newCtx(state, kind) {
     return { kind: kind, state: state, hist: [], ui: { sel: null, hand: null, swap: null, mode: null, moveFrom: null, zoom: 1, fit: true, showOW: true, showSeen: true, showSeenBy: false, coords: false, picked: [], passOK: false, sbCard: '', sbMode: 'place', autoCheck: true, revealOK: false } };
   }
+  // Send an action to the engine. On success: keep the old state for undo, autosave, animate, re-render.
+  // On error: show the message and keep the old state.
   function dispatch(ctx, a) {
     var r = E.apply(ctx.state, a);
     if (r.error) { ctx.err = r.error; render(); return false; }
@@ -4973,6 +5157,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (!E.needsPlacement(d)) return (E.isFree(st, u) ? 0 : +d.cost || 0) <= ap;
     var L = E.legalCells(st, u); return Object.keys(L).some(function (k) { return L[k] <= ap; });
   }
+  // True when the current player has no ● and nothing free left to do.
   function stuck(st) {
     if (!st.turn || !st.turn.started || st.pending || st.res || st.winner != null || st.reveal) return false;
     var pl = st.players[st.cur]; if (E.funds(pl) > 0) return false;
@@ -4982,6 +5167,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (!pl.foundationPlaced) return false;
     return true;
   }
+  // If stuck, end the turn after a short pause (the player can stop it with "Wait, I'm not done").
   function maybeAutoEnd(ctx) {
     clearTimeout(maybeAutoEnd.t);
     if (ctx.kind !== 'game' || ctx.state.opts.autoEnd === false || !stuck(ctx.state) || ctx.ui.holdTurn === ctx.state.log.length) { ctx.ui.autoEnding = false; return; }
@@ -4989,17 +5175,21 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var mark = ctx.state.log.length;
     maybeAutoEnd.t = setTimeout(function () { if (ctx.ui.autoEnding && ctx.state.log.length === mark && stuck(ctx.state)) { ctx.ui.autoEnding = false; dispatch(ctx, { t: 'endTurn' }); } }, 1600);
   }
+  // Go back to the previous state in the history.
   function undo(ctx) { if (!ctx.hist.length) return; ctx.state = ctx.hist.pop(); ctx.err = null; ctx.ui.hand = null; ctx.ui.picked = []; lsSet(ctx.kind === 'game' ? 'ks.game' : 'ks.sandbox', ctx.state); render(); }
+  // The context for the page on screen.
   function cur() { return app.page === 'sandbox' ? app.sandbox : app.game; }
 
   /* ---------------- effects: crumble, ◇ and ● flying to their piles ---------------- */
   var FX = (function () {
     var layer = document.createElement('div'); layer.className = 'fxlayer'; layer.setAttribute('aria-hidden', 'true'); document.body.appendChild(layer);
+    // With reduced motion on, skip the flying and crumbling; the text popups stay.
     var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function topUid(st, k) { return E.top(st, k); }
     function valuesByUid(st) {
       var m = {}; st.players.forEach(function (p, i) { E.kingdom(st, i).forEach(function (k) { var u = E.top(st, k), q = E.valueParts(st, k, i); m[u + ':' + i] = { k: k, v: q.base + q.tokens, p: i }; }); }); return m;
     }
+    // Compare the states before and after an action and list the animations to play.
     function diff(ctx, a, b, act) {
       if (!a || !b) return [];
       var ev = [];
@@ -5024,6 +5214,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       }
       return ev;
     }
+    // Animation pieces: floating text, gems and marbles flying to the score piles, crumbling cards, the Curse flare.
     function rectOf(sel) { var e = document.querySelector(sel); return e ? e.getBoundingClientRect() : null; }
     function cellRect(k) { return k ? rectOf('.cell [data-cell="' + k + '"]') : null; }
     function center() { var b = rectOf('.boardwrap'); return b ? { left: b.left + b.width / 2 - 20, top: b.top + b.height / 2 - 20, width: 40, height: 40 } : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 }; }
@@ -5071,6 +5262,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
         fl.animate([{ transform: 'translateY(0) scale(.4)', opacity: 0 }, { transform: 'translateY(-6px) scale(1.2)', opacity: 1, offset: .25 }, { transform: 'translateY(-' + (22 + Math.random() * 18) + 'px) scale(.3)', opacity: 0 }], { duration: 900 + Math.random() * 400, delay: (delay || 0) + Math.random() * 350, easing: 'ease-out', fill: 'both' }).onfinish = (function (el) { return function () { el.remove(); }; })(fl);
       }
     }
+    // Play the listed animations, slightly staggered.
     function run(ev) {
       if (!ev || !ev.length) return;
       var nV = 0, nA = 0;
@@ -5087,6 +5279,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
 
   /* ---------------- card faces ---------------- */
   function artOf(defId) { var c = libById(defId); return c && c.art ? c.art : ''; }
+  // Placement arrows shown in a card's footer.
   function placeIcon(pl) {
     if (pl === 'diag') return '✕';
     if (!pl || pl.length === 4) return '✛';
@@ -5094,6 +5287,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var k = ['N', 'E', 'S', 'W'].filter(function (s) { return pl.indexOf(s) >= 0; }).join('');
     return m[k] || k;
   }
+  // A card's score rule as readable text.
   function scoreText(s) {
     if (!s) return '';
     var n = s.n, m = s.m;
@@ -5165,6 +5359,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ---------------- board ---------------- */
+  // Draw the board. Cells are absolutely positioned; only occupied cells and cells that matter
+  // right now (legal spots, targets, highlights) get drawn.
   function boardHTML(ctx) {
     var st = ctx.state, ui = ctx.ui, b = E.bounds(st), ks = E.keys(st);
     if (!ks.length) b = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
@@ -5206,6 +5402,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var aiming = pd && pd.kind === 'cell' && pd.verb === 'ruin';
     return { html: '<div class="boardsizer' + (claiming ? ' claiming' : '') + (aiming ? ' aiming' : '') + (buryingSuit ? ' burying' : '') + '" style="' + (claiming ? '--meep:' + meepCursor(st.players[st.cur].color) + ';' : '') + (aiming ? '--sword:' + swordCursor() + ';' : '') + (buryingSuit ? '--bury:' + suitCursor(buryingSuit) + ';' : '') + 'width:' + W + 'px;height:' + Hh + 'px"><div class="boardinner" style="width:' + W + 'px;height:' + Hh + 'px">' + h + '</div></div>', W: W, H: Hh };
   }
+  // Optional per-card overlay: ● production or ◇ value.
   function overlayFor(ctx, k) {
     var st = ctx.state, mode = ctx.ui.overlay; if (!mode || mode === 'none') return null;
     var u = E.top(st, k), c = st.cards[u];
@@ -5223,6 +5420,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     return null;
   }
   function vpViewer(ctx) { return ctx.kind === 'game' ? ctx.state.cur : Math.min(ctx.ui.vpFor || 0, ctx.state.players.length - 1); }
+  // One-line summary shown in the board bar while an overlay is on.
   function overlayTotal(ctx) {
     var st = ctx.state, mode = ctx.ui.overlay;
     if (mode === 'prod' && ctx.kind === 'game') return st.players[st.cur].name + ' makes ' + E.income(st, st.cur) + '● per turn' + (st.players[st.cur].foundationPlaced ? '' : ' (base 3 until the Foundation is placed)') + '.';
@@ -5236,6 +5434,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     }
     return '';
   }
+  // Scale the board to fit, or to the chosen zoom. Runs after render because it needs real element sizes.
   function applyZoom(ctx) {
     var wrap = $('.boardwrap'); if (!wrap || !ctx) return;
     var sizer = $('.boardsizer', wrap), inner = $('.boardinner', wrap); if (!sizer) return;
@@ -5244,6 +5443,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var zz = ctx.ui.zoom; inner.style.transform = 'scale(' + zz + ')'; sizer.style.width = W * zz + 'px'; sizer.style.height = Hh * zz + 'px';
     var zl = $('#zoomlbl'); if (zl) zl.textContent = Math.round(zz * 100) + '%';
   }
+  // Toolbar above the board: zoom, highlight toggles, overlays, debug report.
   function boardBar(ctx) {
     var u = ctx.ui;
     return '<div class="boardbar raised row small">' +
@@ -5262,6 +5462,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ---------------- inspector ---------------- */
+  // Right-hand panel: the selected hand card, or the selected board card with its details and buttons.
   function inspector(ctx) {
     var st = ctx.state, ui = ctx.ui, h = '';
     if (ui.hand && !ui.sel) {
@@ -5307,6 +5508,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     } else h += '<fieldset><legend>Sandbox tools</legend>' + refTools(ctx, k) + '</fieldset>';
     return h;
   }
+  // Button text for a card's ability.
   function abilityLabel(ab) {
     if (ab.kind === 'exchange') return 'Exchange ' + ab.pay + '● for ' + ab.gain + '◇';
     if (ab.kind === 'convert') return 'Convert a neighbor (' + ab.pay + '●)';
@@ -5316,6 +5518,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (ab.kind === 'swapMeeple') return 'Offer a meeple swap';
     return 'Use ability';
   }
+  // Referee / sandbox tools for one board card: Ruin, move, remove, change suit, tokens, claims, bury.
   function refTools(ctx, k) {
     var st = ctx.state, u = E.top(st, k), c = st.cards[u], h = '<div class="col small" style="margin-top:6px">';
     h += '<div class="row"><button class="btn sm" data-act="sbRuin" data-k="' + k + '">' + (c.ruined ? 'Flip face up' : 'Ruin') + '</button>';
@@ -5327,6 +5530,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     h += '<div class="row">Card: <select data-sel="buryId" style="max-width:100%">' + cardOptions(st, ctx.ui.buryId) + '</select></div><div class="row"><button class="btn sm" data-act="sbBury" data-k="' + k + '">Bury it under this card</button><button class="btn sm" data-act="sbOnTop" data-k="' + k + '">Put it on top</button></div>';
     return h + '</div>';
   }
+  // <option> list of every card in this game's library.
   function cardOptions(st, selId) {
     var defs = sortLib(Object.keys(st.defs).map(function (id) { return st.defs[id]; }));
     return defs.map(function (d) { return '<option value="' + esc(d.id) + '"' + (d.id === selId ? ' selected' : '') + '>' + esc(d.suit + ': ' + d.name) + '</option>'; }).join('');
@@ -5357,6 +5561,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     }
     return '<svg class="pix pile" viewBox="0 0 32 22" shape-rendering="crispEdges" role="img" aria-label="' + v + ' victory points"><title>' + v + '◇</title>' + s + '</svg>';
   }
+  // Players panel. The table below the first line is an older layout that no longer runs; playerCards is the one in use.
   function playersPanel(ctx) {
     if (ctx.state) return playerCards(ctx);
     var st = ctx.state, sc = E.scores(st), h = '<table class="players small"><tr><th></th><th>Player</th><th title="Victory points">◇</th><th title="Aktion points">●</th><th title="Meeples left">♟</th>' + (ctx.kind === 'game' ? '<th title="Cards in hand">Hand</th>' : '') + '</tr>';
@@ -5382,6 +5587,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (ctx.kind === 'game') h += '<p class="small muted" style="margin:4px 0 0">First to ' + st.opts.target + '◇ at the end of their turn wins. Banked tokens are included.</p>';
     return h;
   }
+  // Pick a color for a log line by matching its text.
   function logClass(l) {
     if (l.indexOf('—') === 0) return 'turn';
     if (/ wins|last player standing|out of the game/.test(l)) return 'lg-win';
@@ -5401,12 +5607,14 @@ if (typeof module !== 'undefined') module.exports = KEngine;
 
   /* ---------------- pages ---------------- */
   var rendering = false, rerender = false;
+  // Redraw the whole app from `app`. A render requested during a render runs once the current one finishes.
   function render() {
     if (rendering) { rerender = true; return; }
     rendering = true;
     try { renderNow(); } finally { rendering = false; }
     if (rerender) { rerender = false; setTimeout(render, 0); }
   }
+  // Build the HTML, swap it in, then restore the scroll positions and input focus that the swap loses.
   function renderNow() {
     var root = $('#app');
     var scrollLog = $('.log'); var atBottom = !scrollLog || scrollLog.scrollTop + scrollLog.clientHeight >= scrollLog.scrollHeight - 20;
@@ -5436,6 +5644,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     }
     return 'Ready.';
   }
+  // The page to draw, from app.page.
   function pageHTML() {
     switch (app.page) {
       case 'game': return app.game ? gamePage(app.game) : newGamePage();
@@ -5448,6 +5657,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ----- new game ----- */
+  // New game page options, kept for the next game.
   var setup = { n: 2, players: [], handSize: 4, drawPerTurn: 2, meeples: 8, target: 48, enforceWeak: true, foundationBy: 3, autoEnd: true, seatStart: true, burySuitOW: true, defense: true, adjDiscount: true, noWander: true, ascension: true };
   function archetypes() { return sortLib(app.lib.filter(function (c) { return c.type === 'Foundation' && c.archetype; })); }
   function ensureSetup() {
@@ -5491,6 +5701,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ----- game page ----- */
+  // Game page: players, ● and log on the left, board in the middle, inspector on the right, hand at the bottom.
   function gamePage(ctx) {
     var st = ctx.state, ui = ctx.ui, pl = st.players[st.cur];
     var h = '<div class="page"><div class="gamegrid">';
@@ -5507,6 +5718,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     h += '<div class="bottom raised">' + handHTML(ctx) + '</div>';
     return h + '</div></div>';
   }
+  // The yellow bar above the board that says what the game is waiting for.
   function promptBar(ctx) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
     if (ctx.err) return '<div class="prompt">' + esc(ctx.err) + ' <button class="btn sm" data-act="clearErr">OK</button></div>';
@@ -5526,6 +5738,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (co.length) return '<div class="prompt">Claim available: your cursor is a meeple. Click an orange-outlined card to claim it (' + st.players[st.cur].meeples + ' meeples left), or keep playing.</div>';
     return '';
   }
+  // The current player's hand. A green border means it can be afforded right now.
   function handHTML(ctx) {
     var st = ctx.state, ui = ctx.ui, pl = st.players[st.cur];
     if (!st.turn.started || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
@@ -5546,6 +5759,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
 
   /* ----- modals ----- */
   function modal(title, body, btns) { return '<div class="modalbg"><div class="modal raised" role="dialog" aria-label="' + esc(title) + '"><div class="titlebar"><span>' + esc(title) + '</span></div><div class="body">' + body + '</div><div class="btns">' + (btns || '') + '</div></div></div>'; }
+  // Dialogs: app.modal for one-off ones; otherwise revealed hands, "pass the device" between turns,
+  // and engine prompts that aren't answered by clicking the board.
   function modalHTML() {
     if (app.modal) return app.modal();
     var ctx = cur(); if (!ctx || (app.page !== 'game' && app.page !== 'sandbox')) return '';
@@ -5565,6 +5780,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (pd && pd.kind !== 'cell') return pendingModal(ctx);
     return '';
   }
+  // Dialog for an engine prompt: choose cards, a suit, a player, yes/no, or resolve by hand. Asks to pass the device first if someone else must answer.
   function pendingModal(ctx) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending, who = st.players[pd.player];
     if (pd.kind !== 'cell' && pd.player !== st.cur && ui.passFor !== pd.player + ':' + st.log.length)
@@ -5602,7 +5818,9 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     h += '<div class="bottom raised small" style="padding:4px 6px">Score breakdown: ' + E.scores(st).map(function (s, i) { var base = 0, ct = 0; E.kingdom(st, i).forEach(function (k) { var q = E.valueParts(st, k, i); base += q.base; ct += q.cardTok; }); return '<b>' + esc(st.players[i].name) + '</b> ' + base + ' from card values + ' + (ct + s.tokens) + ' in tokens = ' + s.total + '◇'; }).join(' · ') + '</div>';
     return h + '</div></div>';
   }
+  // Sandbox players, set from the Reset sandbox dialog.
   var sbSetup = { n: 2, arch: [] };
+  // Create the sandbox, reusing the one saved in this browser unless a reset was asked for.
   function newSandbox() {
     var A = archetypes().map(function (c) { return c.archetype; });
     var ps = []; for (var i = 0; i < sbSetup.n; i++) ps.push({ name: 'Player ' + (i + 1), arch: sbSetup.arch[i] || A[i], color: COLORS[i] });
@@ -5613,6 +5831,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ----- library ----- */
+  // Library page: filterable card table plus a preview.
   function libraryPage() {
     var L = app.libUI, rows = app.lib.filter(function (c) {
       return (!L.suit || c.suit === L.suit) && (!L.type || c.type === L.type) && (!L.q || (c.name + ' ' + c.text).toLowerCase().indexOf(L.q.toLowerCase()) >= 0);
@@ -5635,6 +5854,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     h += '<div class="raised pane">' + (sel ? '<div class="panelhead">Preview</div>' + defFace(sel, { big: true }) + '<div class="row" style="margin-top:6px"><button class="btn def" data-act="editCard" data-id="' + esc(sel.id) + '">Edit</button><button class="btn" data-act="dupCard" data-id="' + esc(sel.id) + '">Duplicate</button><button class="btn" data-act="delCard" data-id="' + esc(sel.id) + '">Delete…</button></div>' : '<p class="muted">Select a card to preview it.</p>') + '</div></div></div>';
     return h;
   }
+  // Short tag for how much of a card the engine automates.
   function autoSummary(c) {
     var parts = [];
     if ((c.type === 'Action' || c.type === 'Blessing') && !E.needsPlacement(c)) parts.push('instant');
@@ -5646,6 +5866,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ----- card builder ----- */
+  // Effect presets for the card builder: menu labels here, and the onPlay steps each one stands for in PRESET_STEPS.
   var STEP_PRESETS = {
     '': 'None', 'draw1discard1': 'Draw 1, then discard 1', 'draw2discard1': 'Draw 2, then discard 1', 'ruinAdj': 'Ruin an adjacent card', 'ruinAdjNonBone': 'Ruin an adjacent non-Bone card',
     'ruinWest': 'Ruin the card west of a card you own', 'ruin3': 'Ruin a card 3 spaces away', 'ruinEastIf2': 'If you own 2 adjacent cards, Ruin the card east',
@@ -5666,10 +5887,13 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     'drawBuried2': [{ do: 'drawBuried', n: 2 }], 'portcullis': [{ do: 'discardDownTo', n: 3, area: 'adjacent' }], 'copy12': [{ do: 'copy', area: 'adjacent', maxCost: 12 }],
     'freshHand': [{ do: 'discardHand' }, { do: 'drawTo', plus: 1 }], 'northBonus': [{ do: 'northBonusOnce', plain: 1, buried: 2 }], 'manual': [{ do: 'manual', text: '' }]
   };
+  // Menu labels for score kinds and sight areas. A new kind also needs handling in engine.js.
   var SCORE_KINDS = { none: 'No ◇ value', flat: 'Flat value', perAdjacentSuit: 'Per adjacent card of a suit', perSuitInKingdom: 'Per card of a suit in your Kingdom', perSuitSplit: 'Per suit card in / outside your Kingdom', perBuriedInKingdom: 'Per buried card in your Kingdom', perDistinctSuitInKingdom: 'Per different suit in your Kingdom', largestRegion: 'Per card in largest Kingdom region', perCardNorth: 'Per card north in its column', flatDoubledIfSurrounded: 'Flat, doubled if fully surrounded', flatMinusPerAdjacentNotOwned: 'Flat minus per neighbor you don’t own', flatMinusPerExtraClaimant: 'Flat minus per extra claimant', flatPlusTokens: 'Flat plus tokens on the card' };
   var SEES = { none: 'Nothing', adjacent: 'Adjacent (4 sides)', surround8: 'All 8 around', north: 'Column to the north', east1: 'Card directly east', ring3: 'Cards 3 spaces away', kingdom: 'Owner’s Kingdom', adjacentToOwn: 'Cards next to the owner’s cards', westOfOwn: 'Cards west of the owner’s cards', board: 'Whole board' };
+  // Which preset matches a card's steps ("custom" if none does).
   function presetOf(steps) { var s = JSON.stringify(steps || []); if (s === '[]') return ''; for (var k in PRESET_STEPS) if (JSON.stringify(PRESET_STEPS[k]) === s) return k; return 'custom'; }
   function openBuilder(card) { app.builder = { card: normalizeCard(clone(card)), orig: card.id || null, json: JSON.stringify(card.onPlay || [], null, 1), jsonErr: null }; app.page = 'builder'; render(); }
+  // Card builder form. Inputs carry data-b="field.path"; builderChange applies each edit.
   function builderPage() {
     if (!app.builder) return '<div class="page"><div class="pane"><p>Pick a card to edit in the Library, or start a new one.</p><div class="row"><button class="btn def" data-act="newCard">New card</button><button class="btn" data-page="library">Open the library</button></div></div></div>';
     var B = app.builder, c = B.card, sk = c.score || { kind: 'none' }, m = c.mods || {};
@@ -5709,6 +5933,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     return h;
   }
   function setPath(o, path, v) { var p = path.split('.'); var x = o; for (var i = 0; i < p.length - 1; i++) { if (x[p[i]] == null || typeof x[p[i]] !== 'object') x[p[i]] = {}; x = x[p[i]]; } x[p[p.length - 1]] = v; }
+  // Apply one form edit to the card being built. Returns true when the form needs redrawing.
   function builderChange(field, raw) {
     var c = app.builder.card, num = ['cost', 'copies', 'income', 'incomePerToken', 'score.n', 'score.m', 'overwhelm', 'ability.pay', 'ability.gain', 'mods.adjacentCost', 'mods.northBonus', 'mods.payoutOnRuin', 'gainOnce', 'mods.limitN', 'perTurnToken'];
     var v = num.indexOf(field) >= 0 ? (raw === '' ? '' : +raw) : raw;
@@ -5727,9 +5952,12 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (field === 'curse.releasedBy') { c.curse = c.curse || {}; if (v) c.curse.releasedBy = v; else delete c.curse.releasedBy; return false; }
     setPath(c, field, v); return /^(suit|ability\.)/.test(field) || field === 'sees.area';
   }
+  // The "Extra ● once" field is stored as a gainAP step at the start of onPlay.
   function gainOf(c) { var g = (c.onPlay || []).filter(function (s) { return s.do === 'gainAP'; })[0]; return g ? g.n : ''; }
   function withGain(steps, g) { steps = (steps || []).filter(function (s) { return s.do !== 'gainAP'; }); if (g) steps.unshift({ do: 'gainAP', n: g }); return steps; }
+  // Turn a name into an id: lowercase letters, digits and dashes.
   function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60); }
+  // Check and save the card being built (under a new id when saving a copy).
   function commitBuilder(asCopy) {
     var B = app.builder, c = clone(B.card);
     if (!c.name.trim()) { toast('Give the card a name before saving.'); return; }
@@ -5739,6 +5967,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var p = saveCard(c); B.orig = c.id; B.card = normalizeCard(clone(c)); app.libUI.sel = c.id;
     p.then(function () { toast('Saved ' + c.name + '.'); });
   }
+  // Shrink an uploaded image to a 320px JPEG so the library stays small.
   function downscale(file, cb) {
     var fr = new FileReader();
     fr.onload = function () {
@@ -5753,6 +5982,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ----- help ----- */
+  // The Help page (static text).
   function helpPage() {
     return '<div class="page scroll"><div class="pane help">' +
       '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
@@ -5782,6 +6012,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   }
 
   /* ---------------- events ---------------- */
+  // One click handler for the whole app. Elements say what they do through data- attributes (data-act, data-cell, data-hand, ...).
   document.addEventListener('click', function (e) {
     var t = e.target.closest('[data-page],[data-act],[data-cell],[data-hand],[data-pick],[data-answer],[data-answer-p],[data-row],[data-sort]');
     if (!t) return;
@@ -5796,6 +6027,8 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (t.hasAttribute('data-answer-p')) { dispatch(ctx, { t: 'answer', v: +t.getAttribute('data-answer-p') }); return; }
     act(t.getAttribute('data-act'), t, ctx);
   });
+  // Clicking a board cell: answer a prompt, finish a move, reclaim, claim, place the selected hand card,
+  // or just select it. In the sandbox it places or buries the chosen card.
   function cellClick(ctx, k) {
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
     if (pd && pd.kind === 'cell' && pd.options.indexOf(k) >= 0) { dispatch(ctx, { t: 'answer', v: k }); return; }
@@ -5816,6 +6049,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     if (ui.sbMode === 'bury' && ui.sbCard && E.top(st, k)) { ui.sel = k; dispatch(ctx, { t: 'sbBury', id: ui.sbCard, k: k }); return; }
     ui.sel = E.top(st, k) ? k : null; render();
   }
+  // What each data-act button does.
   function act(a, t, ctx) {
     var k = t.getAttribute('data-k');
     switch (a) {
@@ -5893,6 +6127,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       case 'textOK': { var ta = $('#bigtext'); try { app._textCb(ta.value); app.modal = null; render(); } catch (err) { app._textErr = err.message || String(err); render(); } return; }
     }
   }
+  // Plain-text dump for bug reports: players, a text map of the board, every card, the log and the full state.
   function debugReport(ctx) {
     var st = ctx.state, L = [], sc = E.scores(st), ks = E.keys(st);
     L.push('KARTENSPIEL DEBUG REPORT — ' + new Date().toISOString());
@@ -5944,6 +6179,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     return L.join('\n');
     function pad(s, n) { s = String(s); return s.length >= n ? s.slice(0, n - 1) + ' ' : s + new Array(n - s.length + 1).join(' '); }
   }
+  // Copy to the clipboard, with a fallback for when the Clipboard API is blocked.
   function copyText(txt, cb) {
     function fallback() { var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) { } document.body.removeChild(ta); cb(ok); }
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { cb(true); }, fallback); else fallback();
@@ -5952,12 +6188,14 @@ if (typeof module !== 'undefined') module.exports = KEngine;
     var txt = debugReport(ctx);
     copyText(txt, function (ok) { if (ok) toast('Debug report copied: log, board and full state (' + txt.split('\n').length + ' lines).'); else textModal('Debug report', 'Copying was blocked here. The text is selected: press Ctrl+C (or Cmd+C) to copy it.', txt, null); });
   }
+  // Dialog with a big text box: read-only for export, or with cb for import (throw in cb to show an error).
   function textModal(title, msg, text, cb) {
     app._textCb = cb; app._textErr = null;
     app.modal = function () { return modal(title, '<p>' + esc(msg) + '</p><textarea id="bigtext" rows="10" style="width:min(640px,80vw)"' + (cb ? '' : ' readonly') + '>' + esc(text) + '</textarea>' + (app._textErr ? '<div class="err">' + esc(app._textErr) + '</div>' : ''), '<button class="btn" data-act="closeModal">' + (cb ? 'Cancel' : 'Close') + '</button>' + (cb ? '<button class="btn def" data-act="textOK">Load</button>' : '')); };
     render(); var ta = $('#bigtext'); if (ta && !cb) ta.select();
   }
 
+  // Form controls: toggles, selects, New game options, library filters, card builder fields.
   document.addEventListener('change', function (e) {
     var t = e.target, ctx = cur();
     if (t.hasAttribute('data-tog')) { ctx.ui[t.getAttribute('data-tog')] = t.checked; render(); return; }
@@ -5992,13 +6230,16 @@ if (typeof module !== 'undefined') module.exports = KEngine;
       render(); return;
     }
   });
+  // Remember which <details> sections are open across re-renders.
   document.addEventListener('toggle', function (e) { var t = e.target; if (t && t.getAttribute && t.getAttribute('data-keep')) app.open[t.getAttribute('data-keep')] = t.open; }, true);
+  // Live typing: player names, library search, and builder text (which only refreshes the preview, so the cursor isn't lost).
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.hasAttribute('data-pname')) { setup.players[+t.getAttribute('data-pname')].name = t.value; return; }
     if (t.hasAttribute('data-lib') && t.tagName === 'INPUT') { app.libUI.q = t.value; render(); return; }
     if (t.hasAttribute('data-b') && (t.tagName === 'TEXTAREA' || t.type === 'text')) { builderChange(t.getAttribute('data-b'), t.value); var pv = document.querySelector('.split > .raised.pane:last-child'); if (pv) pv.innerHTML = '<div class="panelhead">Preview</div>' + defFace(app.builder.card, { big: true }); }
   });
+  // Esc cancels the current selection or dialog; Ctrl/Cmd+Z undoes.
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { var ctx = cur(); if (app.modal) { app.modal = null; render(); return; } if (ctx) { ctx.ui.hand = null; ctx.ui.mode = null; ctx.ui.swap = null; render(); } }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && (app.page === 'game' || app.page === 'sandbox') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); undo(cur()); }
@@ -6008,6 +6249,7 @@ if (typeof module !== 'undefined') module.exports = KEngine;
   /* ---------------- hover magnifier ---------------- */
   var hov = document.createElement('div'); hov.className = 'hovercard'; hov.setAttribute('aria-hidden', 'true'); document.body.appendChild(hov);
   var hovKey = null;
+  // HTML for the magnified card under the mouse. The text before "|" is a key, so it only redraws when what's under the mouse changes.
   function hoverHTML(t) {
     var ctx = cur();
     if (t.hasAttribute('data-cell') && ctx) {

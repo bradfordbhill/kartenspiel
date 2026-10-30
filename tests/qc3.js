@@ -1,3 +1,8 @@
+// Rules checks for changed and new cards. Run: node tests/qc3.js (prints only failures, then a pass count).
+// Each T(...) block sets up a small game with the referee actions (sbPlace, sbClaim, sbGive, ...), plays the
+// card through E.apply like a real player would, then check()s the result.
+// Helpers: game(arch, ...) starts a game with 99●; F(k) plays the Foundation; put(id, k, owner) places a card;
+// give(id) puts one in hand; ans(v) answers the pending prompt.
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, results=[];
 function A(a){const r=E.apply(st,a); if(r.error){return r.error;} st=r; return null;}
