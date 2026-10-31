@@ -36,6 +36,9 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .menu button .k { opacity: .7; }
 .menu hr { border: 0; border-top: 1px solid var(--lo); border-bottom: 1px solid var(--hi); margin: 3px 2px; }
 
+.cardbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px; flex-wrap: wrap; flex: 0 0 auto; }
+.cardbar select { max-width: 260px; }
+.cardbar .grow { flex: 1; }
 .main { flex: 1; min-height: 0; display: flex; gap: 4px; padding: 2px; }
 .toolbox { flex: 0 0 auto; width: 92px; padding: 4px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
@@ -49,7 +52,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 #art { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: pixelated; image-rendering: crisp-edges; box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
 #art.checker { background: repeating-conic-gradient(#cfcfcf 0 25%, #f4f4f4 0 50%) 0 0 / 8px 8px; }
 #art.bg-white { background: #fff; } #art.bg-grey { background: #c0c0c0; } #art.bg-dark { background: #1c1f1f; }
-#over { position: absolute; inset: 0; pointer-events: none; }
+#over { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }   /* sized by CSS: its bitmap is device pixels */
 
 .side { flex: 0 0 300px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
 .panel { padding: 0 0 6px; }

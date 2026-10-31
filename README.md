@@ -20,6 +20,8 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `src/ui.js` | The interface for both apps. `KConfig.edition === 'online'` switches on the public site's pages |
 | `src/bots.js` | The bots (greedy, tactician, raider, warlord): single player in both apps, and the simulator |
 | `src/net.js` | Public site only: the connection to the game server |
+| `src/cardface.js` | Shared by the game and Dithry: card-face markup, suit icons, the suit textures, and the painted faces (`KFace.faces()`) |
+| `src/cardart.js` | Painted card faces built into the game for every player (`KCardArt`), merged in from an art pack by `tools/cardart.js` |
 | `src/sw.js`, `assets/` | The service worker (offline play), app manifest and icons, which `build.sh` copies into `site/`; and `assets/logo.png`, the Fraktur logo, which `build.sh` inlines into both apps |
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
 | `server/store.js` | Accounts and stats, saved to one JSON file |
@@ -30,6 +32,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
+| `tools/cardart.js` | Merges a card art pack from Dithry into `src/cardart.js` (`node tools/cardart.js kartenspiel-card-art.json`) |
 | `tools/art.js` | Redraws the Fraktur logo and the app icons as pixel art (`node tools/art.js`, then `./build.sh`) |
 
 ## Build, test, simulate
@@ -163,6 +166,24 @@ The tools are:
 Layers have visibility, lock and opacity. Undo and redo cover pixel changes and layer-structure changes. Mirror drawing, selections (with copy, cut and paste), and **Dither layer by brightness** (which turns an imported picture into pixel art) round it out.
 
 Projects save as `.dithry` files (JSON with a PNG per layer) and autosave in the browser. **Export PNG** scales by whole steps so pixels stay square. The Card Builder keeps PNGs with 256 colours or fewer as crisp, unsmoothed pixel art (`isPixelArt` in `ui.js`), and draws them with `image-rendering: pixelated`.
+
+### Painting the cards
+
+**Card mode** (File → Paint the Kartenspiel cards; or `dithry.html#cards`, or `#card=<id>`; linked from the Library and the Card Builder) steps through the library one card at a time.
+
+**One canvas, two versions.** The card's hand version (75 × 103, shown at 2× on a 150 × 206 desktop hand card) and its board version (52 × 52, on a 104 × 104 cell) sit side by side on one canvas. The gap between them and the space below the square card can't be painted (`app.allow`).
+
+**The text stays in front.** The card's own text is drawn on top of the paint with the game's face markup (`KFace.handFace` / `KFace.boardBlank`) and its stylesheet, inside a shadow root.
+
+**What you start from.** A card begins as its suit colour plus its usual dithered texture, on a `Card` layer, with an empty `Paint` layer above it.
+
+**Saving.** **Save to Kartenspiel** writes the two pictures to this browser's `ks.faces`. The game reads it through `KFace.faces()` and redraws on the `storage` event, so an open Kartenspiel tab updates right away. Dithry keeps the card's layers in `dithry.card.<id>`, so you can reopen it and carry on. **Reset** removes a card's painting.
+
+**For every player.** **Art pack… → Download** saves every painted card in one file. Then:
+1. Run `node tools/cardart.js kartenspiel-card-art.json` to write them into `src/cardart.js`.
+2. Rebuild and push.
+
+Painted faces show wherever the card is drawn: in hand, on the board, the Library preview and the drag ghost. Ruined and Ascended cards keep their own looks.
 
 To add a dither pattern, add an entry to `PATTERNS` in `dithry/engine.js`: it returns a threshold from 0 to 1 for each pixel, where lower thresholds show first. To add a style preset, add it to `PRESETS`.
 

@@ -421,6 +421,7 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .bottom .card .txt.mid { font-size: 10.5px; }
 }
 
+a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }
 

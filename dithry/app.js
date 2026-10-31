@@ -64,7 +64,7 @@
 
   /* ---------------- the window ---------------- */
   var MENUS = [
-    { id: 'file', name: 'File', items: [['new', 'New…', 'Ctrl+Alt+N'], ['open', 'Open…', 'Ctrl+O'], ['save', 'Save project', 'Ctrl+S'], '-', ['import', 'Import image as layer…'], ['export', 'Export PNG…', 'Ctrl+E'], ['copyPicture', 'Copy picture'], '-', ['example', 'Open the example scene']] },
+    { id: 'file', name: 'File', items: [['new', 'New…', 'Ctrl+Alt+N'], ['open', 'Open…', 'Ctrl+O'], ['save', 'Save project', 'Ctrl+S'], '-', ['import', 'Import image as layer…'], ['export', 'Export PNG…', 'Ctrl+E'], ['copyPicture', 'Copy picture'], '-', ['example', 'Open the example scene'], '-', ['cards', 'Paint the Kartenspiel cards…']] },
     { id: 'edit', name: 'Edit', items: [['undo', 'Undo', 'Ctrl+Z'], ['redo', 'Redo', 'Ctrl+Y'], '-', ['cut', 'Cut', 'Ctrl+X'], ['copy', 'Copy', 'Ctrl+C'], ['paste', 'Paste as new layer', 'Ctrl+V'], '-', ['selectAll', 'Select all', 'Ctrl+A'], ['deselect', 'Deselect', 'Ctrl+D'], '-', ['fillLayer', 'Fill with style', 'Shift+F'], ['clearLayer', 'Clear', 'Delete']] },
     { id: 'image', name: 'Image', items: [['resize', 'Canvas size…'], ['flipH', 'Flip layer left–right'], ['flipV', 'Flip layer upside down'], '-', ['ditherLayer', 'Dither layer by brightness'], ['mirror', 'Mirror drawing (symmetry)', 'Shift+M']] },
     { id: 'layer', name: 'Layer', items: [['addLayer', 'New layer', 'Ctrl+Shift+N'], ['dupLayer', 'Duplicate layer'], ['delLayer', 'Delete layer'], ['mergeDown', 'Merge down', 'Ctrl+M'], '-', ['layerUp', 'Move layer up'], ['layerDown', 'Move layer down']] },
@@ -157,7 +157,7 @@
 
   function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.scrollTop = top; drawPreview(); drawThumbs(); }
   function renderOpts() { $('#opts').innerHTML = optsHTML(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
-  function renderTitle() { $('#title').textContent = 'Dithry — ' + app.name + (app.dirty ? ' *' : ''); document.title = app.name + (app.dirty ? ' * ' : ' ') + '· Dithry'; }
+  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; document.title = t + ' · Dithry'; }
 
   // The style preview: the current style across a strip, as it would paint a shape.
   function drawPreview() {
@@ -203,6 +203,7 @@
     art.style.width = W() * app.zoom + 'px'; art.style.height = H() * app.zoom + 'px';
     art.style.transform = 'translate(' + Math.round(app.panX) + 'px,' + Math.round(app.panY) + 'px)';
     $('#sZoom').textContent = Math.round(app.zoom * 100) + '%'; drawOverlay();
+    hooks.view.forEach(function (f) { f(); });
   }
   function fit() {
     var r = work.getBoundingClientRect(), z = Math.min((r.width - 32) / W(), (r.height - 32) / H());
@@ -221,6 +222,7 @@
   function toScreen(x, y) { return [app.panX + x * app.zoom, app.panY + y * app.zoom]; }
 
   // The overlay: pixel grid, brush outline, shape guides, gradient handles, polygon points, mirror axis.
+  var hooks = { view: [], overlay: [], change: [] };   // used by card mode (cards.js)
   var overFrame = null;
   function drawOverlay() { if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
   function paintOverlay() {
@@ -236,6 +238,7 @@
       for (var y = ya; y <= yb; y++) { var sy = Math.round(oy + y * z) + .5; g.moveTo(ox + xa * z, sy); g.lineTo(ox + xb * z, sy); }
       g.stroke();
     }
+    hooks.overlay.forEach(function (f) { f(g, toScreen, z); });
     if (app.sel) {   // the selection: black and white dashes
       var s0 = toScreen(app.sel.x0, app.sel.y0), s1 = toScreen(app.sel.x1, app.sel.y1), rx = Math.round(s0[0]) + .5, ry = Math.round(s0[1]) + .5, rw = Math.round(s1[0] - s0[0]) - 1, rh = Math.round(s1[1] - s0[1]) - 1;
       g.lineWidth = 1; g.setLineDash([]); g.strokeStyle = '#000'; g.strokeRect(rx, ry, rw, rh); g.setLineDash([4, 4]); g.strokeStyle = '#fff'; g.strokeRect(rx, ry, rw, rh); g.setLineDash([]);
@@ -284,6 +287,7 @@
   function show(fieldBox, style, erase) {
     var L = layer(op.li), region = D.union(op.shown, op.box); if (!region) return;
     restore(L.data, op.before, region);
+    if (op.box && app.allow) { var bx = op.box; for (var y = bx.y0; y < bx.y1; y++) for (var x = bx.x0; x < bx.x1; x++) { var k = y * W() + x; if (!app.allow[k]) op.mask[k] = 0; } }   // card mode: only the cards are paintable
     if (op.box) {
       var st = style || app.style, fb = fieldBox || op.box;
       var field = D.makeField(st, fb, st.grad.type === 'edge' && !fieldBox ? D.edgeDistance(op.mask, W(), op.box) : null);
@@ -462,7 +466,7 @@
         D.composite(out, [{ visible: true, opacity: low.opacity, data: low.data }, { visible: top.visible, opacity: top.opacity, data: top.data }], W(), H());
         low.data = out; low.opacity = 1; d.layers.splice(d.active, 1); d.active--; });
     },
-    clearLayer: function () { if (!begin('clear')) return; var b = app.sel || full(), d = layer().data; for (var y = b.y0; y < b.y1; y++) d.fill(0, (y * W() + b.x0) * 4, (y * W() + b.x1) * 4); redraw(); commit(); },
+    clearLayer: function () { if (!begin('clear')) return; var b = app.sel || full(), d = layer().data; for (var y = b.y0; y < b.y1; y++) for (var x = b.x0; x < b.x1; x++) if (!app.allow || app.allow[y * W() + x]) d.fill(0, (y * W() + x) * 4, (y * W() + x) * 4 + 4); redraw(); commit(); },
     fillLayer: function () { if (!begin('fillLayer')) return; op.mask.fill(1); op.box = full(); show(); commit(); },
     selectAll: function () { app.sel = full(); drawOverlay(); },
     deselect: function () { app.sel = null; drawOverlay(); },
@@ -484,11 +488,12 @@
     mirror: function () { app.mirror = !app.mirror; renderOpts(); drawOverlay(); toast('Mirror drawing ' + (app.mirror ? 'on: everything you draw is copied across the middle.' : 'off.')); },
     new: function () { newDialog(); }, open: function () { pickFile('.dithry,.json,image/*', openFile); }, save: saveProject,
     import: function () { pickFile('image/*', importImage); }, export: exportDialog, copyPicture: copyPicture, example: function () { confirmDiscard(function () { exampleScene(); }); },
+    cards: function () { if (hooks.enter) hooks.enter(); },
     resize: resizeDialog, guide: guideDialog, keys: keysDialog, about: aboutDialog
   };
 
   /* ---------------- files ---------------- */
-  function touched() { app.dirty = true; renderTitle(); scheduleAutosave(); }
+  function touched() { app.dirty = true; renderTitle(); scheduleAutosave(); hooks.change.forEach(function (f) { f(); }); }
   function layerPNG(l) { return toCanvas(l.data, W(), H()).toDataURL('image/png'); }
   function projectJSON() { return { app: 'Dithry', version: 1, name: app.name, w: W(), h: H(), active: app.doc.active, style: app.style,
     layers: app.doc.layers.map(function (l) { return { name: l.name, visible: l.visible, opacity: l.opacity, locked: l.locked, png: layerPNG(l) }; }) }; }
@@ -497,10 +502,11 @@
       var g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0); res({ data: g.getImageData(0, 0, c.width, c.height).data, w: img.width, h: img.height, img: img }); }; img.onerror = rej; img.src = url; });
   }
   function loadProject(p) {
+    if (hooks.leave) hooks.leave();
     if (!p || p.app !== 'Dithry' || !p.layers) return Promise.reject(new Error('not a Dithry project'));
     return Promise.all(p.layers.map(function (l) { return decode(l.png, p.w, p.h); })).then(function (imgs) {
       app.doc = { w: p.w, h: p.h, active: Math.min(p.active || 0, p.layers.length - 1), layers: p.layers.map(function (l, i) { var L = D.newLayer(p.w, p.h, l.name); L.visible = l.visible !== false; L.opacity = l.opacity == null ? 1 : l.opacity; L.locked = !!l.locked; L.data.set(imgs[i].data); return L; }) };
-      if (p.style) app.style = Object.assign(D.defaultStyle(), p.style);
+      if (p.style && app.mode !== 'cards') app.style = Object.assign(D.defaultStyle(), p.style);   // switching cards keeps your brush
       app.name = p.name || 'Untitled'; app.undo = []; app.redo = []; app.dirty = false; app.rampSel = 0;
       setupCanvas(); renderSide(); renderTitle();
     });
@@ -508,12 +514,14 @@
   function download(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   function fileName(ext) { return (app.name || 'dithry').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + ext; }
   function saveProject() {
+    if (hooks.save && app.mode === 'cards') return hooks.save();   // card mode saves to Kartenspiel
     var j = projectJSON(); download(new Blob([JSON.stringify(j)], { type: 'application/json' }), fileName('.dithry'));
     app.dirty = false; renderTitle(); autosave(); toast('Saved ' + fileName('.dithry') + ' to your downloads. Open it again with File → Open.');
   }
   var saveTimer = null, warnedFull = false;
-  function scheduleAutosave() { clearTimeout(saveTimer); saveTimer = setTimeout(autosave, 900); }
+  function scheduleAutosave() { clearTimeout(saveTimer); if (app.mode !== 'cards') saveTimer = setTimeout(autosave, 900); }   // card mode saves to Kartenspiel instead
   function autosave() {
+    if (app.mode === 'cards') return;   // the picture you had open stays saved while you paint cards
     if (!lsSet('dithry.autosave', projectJSON()) && !warnedFull) { warnedFull = true; toast('This picture is too big to keep in the browser between visits. Use File → Save project.'); }
   }
   function pickFile(accept, cb) { var i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.onchange = function () { if (i.files && i.files[0]) cb(i.files[0]); }; i.click(); }
@@ -590,6 +598,7 @@
     };
   }
   function newDoc(w, h, bg, name) {
+    if (hooks.leave) hooks.leave();
     app.doc = { w: w, h: h, active: 0, layers: [D.newLayer(w, h, 'Background')] };
     var d = layer().data;
     if (bg === 'white' || bg === 'grey') { var c = bg === 'white' ? [255, 255, 255] : [192, 192, 192]; for (var i = 0; i < d.length; i += 4) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; } }
@@ -802,11 +811,12 @@
     document.getElementById('app').innerHTML = shellHTML();
     art = $('#art'); over = $('#over'); octx = over.getContext('2d'); work = $('#work');
     var saved = lsGet('dithry.autosave');
-    var ready = saved ? loadProject(saved).catch(function () { exampleScene(); }) : Promise.resolve(exampleScene());
+    var cardsFirst = /^#card/.test(location.hash);   // opening straight into card mode: no example scene first
+    var ready = saved ? loadProject(saved).catch(function () { exampleScene(); }) : Promise.resolve(cardsFirst ? newDoc(64, 24, 'transparent') : exampleScene());
     app.doc = app.doc || { w: 64, h: 24, active: 0, layers: [D.newLayer(64, 24, 'Background')] };
     if (!saved) { /* exampleScene ran above */ } else setupCanvas();
     renderOpts(); renderSide(); renderTitle();
-    ready.then(function () { renderOpts(); window.dithryReady = true; });
+    ready.then(function () { renderOpts(); if (hooks.start) return hooks.start(); }).then(function () { window.dithryReady = true; });
 
     document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { setTool(b.getAttribute('data-tool')); }); });
     $('.menubar').addEventListener('click', function (e) {
@@ -828,6 +838,10 @@
     window.addEventListener('beforeunload', function () { if (app.dirty) autosave(); });
   }
   var wheelAcc = 0;
-  window.DithryApp = { app: app, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject };
+  // For card mode (cards.js) and tests.
+  window.DithryApp = { app: app, D: D, hooks: hooks, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject,
+    setupCanvas: function () { setupCanvas(); }, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,
+    confirmDiscard: confirmDiscard, decode: decode, toCanvas: toCanvas, layerPNG: layerPNG, autosaved: function () { return lsGet('dithry.autosave'); }, fit: fit, applyView: applyView, drawOverlay: drawOverlay,
+    cancel: function () { if (op) cancel(); }, lsGet: lsGet, lsSet: lsSet, esc: esc, work: function () { return work; } };
   start();
 })();

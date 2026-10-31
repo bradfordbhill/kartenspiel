@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Tiny5&text=%E2%97%8F&display=swap" rel="stylesheet">
 <style>
 /* Dithry: a Windows 95-style window, like Kartenspiel. Colours are tokens so dark mode can swap them. */
 :root {
@@ -47,6 +48,9 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .menu button .k { opacity: .7; }
 .menu hr { border: 0; border-top: 1px solid var(--lo); border-bottom: 1px solid var(--hi); margin: 3px 2px; }
 
+.cardbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px; flex-wrap: wrap; flex: 0 0 auto; }
+.cardbar select { max-width: 260px; }
+.cardbar .grow { flex: 1; }
 .main { flex: 1; min-height: 0; display: flex; gap: 4px; padding: 2px; }
 .toolbox { flex: 0 0 auto; width: 92px; padding: 4px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
@@ -60,7 +64,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 #art { position: absolute; left: 0; top: 0; transform-origin: 0 0; image-rendering: pixelated; image-rendering: crisp-edges; box-shadow: 0 0 0 1px #000, 4px 4px 0 rgba(0, 0, 0, .35); }
 #art.checker { background: repeating-conic-gradient(#cfcfcf 0 25%, #f4f4f4 0 50%) 0 0 / 8px 8px; }
 #art.bg-white { background: #fff; } #art.bg-grey { background: #c0c0c0; } #art.bg-dark { background: #1c1f1f; }
-#over { position: absolute; inset: 0; pointer-events: none; }
+#over { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }   /* sized by CSS: its bitmap is device pixels */
 
 .side { flex: 0 0 300px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
 .panel { padding: 0 0 6px; }
@@ -120,6 +124,3566 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
   .titlebar .tip { display: none; }
 }
 </style></head><body><div id="app"></div><script>
+var KCardCSS = "/* Kartenspiel styles: a Windows 95 look. Colors are variables here, redefined for dark mode below. */\n/* Rules later in the file override earlier ones, so the newer tweaks sit near the bottom. */\n:root {\n  --desk: #008080; --face: #c0c0c0; --hi: #ffffff; --lo: #808080; --dk: #000000;\n  --text: #000000; --field: #ffffff; --title1: #000080; --title2: #1084d0; --titletext: #ffffff;\n  --sel: #000080; --seltext: #ffffff; --tip: #ffffe1; --muted: #4a4a4a;\n  --see: #e8c400; --seefill: rgba(255, 230, 0, .38); --seenby: #00a6c8; --legal: rgba(0, 170, 0, .28); --legaledge: #008a00;\n  --opt: #ff7a00; --focus: #000080;\n  color-scheme: light;\n  box-sizing: border-box;\n  padding-top: env(safe-area-inset-top, 0px);\n  padding-bottom: env(safe-area-inset-bottom, 0px);\n}\n/* Dark mode follows the system unless data-theme=\"light\"; data-theme=\"dark\" forces it. */\n@media (prefers-color-scheme: dark) {\n  :root:not([data-theme=\"light\"]) {\n    --desk: #0c3434; --face: #4b4b4b; --hi: #757575; --lo: #2a2a2a; --dk: #0a0a0a;\n    --text: #f1f1f1; --field: #2c2c2c; --title1: #1b1b62; --title2: #3d63ad; --sel: #3d63ad; --tip: #3d3b25; --muted: #c8c8c8;\n    --focus: #9ab8ff; color-scheme: dark;\n  }\n}\n:root[data-theme=\"dark\"] {\n  --desk: #0c3434; --face: #4b4b4b; --hi: #757575; --lo: #2a2a2a; --dk: #0a0a0a;\n  --text: #f1f1f1; --field: #2c2c2c; --title1: #1b1b62; --title2: #3d63ad; --sel: #3d63ad; --tip: #3d3b25; --muted: #c8c8c8;\n  --focus: #9ab8ff; color-scheme: dark;\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }\n/* Text is DotGothic16, whose digits are easy to tell apart. Its ● is an oversized full-width glyph, so build.sh\n   loads Tiny5 with just that one character (text=●), listed first so only ● comes from it. */\nbody {\n  height: 100%; margin: 0; background: var(--desk); color: var(--text);\n  font-family: \"Tiny5\", \"DotGothic16\", Tahoma, \"MS Sans Serif\", Geneva, sans-serif; font-size: 13px; line-height: 1.3;\n}\nbutton, input, select, textarea { font: inherit; color: var(--text); }\n\n/* bevels */\n.raised { border: 2px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); box-shadow: inset -1px -1px var(--lo), inset 1px 1px var(--face); background: var(--face); }\n.sunken { border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); background: var(--field); }\n.etched { border: 1px solid var(--lo); box-shadow: 1px 1px 0 var(--hi), inset 1px 1px 0 var(--hi); }\n\n.btn {\n  background: var(--face); border: 2px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi);\n  box-shadow: inset -1px -1px var(--lo), inset 1px 1px var(--face); padding: 2px 9px; min-height: 24px; cursor: pointer; white-space: nowrap;\n}\n.btn:active:not(:disabled), .btn.on { border-color: var(--dk) var(--hi) var(--hi) var(--dk); box-shadow: inset 1px 1px var(--lo); }\n.btn:disabled { color: var(--lo); text-shadow: 1px 1px 0 var(--hi); cursor: default; }\n.btn:focus-visible, .cellbtn:focus-visible, .tab:focus-visible { outline: 1px dotted var(--text); outline-offset: -5px; }\n.btn.sm { padding: 0 6px; min-height: 20px; }\n.btn.def { outline: 1px solid var(--dk); }\n/* form fields */\ninput[type=text], input[type=number], select, textarea { background: var(--field); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); padding: 2px 4px; min-height: 22px; }\ntextarea { width: 100%; resize: vertical; }\ninput[type=number] { width: 64px; }\nlabel { cursor: default; }\nfieldset { border: 1px solid var(--lo); box-shadow: 1px 1px 0 var(--hi), inset 1px 1px 0 var(--hi); margin: 0 0 8px; padding: 6px 8px 8px; }\nlegend { padding: 0 3px; }\n\n/* window */\n.win { position: fixed; inset: max(6px, env(safe-area-inset-top, 0px)) 6px max(6px, env(safe-area-inset-bottom, 0px)) 6px; display: flex; flex-direction: column; padding: 3px; }\n.titlebar { background: linear-gradient(90deg, var(--title1), var(--title2)); color: var(--titletext); display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 6px; font-weight: 700; }\n.titlebar .grow { flex: 1; }\n.titlebar .tb { width: 18px; height: 16px; padding: 0; min-height: 0; line-height: 10px; font-size: 11px; }\n.menubar { display: flex; gap: 2px; padding: 3px 2px; flex-wrap: wrap; align-items: center; }\n.tab { background: transparent; border: 1px solid transparent; padding: 2px 9px; cursor: pointer; }\n.tab:hover { border-color: var(--hi) var(--lo) var(--lo) var(--hi); }\n.tab.on { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--field); }\n.content { flex: 1; min-height: 0; display: flex; flex-direction: column; }\n.statusbar { display: flex; gap: 3px; padding-top: 3px; }\n.statusbar > div { padding: 1px 6px; flex: 0 0 auto; }\n.statusbar > div.grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n\n/* panels */\n.page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px 0; }\n.scroll { overflow: auto; }\n.pane { padding: 6px; overflow: auto; }\n.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }\n.col { display: flex; flex-direction: column; gap: 6px; }\n.muted { color: var(--muted); }\n.small { font-size: 12px; }\n.h { font-weight: 700; margin: 0 0 4px; font-size: 13px; }\n.panelhead { background: var(--lo); color: var(--hi); padding: 1px 6px; font-weight: 700; margin: -6px -6px 6px; }\n.err { background: var(--tip); border: 1px solid var(--dk); padding: 3px 6px; color: var(--text); }\n\n/* game layout */\n.gamegrid { flex: 1; min-height: 0; display: grid; grid-template-columns: 228px minmax(0, 1fr) 282px; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; }\n.gamegrid > .left { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px; min-height: 0; }\n.gamegrid > .center { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-height: 0; gap: 4px; }\n.gamegrid > .right { grid-column: 3; grid-row: 1 / span 2; min-height: 0; }\n.gamegrid > .bottom { grid-column: 2; grid-row: 2; }\n@media (max-width: 900px) {\n  .gamegrid { grid-template-columns: 1fr; grid-template-rows: auto; }\n  .gamegrid > .left, .gamegrid > .center, .gamegrid > .right, .gamegrid > .bottom { grid-row: auto; grid-column: auto; }\n  .page { overflow: auto; }\n  .gamegrid > .center { min-height: 70vh; }\n  .boardwrap { min-height: 60vh; }\n}\n/* players panel and log */\n.players { width: 100%; border-collapse: collapse; }\n.players td, .players th { padding: 2px 3px; text-align: left; white-space: nowrap; }\n.players th { font-weight: 400; color: var(--muted); }\n.players tr.cur td { background: var(--sel); color: var(--seltext); }\n.swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid var(--dk); vertical-align: -1px; }\n.log { flex: 1; min-height: 80px; overflow: auto; padding: 4px; font-size: 12px; }\n.log div { padding: 1px 0; border-bottom: 1px dotted var(--lo); }\n.log div.turn { font-weight: 700; border-bottom: none; padding-top: 4px; }\n\n/* board */\n.boardbar { padding: 2px 4px; }\n.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; }\n.boardsizer { position: relative; }\n.boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }\n.cell { position: absolute; width: 104px; height: 104px; }\n.cell.empty { border: 1px dashed rgba(128, 128, 128, .35); }\n.cell .coord { position: absolute; left: 3px; bottom: 2px; font-size: 9px; color: #888; }\n.cellbtn { position: absolute; inset: 0; background: transparent; border: 0; padding: 0; cursor: pointer; }\n.cell.legal { background: var(--legal); border: 2px solid var(--legaledge); }\n.cell.legal .cost { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; color: #064; font-size: 15px; }\n.cell.legal.poor { background: rgba(128, 128, 128, .22); border: 2px dashed #8a8a8a; }\n.cell.legal.poor .cost { color: #6a6a6a; font-size: 12px; text-align: center; }\n.cell.opt::after { content: \"\"; position: absolute; inset: -4px; border: 3px solid var(--opt); pointer-events: none; }\n.cell.optempty { background: rgba(255, 122, 0, .2); border: 2px solid var(--opt); }\n.cell.see::before { content: \"\"; position: absolute; inset: -3px; border: 2px dashed var(--see); pointer-events: none; z-index: 2; }\n.cell.counted::before { background: var(--seefill); border-style: solid; }\n.cell.seenby::after { content: \"\"; position: absolute; inset: -5px; border: 2px solid var(--seenby); pointer-events: none; }\n.cell.focus .card { outline: 3px solid var(--focus); outline-offset: 1px; }\n.boardsizer.claiming, .boardsizer.claiming .cellbtn { cursor: var(--meep), pointer; }\n.boardsizer.claiming .cell:not(.claimable) .cellbtn { cursor: var(--meep), default; }\n\n/* cards */\n.card { position: absolute; inset: 0; color: #111; background: #fff; border: 1px solid #000; box-shadow: 2px 2px 0 rgba(0, 0, 0, .35); padding: 3px 4px; display: flex; flex-direction: column; overflow: hidden; font-size: 11px; line-height: 1.15; }\n.card.s-Sceptre { background: #fff6c2; } .card.s-Goblet { background: #f6dcf2; } .card.s-Sword { background: #ffdad5; }\n.card.s-Bone { background: #ececec; } .card.s-Leaf { background: #dcf2d4; } .card.s-Tome { background: #d9e4ff; }\n.card .top { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }\n.card .nm { font-weight: 700; margin-top: 2px; word-break: break-word; }\n.card .ty { color: #555; font-size: 10px; }\n.card .art { height: 30px; margin: 2px 0; background-size: cover; background-position: center; border: 1px solid rgba(0, 0, 0, .25); }\n.card .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 2px; }\n.card .val { font-weight: 700; }\n.card .meeps { display: flex; gap: 2px; }\n.meep { width: 11px; height: 13px; border: 1px solid #000; border-radius: 5px 5px 1px 1px; display: inline-block; }\n.card .stackn { position: absolute; right: 2px; bottom: 17px; background: #333; color: #fff; font-size: 9px; padding: 0 3px; }\n.card .owc { position: absolute; left: 2px; bottom: 17px; font-size: 9px; padding: 0 2px; background: #fff; border: 1px solid #999; }\n.card .owc.hot { background: #ffd0d0; border-color: #c00; color: #900; font-weight: 700; }\n.card .badge { position: absolute; left: 0; right: 0; bottom: 33px; text-align: center; font-size: 10px; font-weight: 700; }\n.card .badge.curse { background: #5b2a86; color: #fff; }\n.card.ruined { background: repeating-linear-gradient(45deg, #9a9a9a 0 4px, #b4b4b4 4px 8px) !important; color: #222; }\n.card.ruined .nm { text-decoration: line-through; }\n.card.big { position: relative; inset: auto; width: 100%; min-height: 300px; font-size: 13px; line-height: 1.3; padding: 8px 10px; }\n.card.big .ty { font-size: 12px; }\n.card.big .art { height: 120px; }\n.card.big .txt { margin-top: 6px; }\n.card.big .nm { font-size: 16px; }\n.suitico { width: 13px; height: 13px; vertical-align: -2px; }\n.card.big .suitico { width: 18px; height: 18px; }\n\n/* hand */\n.hand { display: flex; gap: 6px; padding: 6px; overflow-x: auto; min-height: 134px; align-items: flex-start; }\n.hcard { position: relative; width: 88px; height: 118px; flex: 0 0 auto; }\n.hcard .cellbtn { z-index: 3; }\n.hcard.sel .card { outline: 3px solid var(--focus); outline-offset: 1px; transform: translateY(-4px); }\n.hcard.blocked .card { opacity: .55; }\n.hcard.pick .card { outline: 3px solid var(--opt); }\n.prompt { padding: 4px 6px; background: var(--tip); color: var(--text); border: 1px solid var(--dk); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }\n\n/* modal */\n.modalbg { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: grid; place-items: center; z-index: 50; padding: 12px; }\n.modal { min-width: 280px; max-width: min(760px, 96vw); max-height: 90vh; display: flex; flex-direction: column; padding: 3px; }\n.modal .body { padding: 10px 12px; overflow: auto; }\n.modal .btns { display: flex; gap: 6px; justify-content: flex-end; padding: 0 12px 10px; flex-wrap: wrap; }\n\n/* tables */\ntable.list { border-collapse: collapse; width: 100%; background: var(--field); }\ntable.list th { position: sticky; top: 0; text-align: left; font-weight: 400; padding: 2px 6px; background: var(--face); border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); cursor: pointer; }\ntable.list td { padding: 2px 6px; white-space: nowrap; border-bottom: 1px dotted var(--lo); }\ntable.list tr.sel td { background: var(--sel); color: var(--seltext); }\ntable.list tr { cursor: default; }\n\n/* two-column pages (library, card builder) and forms */\n.split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 4px; }\n@media (max-width: 800px) { .split { grid-template-columns: 1fr; } }\n.form { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 5px 8px; align-items: center; }\n.form > .full { grid-column: 1 / -1; }\n.help { max-width: 78ch; }\n.help h2 { font-size: 15px; margin: 14px 0 4px; }\n.help p, .help li { margin: 4px 0; }\n.kbd { border: 1px solid var(--lo); padding: 0 4px; background: var(--field); }\n.banner { padding: 6px 8px; background: var(--tip); color: var(--text); border: 1px solid var(--dk); }\n\n.form select { max-width: 360px; }\n\n/* hand cards at reading size */\n.hand { min-height: 224px; }\n.hcard { width: 150px; height: 206px; }\n.card .txt.mid { margin-top: 4px; font-size: 11.5px; line-height: 1.25; }\n.hand .card .nm { font-size: 12.5px; }\n\n/* hover magnifier */\n.hovercard { position: fixed; z-index: 70; width: 250px; pointer-events: none; display: none; filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, .4)); }\n.hovercard .card.big { min-height: 0; }\n.hovercard .hovinfo { background: var(--tip); color: var(--text); border: 1px solid var(--dk); border-top: 0; padding: 4px 8px; font-size: 12px; }\n\n/* ability available */\n.cell.ready .card { box-shadow: 0 0 0 4px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }\n\n/* overlays */\n.cell.ovl-dim .card { opacity: .3; }\n.cell.ovl-on .card { box-shadow: 0 0 0 4px #ffcc00, 2px 2px 0 rgba(0, 0, 0, .35); }\n.ovl { position: absolute; inset: 22px 2px auto; z-index: 3; pointer-events: none; text-align: center; font-size: 26px; font-weight: 700; color: #000; background: rgba(255, 255, 255, .85); border: 2px solid #000; padding: 2px 0; line-height: 1.05; }\n.ovl span { display: block; font-size: 10px; font-weight: 400; }\n\n/* log colors */\n.loglegend { font-size: 11px; padding-bottom: 3px; border-bottom: 1px solid var(--lo); margin-bottom: 2px; display: flex; flex-wrap: wrap; gap: 6px; }\n.lg-play { color: #1f4fd1; } .lg-claim { color: #137a30; } .lg-ap { color: #9a5b00; } .lg-vp { color: #a07400; font-weight: 700; }\n.lg-ruin { color: #b01010; } .lg-curse { color: #6a2a9a; } .lg-card { color: #555; } .lg-ref { color: #777; font-style: italic; }\n.lg-win { color: #fff; background: #137a30; font-weight: 700; padding: 1px 3px; }\n.log div.turn { color: #000080; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .lg-play { color: #8fb0ff; } :root:not([data-theme=\"light\"]) .lg-claim { color: #6fdc8c; } :root:not([data-theme=\"light\"]) .lg-ap { color: #f2b35c; } :root:not([data-theme=\"light\"]) .lg-vp { color: #ffd54a; } :root:not([data-theme=\"light\"]) .lg-ruin { color: #ff7b7b; } :root:not([data-theme=\"light\"]) .lg-curse { color: #d2a0ff; } :root:not([data-theme=\"light\"]) .lg-card { color: #bdbdbd; } :root:not([data-theme=\"light\"]) .lg-ref { color: #a8a8a8; } :root:not([data-theme=\"light\"]) .log div.turn { color: #a9c1ff; } }\n:root[data-theme=\"dark\"] .lg-play { color: #8fb0ff; } :root[data-theme=\"dark\"] .lg-claim { color: #6fdc8c; } :root[data-theme=\"dark\"] .lg-ap { color: #f2b35c; } :root[data-theme=\"dark\"] .lg-vp { color: #ffd54a; } :root[data-theme=\"dark\"] .lg-ruin { color: #ff7b7b; } :root[data-theme=\"dark\"] .lg-curse { color: #d2a0ff; } :root[data-theme=\"dark\"] .lg-card { color: #bdbdbd; } :root[data-theme=\"dark\"] .lg-ref { color: #a8a8a8; } :root[data-theme=\"dark\"] .log div.turn { color: #a9c1ff; }\n.ovl b { display: block; }\n.ovl .who { display: block; font-size: 10px; font-weight: 400; }\n.tok { display: inline-block; background: #ffd54a; color: #000; border: 1px solid #8a6a00; border-radius: 9px; padding: 0 6px; font-weight: 700; }\n.ovl .tok { font-size: 16px; margin-top: 2px; }\n/* full-card overlays (Quickview, War): cover the card, no names */\n.cell.ovl-on.ovl-full .card { box-shadow: 2px 2px 0 rgba(0, 0, 0, .35); }\n.ovl.full { inset: 0; border: 1px solid #000; padding: 4px; background: #fff; display: flex; flex-direction: column; justify-content: center; gap: 2px; }\n.ovl.quick .qv { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }\n.ovl.quick .qv + .qv { border-top: 1px dotted #999; padding-top: 3px; margin-top: 2px; }\n.ovl.quick .qv b { font-size: 24px; }\n.ovl.quick .qv:only-child b { font-size: 28px; }\n.ovl.war { justify-content: stretch; }\n.ovl.war .strip { flex: 1; border: 1px solid rgba(0, 0, 0, .45); background: rgba(0, 0, 0, .06); }\n.ovl.war .wn { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; color: #000; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }\n.ovl.war.safe { justify-content: center; }\n.ovl.war.safe .wn { font-size: 14px; position: static; }\n.ovl.war.hot { outline: 3px solid #c00; outline-offset: 1px; }\n.hcard .freetag { position: absolute; left: 4px; right: 4px; top: 40%; z-index: 2; background: #19e619; color: #000; border: 1px solid #000; text-align: center; font-weight: 700; font-size: 11px; pointer-events: none; }\n\n/* ---------- type scale: important things are bigger ---------- */\nbody { font-size: 13px; }\n.titlebar { font-size: 15px; }\n.tab { font-size: 15px; padding: 3px 12px; }\n.prompt { font-size: 14px; }\n.btn.big { font-size: 16px; padding: 4px 16px; min-height: 34px; font-weight: 700; }\n.btn.def { font-weight: 700; }\n.bignum { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: .5px; }\n.bignum .unit { font-size: 20px; margin-left: 2px; }\n.panelhead { font-size: 13px; }\n.hand + .row, .bottom .row.small b { font-size: 14px; }\n.pix { image-rendering: pixelated; display: block; }\n.pix.jar { width: 60px; height: 72px; flex: 0 0 auto; }\n.pix.pile { width: 84px; height: 58px; flex: 0 0 auto; }\n.apbox { display: flex; gap: 10px; align-items: flex-end; }\n.claimstate { margin-top: 4px; font-size: 13px; color: var(--muted); }\n.claimstate.avail { color: #137a30; font-weight: 700; }\n.plist { display: flex; flex-direction: column; gap: 4px; }\n.pcard { border: 1px solid var(--lo); padding: 3px 5px; background: var(--field); }\n.pcard.cur { border: 2px solid var(--sel); box-shadow: inset 0 0 0 1px var(--hi); }\n.pcard.out { opacity: .45; }\n.pname { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 14px; }\n.turnmark { margin-left: auto; background: var(--sel); color: var(--seltext); padding: 0 5px; font-size: 12px; }\n.pbody { display: flex; align-items: flex-end; gap: 8px; }\n.pstats { min-width: 0; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .claimstate.avail { color: #6fdc8c; } }\n:root[data-theme=\"dark\"] .claimstate.avail { color: #6fdc8c; }\n\n/* ---------- QoL: affordable cards, aiming, effects ---------- */\n.hcard.afford .card { box-shadow: 0 0 0 3px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }\n.hcard.afford.sel .card { box-shadow: 0 0 0 3px #19e619, 0 0 0 6px var(--focus); outline: none; }\n.boardsizer.aiming, .boardsizer.aiming .cellbtn { cursor: var(--sword), crosshair; }\n/* animation layer (FX in ui.js) */\n.fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }\n.fx { position: fixed; left: 0; top: 0; }\n.fx.shard { border: 1px solid rgba(0, 0, 0, .35); }\n.fx.dust { width: 8px; height: 8px; background: rgba(140, 130, 115, .55); border-radius: 50%; }\n.fx.gem { width: 8px; height: 6px; border: 1px solid #000; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .6); }\n.fx.marble { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #000; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .6); }\n.fx.pop { font-weight: 700; font-size: 20px; white-space: nowrap; padding: 1px 6px; border: 2px solid #000; background: #fff; color: #000; }\n.fx.pop.vp { background: #ffe58a; }\n.fx.pop.ap { background: #cfe0ff; }\n.fx.pop.ruin { background: #ffd0d0; color: #900; }\n\n/* Foundations: deeper suit color and a raised bevel */\n.card.found { border: 3px solid; border-color: rgba(255,255,255,.85) rgba(0,0,0,.65) rgba(0,0,0,.65) rgba(255,255,255,.85); box-shadow: inset -2px -2px 0 rgba(0,0,0,.25), inset 2px 2px 0 rgba(255,255,255,.45), 2px 2px 0 rgba(0,0,0,.45); }\n.card.found.s-Sceptre { background: #f0d45c; } .card.found.s-Goblet { background: #dea0d4; } .card.found.s-Sword { background: #f19a8e; }\n.card.found.s-Bone { background: #c4c4c4; } .card.found.s-Leaf { background: #a9db97; } .card.found.s-Tome { background: #a1bbf0; }\n.card.found .nm { letter-spacing: .3px; }\n.card.found.ruined { background: repeating-linear-gradient(45deg, #7d7d7d 0 4px, #9a9a9a 4px 8px) !important; }\n\n/* suit icons: each suit has its own dark color */\n.suitico { width: 15px; height: 15px; }\n.si-Sceptre { color: #8a6500; } .si-Goblet { color: #86206f; } .si-Sword { color: #9b1c10; }\n.si-Bone { color: #2e2e2e; } .si-Leaf { color: #1e6b1e; } .si-Tome { color: #1b3f91; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .suitico.si-Sceptre { color: #f2c94c; } :root:not([data-theme=\"light\"]) .suitico.si-Goblet { color: #f29ade; } :root:not([data-theme=\"light\"]) .suitico.si-Sword { color: #ff8a7a; } :root:not([data-theme=\"light\"]) .suitico.si-Bone { color: #e0e0e0; } :root:not([data-theme=\"light\"]) .suitico.si-Leaf { color: #7fd67f; } :root:not([data-theme=\"light\"]) .suitico.si-Tome { color: #8fb0ff; } }\n:root[data-theme=\"dark\"] .suitico.si-Sceptre { color: #f2c94c; } :root[data-theme=\"dark\"] .suitico.si-Goblet { color: #f29ade; } :root[data-theme=\"dark\"] .suitico.si-Sword { color: #ff8a7a; } :root[data-theme=\"dark\"] .suitico.si-Bone { color: #e0e0e0; } :root[data-theme=\"dark\"] .suitico.si-Leaf { color: #7fd67f; } :root[data-theme=\"dark\"] .suitico.si-Tome { color: #8fb0ff; }\n.card .suitico.si-Sceptre { color: #8a6500 !important; } .card .suitico.si-Goblet { color: #86206f !important; } .card .suitico.si-Sword { color: #9b1c10 !important; }\n.card .suitico.si-Bone { color: #2e2e2e !important; } .card .suitico.si-Leaf { color: #1e6b1e !important; } .card .suitico.si-Tome { color: #1b3f91 !important; }\n.card.big .suitico { width: 22px; height: 22px; }\n\n/* defense tokens and Ascension */\n.card .defb { position: absolute; right: 2px; top: 30px; background: transparent; border: 0; color: #1b3f91; font-size: 10px; font-weight: 700; padding: 0 2px; display: inline-flex; align-items: center; gap: 1px; }\n.card .ascb { position: absolute; left: 0; right: 0; bottom: 33px; text-align: center; font-size: 10px; font-weight: 700; color: #fff; background: linear-gradient(90deg, #d0123a, #e0a400, #1aa35a, #1d5fd6, #8a2be2); }\n.card.ascended { background: linear-gradient(120deg, #ffd6e0, #fff2b3, #d6ffd9, #d4e6ff, #ecd6ff, #ffd6e0) !important; background-size: 300% 300% !important; animation: poly 4s linear infinite; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #8a2be2, 2px 2px 0 rgba(0, 0, 0, .35); }\n@keyframes poly { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }\n@media (prefers-reduced-motion: reduce) { .card.ascended { animation: none; } }\n.fx.pop.asc { background: linear-gradient(90deg, #ffd6e0, #fff2b3, #d6ffd9, #d4e6ff, #ecd6ff); }\n.fx.pop.def { background: #d4e6ff; color: #1b3f91; }\n\n/* weak-suit cards in discard choices */\n.hcard.weak .card { filter: grayscale(1); opacity: .55; }\n.hcard.weak.pick .card { opacity: .8; }\n.hcard .weaktag { position: absolute; left: 4px; right: 4px; top: 40%; z-index: 2; background: #808080; color: #fff; border: 1px solid #000; text-align: center; font-size: 11px; font-weight: 700; pointer-events: none; }\n/* burying: suit cursor, dashed border where suits differ */\n.boardsizer.burying, .boardsizer.burying .cellbtn { cursor: var(--bury), copy; }\n.cell.opt.optdash::after { border-style: dashed; }\n/* stacked shields */\n.card .defb { padding: 1px 2px; gap: 2px; }\n.card .defb b { font-size: 10px; }\n/* ● orbs: ghostly mint glow; ◇ gems: cut-stone diamonds */\n.fx.marble { width: 9px; height: 9px; border: 0; background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, #b6ffe4 35%, rgba(127,245,201,.75) 60%, rgba(127,245,201,0) 72%) !important; box-shadow: 0 0 8px 3px rgba(127,245,201,.75), 0 0 16px 6px rgba(127,245,201,.35); border-radius: 50%; }\n.fx.gem { width: 9px; height: 9px; border: 1px solid rgba(0,0,0,.7); clip-path: polygon(50% 0, 100% 38%, 50% 100%, 0 38%); box-shadow: inset 2px 2px 0 rgba(255,255,255,.65), inset -2px -2px 0 rgba(0,0,0,.25); }\n.pix.jar { filter: drop-shadow(0 0 3px rgba(127,245,201,.55)); }\n\n/* Curses: purple flame flare, then a soft steady glow */\n.card.cursed { box-shadow: 0 0 0 2px #8a3ff0, 0 0 10px 3px rgba(150, 70, 255, .55), 2px 2px 0 rgba(0, 0, 0, .35); }\n.fx.flare { border: 3px solid #a24bff; border-radius: 3px; }\n.fx.flame { width: 8px; height: 12px; border-radius: 50% 50% 40% 40% / 70% 70% 30% 30%; background: radial-gradient(circle at 50% 70%, #fff 0 15%, #e3a6ff 30%, #a24bff 60%, rgba(120, 30, 220, 0) 75%); }\n.fx.pop.curse { background: #5b2a86; color: #fff; }\n.reserve { margin-top: 3px; font-size: 14px; font-weight: 700; color: #9b1c10; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .reserve { color: #ff8a7a; } }\n:root[data-theme=\"dark\"] .reserve { color: #ff8a7a; }\n.card .bonusb { position: absolute; left: 2px; bottom: 16px; background: #fff; border: 1px solid #555; color: #000; font-size: 10px; font-weight: 700; padding: 0 2px; }\n\n/* ---------- public site: home, online pages, profiles ---------- */\ninput[type=password] { background: var(--field); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); padding: 2px 4px; }\n.linkbtn { background: none; border: 0; padding: 0; color: var(--sel); text-decoration: underline; cursor: pointer; font: inherit; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .linkbtn { color: #9ab8ff; } }\n:root[data-theme=\"dark\"] .linkbtn { color: #9ab8ff; }\n.home { max-width: 820px; margin: 0 auto; padding: 16px; }\n.home h1 { font-size: 34px; margin: 4px 0 6px; }\n.home > p { font-size: 15px; }\n.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 16px 0; }\n.choice { padding: 12px 14px; }\n.choice h2 { margin: 0 0 6px; font-size: 20px; }\n.choice p { min-height: 3.2em; }\n.online { max-width: 900px; }\n.online h2 { margin: 0; font-size: 18px; }\n.row.spread { justify-content: space-between; margin-bottom: 6px; }\n.split2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin-top: 8px; }\n.tag { font-size: 11px; padding: 0 5px; border: 1px solid var(--lo); background: var(--field); }\n.tag.off { color: #9b1c10; border-color: #9b1c10; }\n.code { font-size: 16px; letter-spacing: 2px; background: var(--field); border: 1px solid var(--lo); padding: 0 6px; }\n.codein { width: 110px; text-transform: uppercase; letter-spacing: 2px; }\n.archpick { display: flex; flex-wrap: wrap; gap: 8px; }\n.archpick .hcard .card { cursor: pointer; }\n.archpick .archtag { position: absolute; left: 0; right: 0; bottom: -2px; text-align: center; font-size: 11px; font-weight: 700; background: var(--face); border: 1px solid var(--dk); z-index: 2; }\n.stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }\n.stat { padding: 8px 14px; min-width: 130px; }\n.won { color: #137a30; }\ntable.list td.wrap { white-space: normal; }\ntable.keys td { white-space: normal; }\ntable.keys td:first-child { width: 110px; }\n\n/* ---------- drag and drop ---------- */\n.hcard { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }\n.draglayer { position: fixed; inset: 0; pointer-events: none; z-index: 95; }\n.dragghost { position: fixed; left: 0; top: 0; width: 88px; height: 118px; opacity: .93; filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, .35)); }\n.dragghost.meepghost { width: 30px; height: 34px; display: grid; place-items: center; }\n.dragghost.meepghost .meep { width: 22px; height: 26px; border-radius: 10px 10px 2px 2px; }\n.dragghost:not([data-tip=\"\"])::after { content: attr(data-tip); position: absolute; left: 50%; top: -26px; transform: translateX(-50%); background: var(--tip); color: var(--text); border: 1px solid #000; padding: 1px 6px; font-size: 12px; white-space: nowrap; }\n.dropzone { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); max-width: 90vw; padding: 12px 16px; background: var(--face); color: var(--text); border: 2px dashed #000; font-weight: 700; text-align: center; }\n.dropzone.drophover { background: #ffd0d0; color: #000; }\n.cell.drophover { outline: 4px solid var(--focus); outline-offset: 2px; z-index: 4; }\nbody.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }\n.meepchip { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; width: 30px; height: 30px; border: 2px solid var(--dk); background: var(--field); cursor: grab; touch-action: none; }\n.meepchip .meep { width: 14px; height: 17px; }\n\n/* ---------- phones: the game screen (gamePageMobile) ---------- */\n@media (max-width: 900px), (max-height: 520px) {\n  body { touch-action: manipulation; }\n  .win.mwin { inset: 0; padding: 0; border: 0; box-shadow: none; }\n  .win.mwin > .titlebar, .win.mwin > .menubar, .win.mwin > .statusbar { display: none; }\n  .page.mgame { position: relative; padding: 0; gap: 0; overflow: hidden; }\n  .mtop { display: flex; align-items: center; gap: 6px; padding: 4px 6px; padding-top: max(4px, env(safe-area-inset-top, 0px)); }\n  .mtop .mname { max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n  .mtop .mstat { font-size: 16px; font-weight: 700; white-space: nowrap; }\n  .mtop .grow { flex: 1; }\n  .mgame .btn { min-height: 40px; min-width: 40px; padding: 0 10px; }\n  .mgame .prompt { font-size: 13px; padding: 4px 6px; }\n  .mgame .boardwrap { flex: 1; min-height: 0; touch-action: none; }\n  .mhand { flex: 0 0 auto; }\n  .mhand .hand { min-height: 0; padding: 4px 6px 6px; gap: 6px; }\n  .mhand .hcard { width: 104px; height: 142px; touch-action: pan-x; }\n  .mhand .card .txt.mid { font-size: 10px; line-height: 1.15; }\n  .mhand .row.small { padding: 2px 6px 0; font-size: 12px; }\n  .mtabs { display: flex; gap: 4px; padding: 4px; padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)); background: var(--face); border-top: 2px solid var(--hi); }\n  .mtabs .btn { flex: 1; }\n  .msheet { position: absolute; left: 0; right: 0; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); max-height: 62%; overflow: auto; z-index: 30; padding: 6px; }\n  .msheet .log { max-height: 50vh; }\n  .msheet .boardbar { border: 0; box-shadow: none; padding: 0; background: none; }\n  .msheet .card.big { min-height: 0; }\n  .modal { max-height: 92vh; }\n}\n/* a phone held sideways: a shorter hand strip */\n@media (max-height: 520px) {\n  .mhand .hcard { width: 78px; height: 106px; }\n  .mhand .card .txt.mid, .mhand .row.small { display: none; }\n}\n\n/* ---------- QC fixes ---------- */\n/* short desktop windows: the left column scrolls instead of spilling past the window */\n.gamegrid > .left { overflow: auto; }\n.gamegrid > .left .log { min-height: 120px; }\n/* Quickview totals: a light chip so each player's colour reads in dark mode too */\n.qtot { background: #fff; border: 1px solid #000; padding: 0 5px; }\n/* short desktop screens: give the board the room (the highlight legend is on the Help page) */\n@media (min-width: 901px) and (max-height: 800px) {\n  .boardbar .legend { display: none; }\n  .bottom .hand { min-height: 0; }\n  .bottom .hcard { width: 128px; height: 176px; }\n  .bottom .card .txt.mid { font-size: 10.5px; }\n}\n\na.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }\n.appbox { margin: 0 0 12px; }\n.guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }\n\n/* ---------- placement chevrons: green = this card would pressure that one, red = that one would pressure this card ---------- */\n.chev { position: absolute; width: 6px; height: 20px; z-index: 3; pointer-events: none; opacity: .8; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 50% 0, 100% 50%, 50% 100%, 0 100%, 50% 50%); }\n.chev.g { background: #16b416; } .chev.r { background: #e01010; }\n.cell.legal:hover .chev, .cell.drophover .chev { opacity: 1; }\n/* Overwhelm pressure: chevrons in the gutter between cards (pressMarks in ui.js), the same shape as the placement ones.\n   They point at the pressured card; .hot = that card is one step from Overwhelm; .dg = a Foundation's diagonal. */\n.gchev { position: absolute; width: 6px; height: 20px; z-index: 3; pointer-events: none; opacity: .85; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 50% 0, 100% 50%, 50% 100%, 0 100%, 50% 50%); }\n.gchev.hot { width: 8px; height: 26px; opacity: 1; }\n.gchev.dg { width: 5px; height: 14px; } .gchev.dg.hot { width: 6px; height: 18px; }\n.chev.d-E { right:3px;top:50%;margin-top:-10px; } .chev.g.d-E { transform: rotate(0deg); } .chev.r.d-E { transform: rotate(180deg); }\n.chev.g.both.d-E { margin-top:-22px; } .chev.r.both.d-E { margin-top:2px; }\n.chev.d-SE { bottom:1px;right:8px; } .chev.g.d-SE { transform: rotate(45deg); } .chev.r.d-SE { transform: rotate(225deg); }\n.chev.g.both.d-SE { right:2px;bottom:6px; } .chev.r.both.d-SE { right:14px;bottom:-4px; }\n.chev.d-S { bottom:-4px;left:50%;margin-left:-3px; } .chev.g.d-S { transform: rotate(90deg); } .chev.r.d-S { transform: rotate(270deg); }\n.chev.g.both.d-S { margin-left:-15px; } .chev.r.both.d-S { margin-left:9px; }\n.chev.d-SW { bottom:1px;left:8px; } .chev.g.d-SW { transform: rotate(135deg); } .chev.r.d-SW { transform: rotate(315deg); }\n.chev.g.both.d-SW { left:2px;bottom:6px; } .chev.r.both.d-SW { left:14px;bottom:-4px; }\n.chev.d-W { left:3px;top:50%;margin-top:-10px; } .chev.g.d-W { transform: rotate(180deg); } .chev.r.d-W { transform: rotate(360deg); }\n.chev.g.both.d-W { margin-top:-22px; } .chev.r.both.d-W { margin-top:2px; }\n.chev.d-NW { top:1px;left:8px; } .chev.g.d-NW { transform: rotate(-135deg); } .chev.r.d-NW { transform: rotate(45deg); }\n.chev.g.both.d-NW { left:14px;top:-4px; } .chev.r.both.d-NW { left:2px;top:6px; }\n.chev.d-N { top:-4px;left:50%;margin-left:-3px; } .chev.g.d-N { transform: rotate(-90deg); } .chev.r.d-N { transform: rotate(90deg); }\n.chev.g.both.d-N { margin-left:-15px; } .chev.r.both.d-N { margin-left:9px; }\n.chev.d-NE { top:1px;right:8px; } .chev.g.d-NE { transform: rotate(-45deg); } .chev.r.d-NE { transform: rotate(135deg); }\n.chev.g.both.d-NE { right:14px;top:-4px; } .chev.r.both.d-NE { right:2px;top:6px; }\n/* the suit wheel */\n.wheelbox { max-width: 460px; }\n.suitwheel { width: 100%; max-width: 420px; display: block; margin: 4px auto; color: var(--text); }\n.suitwheel line.arch { stroke: currentColor; stroke-width: 2.2; } .suitwheel line.sword { stroke: #b01010; stroke-width: 1.6; stroke-dasharray: 5 4; }\n.suitwheel .wh-head.arch { fill: currentColor; } .suitwheel .wh-head.sword { fill: #b01010; }\n.suitwheel .wh-node circle { fill: #fff; stroke: currentColor; stroke-width: 2; }\n.suitwheel .wh-name { font-size: 13px; font-weight: 700; fill: currentColor; } .suitwheel .wh-arch { font-size: 11px; fill: var(--muted); }\n\n/* ---------- a light medieval touch: Fraktur logo, crest, blackletter headings, pixel ornaments ---------- */\n.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }\n.pix { display: block; flex: 0 0 auto; }\n/* the logo is a 140 x 30 bitmap, shown at whole multiples (3x, 2x on phones) so its pixels stay square */\nh1.logo { width: 420px; max-width: 100%; aspect-ratio: 140 / 30; margin: 6px auto 0; background: var(--logo) no-repeat center / contain; image-rendering: pixelated; }\nh1.logo.small { width: 280px; }\n@media (max-width: 460px) { h1.logo { width: 280px; } }\n.fleuron { display: flex; justify-content: center; margin: 2px 0 12px; }\n.titlebar .crest { margin-right: 2px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .45)); }\n/* section headings in a pixel blackletter; user-chosen names stay in the plain font */\nh2:not(.plain) { font-family: \"Jacquard 24\", \"DotGothic16\", serif; font-weight: 400; font-size: 26px; letter-spacing: .3px; line-height: 1.05; }\n.help h2:not(.plain) { font-size: 24px; margin: 16px 0 4px; }\n.online h2:not(.plain) { font-size: 26px; }\n/* Win95 message-box layout: an icon on the left, the text beside it */\n.msgbox { display: flex; gap: 14px; align-items: flex-start; }\n.msgbox .pix { margin-top: 2px; }\n.msgbox p:first-child { margin-top: 0; }\n.prompt.winner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }\n.prompt.winner b { font-family: \"Jacquard 24\", \"DotGothic16\", serif; font-weight: 400; font-size: 26px; }\n/* the board in light mode: a faded vellum war-table instead of grey paper */\n/* the board's backdrop is a dithered night landscape, painted by paintScene in ui.js; these are its tones before it's drawn */\n.boardwrap { background: #c9c9c9 no-repeat 0 0; image-rendering: pixelated; }\n.boardsizer { image-rendering: auto; }   /* the pixelated setting is for the backdrop only */\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .boardwrap { background-color: #262a2a; } }\n:root[data-theme=\"dark\"] .boardwrap { background-color: #262a2a; }\n";
+/* Kartenspiel — starter data. Card definitions are plain JSON so they can live in a db later. */
+var KData = (function () {
+  var SUITS = ['Sceptre', 'Goblet', 'Sword', 'Bone', 'Leaf', 'Tome'];
+  var TYPES = ['Foundation', 'Structure', 'Grounds', 'Action', 'Blessing', 'Curse'];
+  var ALL4 = ['N', 'E', 'S', 'W'];
+
+  // Every card gets every field: defaults first, then the card's own values on top.
+  function c(o) {
+    var d = {
+      id: '', name: '', suit: 'Sceptre', type: 'Structure', cost: 0, copies: 1,
+      income: 0, text: '', place: ALL4.slice(), overwhelm: null,
+      score: { kind: 'none' }, sees: { area: 'none' }, onPlay: [],
+      curse: null, ability: null, perTurn: null, incomePerToken: 0, mods: {},
+      archetype: '', weakTo: '', art: '', note: ''
+    };
+    for (var k in o) d[k] = o[k];
+    return d;
+  }
+
+  // The starter library (87 cards). Card fields:
+  //   id                    unique; used in saves and to look the card up
+  //   name, suit, type      type is one of TYPES above
+  //   cost, income          ● to place it; ● it gives its owner each turn
+  //   copies                how many go in the deck (Foundations start in hand instead)
+  //   text, note            rules text shown on the card; designer note shown in the library
+  //   place                 sides that may touch existing cards: some of N/E/S/W, or 'diag' for corners only
+  //   overwhelm             enemy neighbours needed to Overwhelm it; null = default (3, Foundations 8)
+  //   score                 how it is worth ◇: { kind, n, m, suit }. Formulas: cardValue0 in engine.js
+  //   sees                  what the UI highlights when the card is selected
+  //   onPlay                effect steps run when it's played. Handlers: H in engine.js
+  //   ability               once-per-turn ability: { kind, pay, gain, ... }
+  //   curse                 Curse cards only: { mode: 'under' | 'top', effect, releasedBy }
+  //   perTurn, incomePerToken   token growth and ● per token (Acorn)
+  //   mods                  special rule flags the engine looks for (adjacentCost, multiClaim, reaction, ...)
+  //   archetype, weakTo     Foundations only: the archetype it belongs to, and the suit that archetype can't play
+  //   art                   image as a data URL ('' for none)
+  var STARTER = [
+   {
+    "id": "mausoleum",
+    "name": "Mausoleum",
+    "suit": "Bone",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "3◇ per buried card in your Kingdom. You cannot play Leaf cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perBuriedInKingdom",
+     "n": 3
+    },
+    "sees": {
+     "area": "kingdom"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "Cryptkeeper",
+    "weakTo": "Leaf",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "burial-rites",
+    "name": "Burial Rites",
+    "suit": "Bone",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Pick a Ruined card and flip it back over. Its suit is now Bone.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "board"
+    },
+    "onPlay": [
+     {
+      "do": "unruin",
+      "setSuit": "Bone"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "embalm",
+    "name": "Embalm",
+    "suit": "Bone",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Bury a card from your hand under your Foundation. Do it twice if you’re the Cryptkeeper.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "bonusArchetype": "Cryptkeeper",
+      "bonusN": 2,
+      "do": "buryFromHand",
+      "n": 1
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "living-death",
+    "name": "Living Death",
+    "suit": "Bone",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Draw two buried cards to hand from under unclaimed cards or cards you own.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "drawBuried",
+      "n": 2
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "sarcophagus",
+    "name": "Sarcophagus",
+    "suit": "Bone",
+    "type": "Curse",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Place this card on top of an adjacent card. That card loses its effects and owner. If a Leaf card is played adjacent to this card, destroy the Curse and return the card to its previous owner.",
+    "place": [
+     "N",
+     "E"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [
+     {
+      "area": "adjacent",
+      "do": "curse"
+     }
+    ],
+    "curse": {
+     "effect": "cover",
+     "mode": "top",
+     "releasedBy": "Leaf"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "procession",
+    "name": "Procession",
+    "suit": "Bone",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a non-Cryptkeeper player. That player must give you all Bone cards in their hand. If you didn’t choose a player, draw a card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "takeSuitFromHand",
+      "notArchetype": "Cryptkeeper",
+      "orDraw": 1,
+      "suit": "Bone"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "obelisk",
+    "name": "Obelisk",
+    "suit": "Bone",
+    "type": "Structure",
+    "cost": 16,
+    "copies": 1,
+    "income": 6,
+    "text": "Worth 8◇. Double its value if fully surrounded.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flatDoubledIfSurrounded",
+     "n": 8
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "last-will",
+    "name": "Last Will and Testament",
+    "suit": "Bone",
+    "type": "Action",
+    "cost": 9,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card from your hand and set it aside. You may play it for free next turn.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "setAside"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "If you don’t play it on your next turn, it stays in your hand at its normal cost."
+   },
+   {
+    "id": "funeral-pyre",
+    "name": "Funeral Pyre",
+    "suit": "Bone",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 2,
+    "text": "Once per turn, you may bury a card from your hand under this card.",
+    "place": [
+     "E",
+     "W",
+     "S"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "buryHand",
+     "pay": 0
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "crumbling-ossuary",
+    "name": "Crumbling Ossuary",
+    "suit": "Bone",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 0,
+    "text": "Whenever a non-Cryptkeeper player claims this card or an adjacent card, they lose their remaining ● for their turn.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 6
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "claimDrain": "Cryptkeeper"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "palace",
+    "name": "Palace",
+    "suit": "Goblet",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "4◇ per Goblet card in your Kingdom, 3◇ per Goblet card not in it. You cannot play Sceptre cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perSuitSplit",
+     "m": 3,
+     "n": 4,
+     "suit": "Goblet"
+    },
+    "sees": {
+     "area": "board",
+     "suit": "Goblet"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "Hedonist",
+    "weakTo": "Sceptre",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "gluttony",
+    "name": "Gluttony",
+    "suit": "Goblet",
+    "type": "Blessing",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Draw 2 cards, then discard 1. You cannot play this card if you own more than 3 Sceptre cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "draw",
+      "n": 2
+     },
+     {
+      "do": "discard",
+      "n": 1
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "cannotPlayIfOwnMore": {
+      "n": 3,
+      "suit": "Sceptre"
+     }
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "The library sheet lists this as a Curse; kept as a Blessing because it has no Curse effect."
+   },
+   {
+    "id": "gundy-and-dundy",
+    "name": "Gundy and Dundy",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 3,
+    "text": "Any number of players can claim this card. Worth 8◇, minus 2◇ for each claimant beyond 1.",
+    "place": [
+     "E",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flatMinusPerExtraClaimant",
+     "m": 2,
+     "n": 8
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "multiClaim": true
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "choreography",
+    "name": "Choreography and Merriment",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 3,
+    "text": "1◇ per Goblet card in your Kingdom. Once per turn, you may move this card to an adjacent space.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perSuitInKingdom",
+     "m": 0,
+     "n": 1,
+     "suit": "Goblet"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "move",
+     "pay": 0
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "fairgrounds",
+    "name": "Fairgrounds",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 3,
+    "text": "",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "secrets-and-whispers",
+    "name": "Secrets and Whispers",
+    "suit": "Goblet",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Curse a card adjacent to one of yours. That card cannot generate ●.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacentToOwn"
+    },
+    "onPlay": [
+     {
+      "area": "adjacentToOwn",
+      "do": "curse"
+     }
+    ],
+    "curse": {
+     "effect": "noIncome",
+     "mode": "under"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "den-of-sin",
+    "name": "Den of Sin",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 6,
+    "text": "You may corrupt two adjacent cards. Their suit is now Goblet. 2◇ per adjacent Goblet card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perAdjacentSuit",
+     "n": 2,
+     "suit": "Goblet"
+    },
+    "sees": {
+     "area": "adjacent",
+     "suit": "Goblet"
+    },
+    "onPlay": [
+     {
+      "area": "adjacent",
+      "count": 2,
+      "do": "setSuit",
+      "optional": true,
+      "suit": "Goblet"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "ballroom",
+    "name": "Ballroom",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 4,
+    "text": "Whenever a card moves adjacent to this card, the owner of Ballroom may draw a card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "drawOnMoveIn": 1
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "spice-caravan",
+    "name": "Spice Caravan",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 3,
+    "copies": 1,
+    "income": 8,
+    "text": "At the end of your turn, this card moves one space East or West. If both spaces are occupied, Spice Caravan is discarded. If it moved successfully, you get 1◇ token.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "caravan": 1
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Tries East first, then West."
+   },
+   {
+    "id": "sleeping-giant",
+    "name": "Sleeping Giant",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 1,
+    "text": "If a card moves or is Ruined adjacent to this card: the Sleeping Giant moves into that occupied space, leaving behind all cards that were buried under it. The card that was in that space, and all cards buried under it, are buried under the Sleeping Giant. (Burying invalidates claims.)",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 5
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "giant": 1
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Moves into the space of the card that moved or was Ruined."
+   },
+   {
+    "id": "orchard",
+    "name": "Orchard",
+    "suit": "Leaf",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "4◇ for each card in the largest contiguous region in your Kingdom. You cannot play Goblet cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "largestRegion",
+     "n": 4
+    },
+    "sees": {
+     "area": "kingdom"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "Gardener",
+    "weakTo": "Goblet",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "acorn",
+    "name": "Acorn",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "−1◇. At the end of your turn, place 1◇ token on this card. +1● per turn for each token on this card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flatPlusTokens",
+     "n": -1
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": {
+     "token": 1,
+     "when": "ownerTurnEnd"
+    },
+    "incomePerToken": 1,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "irrigation-canals",
+    "name": "Irrigation Canals",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "8◇, minus 1 for each adjacent card not owned by this card’s owner.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flatMinusPerAdjacentNotOwned",
+     "m": 1,
+     "n": 8
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "turn-the-soil",
+    "name": "Turn the Soil",
+    "suit": "Leaf",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Discard your hand. Draw up to your hand size, plus one for every two Leaf cards in your Kingdom (rounded down).",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "discardHand"
+     },
+     {
+      "do": "drawTo",
+      "plusPer": {
+       "per": 2,
+       "suit": "Leaf"
+      }
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "burrow",
+    "name": "Burrow",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 3,
+    "text": "1◇ per card north of this card.",
+    "place": [
+     "N",
+     "E",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perCardNorth",
+     "n": 1
+    },
+    "sees": {
+     "area": "north"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "fountain",
+    "name": "Fountain",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 3,
+    "text": "2◇ per adjacent Leaf card.",
+    "place": [
+     "N",
+     "S"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perAdjacentSuit",
+     "n": 2,
+     "suit": "Leaf"
+    },
+    "sees": {
+     "area": "adjacent",
+     "suit": "Leaf"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "topiary",
+    "name": "Topiary",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 0,
+    "text": "Copy an adjacent card with a cost up to 12●. This card is still a Leaf card.",
+    "place": [
+     "E",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [
+     {
+      "area": "adjacent",
+      "do": "copy",
+      "maxCost": 12
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Copies the target’s ◇ value, income and abilities, not its one-time effects."
+   },
+   {
+    "id": "volcanic-soil",
+    "name": "Volcanic Soil",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 0,
+    "text": "When placed: for each non-buried card in the column north of this one, that card’s owner gets +1◇, or +2◇ if the card has any cards buried under it.",
+    "place": [
+     "N"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "north"
+    },
+    "onPlay": [
+     {
+      "buried": 2,
+      "do": "northBonusOnce",
+      "plain": 1
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "wise-old-tree",
+    "name": "The Wise Old Tree",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "This card cannot be Ruined, Buried, Cursed, or Overwhelmed. Its suit cannot be modified. Cards cannot be placed on top of it. It cannot be claimed, but it does count as part of the Gardener’s Kingdom.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "immune": true,
+     "kingdomOf": "Gardener"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "proliferation",
+    "name": "Proliferation",
+    "suit": "Leaf",
+    "type": "Action",
+    "cost": 9,
+    "copies": 1,
+    "income": 0,
+    "text": "Create a copy of a Leaf card in your Kingdom and add it to your hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "copyToHand",
+      "suit": "Leaf"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Foundations cannot be copied."
+   },
+   {
+    "id": "cathedral",
+    "name": "Cathedral",
+    "suit": "Sceptre",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "6◇ per Sceptre card in your Kingdom. You cannot play Tome cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perSuitInKingdom",
+     "n": 6,
+     "suit": "Sceptre"
+    },
+    "sees": {
+     "area": "kingdom",
+     "suit": "Sceptre"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "Archbishop",
+    "weakTo": "Tome",
+    "art": "",
+    "note": "Assumed “each Sceptre card” means Sceptre cards in your Kingdom."
+   },
+   {
+    "id": "communion",
+    "name": "Communion",
+    "suit": "Sceptre",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 3,
+    "text": "Draw a card, then discard a card.",
+    "place": [
+     "N",
+     "S"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 5
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "draw",
+      "n": 1
+     },
+     {
+      "do": "discard",
+      "n": 1
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "absolution",
+    "name": "Absolution",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "If an adjacent card is Cursed, replace the Curse with this card, destroying it. You may change the card’s suit.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [
+     {
+      "area": "adjacent",
+      "chooseSuit": true,
+      "do": "removeCurse"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "convert",
+    "name": "Convert",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "A card adjacent to a card you own has its suit changed to your choice of suit.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacentToOwn"
+    },
+    "onPlay": [
+     {
+      "area": "adjacentToOwn",
+      "do": "setSuit",
+      "suit": "choose"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "inquisition",
+    "name": "Inquisition",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a suit. Discard cards from the top of the deck until you reveal one of that suit. Draw it to hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "searchSuit",
+      "rest": "discard"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "sanctuary",
+    "name": "Sanctuary",
+    "suit": "Sceptre",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 6,
+    "text": "",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "lay-on-hands",
+    "name": "Lay on Hands",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 9,
+    "copies": 1,
+    "income": 0,
+    "text": "Remove a Curse from a card you own.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "area": "kingdom",
+      "do": "removeCurse"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "tithing-hall",
+    "name": "Tithing Hall",
+    "suit": "Sceptre",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 8,
+    "text": "Once per turn, you may convert a card adjacent to a card you own to your choice of suit for 6●.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacentToOwn"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "area": "adjacentToOwn",
+     "kind": "convert",
+     "pay": 6
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "tithe",
+    "name": "Tithe",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 12,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card on the field with at least 2 neighboring Sceptre cards. The owner of that card chooses two cards, then lets you pick a random one to put in your hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "tithe",
+      "need": 2,
+      "suit": "Sceptre"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "confessional",
+    "name": "Confessional",
+    "suit": "Sceptre",
+    "type": "Structure",
+    "cost": 15,
+    "copies": 1,
+    "income": 6,
+    "text": "On their turn, any player may turn in a Curse (from a Cursed card on the board, or from their hand). They gain 3◇, and the Archbishop takes the Curse into their hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "m": 0,
+     "n": 4,
+     "suit": "Sceptre"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "confess",
+     "pay": 0,
+     "anyPlayer": true,
+     "gain": 3,
+     "toArchetype": "Archbishop"
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "The Archbishop can only turn in Curses from the board."
+   },
+   {
+    "id": "flying-buttresses",
+    "name": "Flying Buttresses",
+    "suit": "Sceptre",
+    "type": "Structure",
+    "cost": 15,
+    "copies": 1,
+    "income": 8,
+    "text": "This card cannot be Buried.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 6
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "unburiable": true
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "warcamp",
+    "name": "Warcamp",
+    "suit": "Sword",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "4◇ tokens per card you Ruin and 8◇ tokens per card you Overwhelm, paid when it happens. Each time, you also gain 12 Reserves: ● that stay until you spend them. You cannot play Bone cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "payoutOnOverwhelm": 8,
+     "payoutOnRuin": 4,
+     "reserveOnRuin": 12
+    },
+    "archetype": "Warmonger",
+    "weakTo": "Bone",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "phalanx",
+    "name": "Phalanx",
+    "suit": "Sword",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Ruin an adjacent non-Bone card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [
+     {
+      "area": "adjacent",
+      "do": "ruin",
+      "notSuit": "Bone"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "encampment",
+    "name": "Encampment",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 6,
+    "text": "This card requires 1 additional card to Overwhelm it.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": 4,
+    "score": {
+     "kind": "flat",
+     "n": 2
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "halberd-strike",
+    "name": "Halberd Strike",
+    "suit": "Sword",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Ruin a card adjacent to a card you own.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacentToOwn"
+    },
+    "onPlay": [
+     {
+      "area": "adjacentToOwn",
+      "do": "ruin"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "portcullis",
+    "name": "Portcullis",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 9,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a card you own. That card’s owner discards down to 3 cards in hand.",
+    "place": [
+     "N",
+     "S"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "adjacentToOwn"
+    },
+    "onPlay": [
+     {
+      "area": "adjacentToOwn",
+      "do": "discardDownTo",
+      "n": 3
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "trebuchet",
+    "name": "Trebuchet",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 0,
+    "text": "Ruin a chosen card 3 spaces away (orthogonally).",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "ring3"
+    },
+    "onPlay": [
+     {
+      "area": "ring3",
+      "do": "ruin"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "watchtower",
+    "name": "Watchtower",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 18,
+    "copies": 1,
+    "income": 0,
+    "text": "Playing adjacent to this card costs 3● more.",
+    "place": "diag",
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 6
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "adjacentCost": 3
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "seizure",
+    "name": "Seizure",
+    "suit": "Sword",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Name a suit, then reveal cards from the deck until you reveal one of that suit. Draw it to hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "searchSuit",
+      "rest": "bottom"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "The other revealed cards go to the bottom of the deck."
+   },
+   {
+    "id": "rear-guard",
+    "name": "Rear Guard",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 8,
+    "copies": 1,
+    "income": 6,
+    "text": "If a card adjacent (or diagonally adjacent) to this card would be Ruined, the owner of this card may choose to swap. If they did, Rear Guard switches places with the targeted card and is Ruined instead.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "surround8"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "guard": 1
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Swaps automatically when the targeted card belongs to Rear Guard’s owner."
+   },
+   {
+    "id": "revenge",
+    "name": "Revenge",
+    "suit": "Sword",
+    "type": "Action",
+    "cost": 0,
+    "copies": 1,
+    "income": 0,
+    "text": "If a card you own is Overwhelmed, you may reveal this card from your hand. If you did, change the suit of two cards adjacent to the Overwhelmed card to a suit of your choosing.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "reaction": "overwhelmed"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Only usable as a reaction. It is discarded after use."
+   },
+   {
+    "id": "observatory",
+    "name": "Observatory",
+    "suit": "Tome",
+    "type": "Foundation",
+    "cost": 0,
+    "copies": 1,
+    "income": 8,
+    "text": "5◇ for each different suit in your Kingdom. You cannot play Sword cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perDistinctSuitInKingdom",
+     "n": 5
+    },
+    "sees": {
+     "area": "kingdom"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "Philosopher",
+    "weakTo": "Sword",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "eureka",
+    "name": "Eureka",
+    "suit": "Tome",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Chosen player reveals their hand.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "revealHand"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "hilltop-relic",
+    "name": "Hilltop Relic",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 18,
+    "copies": 1,
+    "income": 0,
+    "text": "Once per turn, you may exchange 12● for 2◇.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "gain": 2,
+     "kind": "exchange",
+     "pay": 12
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "public-forum",
+    "name": "Public Forum",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 6,
+    "text": "4◇ for each adjacent Tome card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perAdjacentSuit",
+     "n": 4,
+     "suit": "Tome"
+    },
+    "sees": {
+     "area": "adjacent",
+     "suit": "Tome"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "reconstructed-map",
+    "name": "Reconstructed Map",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 0,
+    "text": "Draw a card, then discard a card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 8
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "draw",
+      "n": 1
+     },
+     {
+      "do": "discard",
+      "n": 1
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "watchmakers-shop",
+    "name": "Watchmaker’s Shop",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 3,
+    "text": "When this card becomes fully surrounded, rotate all surrounding cards clockwise once.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "surroundRotate": true
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "death-ray",
+    "name": "Death Ray",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 3,
+    "text": "If you own at least 2 adjacent cards, Ruin the card directly east.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 2
+    },
+    "sees": {
+     "area": "east1"
+    },
+    "onPlay": [
+     {
+      "area": "east1",
+      "auto": true,
+      "do": "ruin",
+      "ownAdjacentAtLeast": 2
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "alchemy-lab",
+    "name": "Alchemy Lab",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "If this card is surrounded by three or more cards of the same suit, you may choose three different suits and assign them to those three cards.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "alchemy": 3
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "errata",
+    "name": "Errata",
+    "suit": "Tome",
+    "type": "Action",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "You may move one of your deployed meeples to a claimable card anywhere on the board.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "moveMeeple"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "university",
+    "name": "University",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 6,
+    "text": "Once per turn, you may offer to swap one of your meeples with an opponent’s. They may deny your request. If they do, place one meeple from your bank onto this card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "swapMeeple",
+     "pay": 0
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "A meeple placed on University stays there until University leaves play."
+   },
+   {
+    "id": "overgrowth",
+    "name": "Overgrowth",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 12,
+    "copies": 1,
+    "income": 6,
+    "text": "Choose a Ruined or Overwhelmed card adjacent to a Leaf card. That card is discarded and replaced with this one, unless it would be Overwhelmed by being placed there.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 4
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "overgrow"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "mildew",
+    "name": "Mildew",
+    "suit": "Leaf",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose any card adjacent to a Leaf card. That card’s ◇ value is halved, rounded down.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToSuit",
+      "suit": "Leaf"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "halveValue"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "intoxicate",
+    "name": "Intoxicate",
+    "suit": "Goblet",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a Goblet card. That card’s Overwhelm number is reduced by 1, but its ● production is increased by 3 per turn.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToSuit",
+      "suit": "Goblet"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "intoxicate"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "fortune-teller",
+    "name": "Fortune Teller",
+    "suit": "Goblet",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a suit. Reveal the top card of the deck. If it is of your chosen suit, you may Curse a card adjacent to a card you own, making it unable to produce ●.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "fortune"
+     },
+     {
+      "do": "curse",
+      "area": "adjacentToOwn",
+      "requires": "fortuneOk",
+      "optional": true,
+      "prompt": "The fortune holds: Curse a card next to one of yours (it will produce no ●), or Skip."
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "noIncome"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "The revealed card stays on top of the deck."
+   },
+   {
+    "id": "tunnel",
+    "name": "Tunnel",
+    "suit": "Sword",
+    "type": "Curse",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a Sword card you own. Any cards buried underneath that card are removed and the card loses all Defense tokens.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToOwnSuit",
+      "suit": "Sword",
+      "pierce": true
+     },
+     {
+      "do": "curseExtra",
+      "kind": "tunnel"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "none"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Defense tokens do not stop Tunnel."
+   },
+   {
+    "id": "usurp",
+    "name": "Usurp",
+    "suit": "Sword",
+    "type": "Curse",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "You may claim a card adjacent to a card you own, even if it has been claimed already. This does not remove the original claimant.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToOwn"
+     },
+     {
+      "do": "curseExtra",
+      "kind": "usurp"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "none"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "ravens-beak",
+    "name": "Raven’s Beak",
+    "suit": "Bone",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a Bone card you own. That card’s Overwhelm number is reduced by 1.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToOwnSuit",
+      "suit": "Bone"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "owMinus"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "eye-of-newt",
+    "name": "Eye of Newt",
+    "suit": "Bone",
+    "type": "Curse",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card with at least three empty adjacent spaces. Those spaces now cost 3● more to place a card in.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "emptyAround3"
+     },
+     {
+      "do": "curseExtra",
+      "kind": "tax"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "tax"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "exile",
+    "name": "Exile",
+    "suit": "Sceptre",
+    "type": "Curse",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a Sceptre card you own. That card loses its claimant and the meeple is returned to its owner.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToOwnSuit",
+      "suit": "Sceptre"
+     },
+     {
+      "do": "curseExtra",
+      "kind": "exile"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "none"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "youll-regret-that",
+    "name": "You’ll Regret That",
+    "suit": "Sceptre",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "When a Structure is used to Ruin a card you own, you may play this from your hand to Curse that Structure. That Structure can no longer produce ●.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": {
+     "mode": "under",
+     "effect": "noIncome"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "reaction": "ruinedByStructure"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Played as a reaction on another player’s turn, at no cost."
+   },
+   {
+    "id": "overwhelming-evidence",
+    "name": "Overwhelming Evidence",
+    "suit": "Tome",
+    "type": "Action",
+    "cost": 18,
+    "copies": 1,
+    "income": 0,
+    "text": "Flip over a Ruined or Overwhelmed card. Its suit is now Tome. You may claim it.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "unruin",
+      "setSuit": "Tome"
+     },
+     {
+      "do": "offerClaim"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "deep-thought",
+    "name": "Deep Thought",
+    "suit": "Tome",
+    "type": "Curse",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card adjacent to a Tome card you own. That card’s ● production is halved, rounded up.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "curse",
+      "area": "adjacentToOwnSuit",
+      "suit": "Tome"
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "halveIncome"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "brambles",
+    "name": "Brambles",
+    "suit": "Leaf",
+    "type": "Structure",
+    "cost": 0,
+    "copies": 1,
+    "income": 2,
+    "text": "If a card is one away from being Overwhelmed, you may play Brambles on top of it. The targeted card and all cards buried under it are now buried under Brambles. Costs 3● less next turn.",
+    "place": [
+     "E",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 2
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "reaction": "oneAway"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Played as a reaction on another player’s turn. Instead of a cost, your next turn starts with 3● less. You claim Brambles if you have a meeple."
+   },
+   {
+    "id": "royal-seal",
+    "name": "Royal Seal",
+    "suit": "Goblet",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "You may claim any unclaimed card. That card’s placement effect is triggered when you claim it.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "royalClaim"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Only Structures with a placement effect re-trigger. Does not use your claim for the turn."
+   },
+   {
+    "id": "artillery",
+    "name": "Artillery",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 8,
+    "copies": 1,
+    "income": 4,
+    "text": "Once per turn, you may spend 6● to Ruin an opponent’s card adjacent to a Sword card you own.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 2
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "artillery",
+     "pay": 6,
+     "suit": "Sword"
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "decay",
+    "name": "Decay",
+    "suit": "Bone",
+    "type": "Structure",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "When placed: place a Decay token on an adjacent card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "decayToken"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "PLACEHOLDER: cost, value and what a Decay token does are not defined yet. The token is tracked but has no effect."
+   },
+   {
+    "id": "scrying-pool",
+    "name": "Scrying Pool",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 6,
+    "copies": 1,
+    "income": 2,
+    "text": "Once per turn, for 3●: choose a card you own and activate its placement effect an additional time.",
+    "place": [
+     "N",
+     "S"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "flat",
+     "n": 2
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": {
+     "kind": "scry",
+     "pay": 3
+    },
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Only Structures with a placement effect."
+   },
+   {
+    "id": "repent",
+    "name": "Repent",
+    "suit": "Sceptre",
+    "type": "Action",
+    "cost": 0,
+    "copies": 1,
+    "income": 0,
+    "text": "If an opponent Ruins or Overwhelms a card, you may Ruin a card adjacent to a card you own that belongs to that player. Costs 3● less next turn.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "reaction": "opponentRuins"
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Played as a reaction. Instead of a cost, your next turn starts with 3● less."
+   },
+   {
+    "id": "front-lines",
+    "name": "Front Lines",
+    "suit": "Sword",
+    "type": "Structure",
+    "cost": 8,
+    "copies": 1,
+    "income": 4,
+    "text": "2◇ for each adjacent (or diagonally adjacent) card owned by an opponent.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perSurroundOpp",
+     "n": 2
+    },
+    "sees": {
+     "area": "surround8"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "vineyard",
+    "name": "Vineyard",
+    "suit": "Goblet",
+    "type": "Structure",
+    "cost": 8,
+    "copies": 1,
+    "income": 4,
+    "text": "2◇ for each adjacent or buried Leaf card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perAdjOrBuriedSuit",
+     "n": 2,
+     "suit": "Leaf"
+    },
+    "sees": {
+     "area": "adjacent",
+     "suit": "Leaf"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "post-office",
+    "name": "Post Office",
+    "suit": "Tome",
+    "type": "Structure",
+    "cost": 8,
+    "copies": 1,
+    "income": 4,
+    "text": "2◇ for each adjacent or buried card of a different suit.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "perAdjOrBuriedOtherSuit",
+     "n": 2
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Different from Post Office’s own suit (Tome)."
+   },
+   {
+    "id": "bread-and-circuses",
+    "name": "Bread and Circuses",
+    "suit": "Goblet",
+    "type": "Action",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "Choose a card. Earn 1◇ for each consecutive non-Ruined card to the East of that card.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "eastChain"
+     }
+    ],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "flowers",
+    "name": "Flowers",
+    "suit": "Bone",
+    "type": "Blessing",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "The card under which Flowers is buried permanently produces 3 additional ● per turn.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "burialEffect": {
+      "ap": 3
+     }
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "eye-for-an-eye",
+    "name": "Eye for an Eye",
+    "suit": "Sceptre",
+    "type": "Blessing",
+    "cost": 3,
+    "copies": 1,
+    "income": 0,
+    "text": "The card under which Eye for an Eye is buried is permanently worth 3 additional ◇.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "burialEffect": {
+      "vp": 3
+     }
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "destroying-angel",
+    "name": "Destroying Angel",
+    "suit": "Leaf",
+    "type": "Curse",
+    "cost": 8,
+    "copies": 1,
+    "income": 0,
+    "text": "Ruin a card adjacent to a Leaf card you own.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [
+     {
+      "do": "ruin",
+      "area": "adjacentToOwnSuit",
+      "suit": "Leaf",
+      "asCurse": true
+     }
+    ],
+    "curse": {
+     "mode": "under",
+     "effect": "none"
+    },
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {},
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": ""
+   },
+   {
+    "id": "standard-bearer",
+    "name": "Standard Bearer",
+    "suit": "Sword",
+    "type": "Blessing",
+    "cost": 6,
+    "copies": 1,
+    "income": 0,
+    "text": "The card under which Standard Bearer is buried cannot be Ruined or Overwhelmed.",
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "none"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "mods": {
+     "burialEffect": {
+      "protect": true
+     }
+    },
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "PLACEHOLDER cost (the sheet gave none). The protection ends if Standard Bearer is unburied."
+   }
+  ].map(c);
+
+  return { SUITS: SUITS, TYPES: TYPES, ALL4: ALL4, STARTER: STARTER, make: c };
+})();
+if (typeof module !== 'undefined') module.exports = KData;
+/* Kartenspiel card faces, shared by the game (src/ui.js) and Dithry's card-painting mode (dithry/cards.js), so a
+   card's text sits in exactly the same place in both. Also here: the suit icons, the faint dithered texture each
+   suit gets, and the store of painted card faces.
+   Painted faces: each card can have a picture for its hand (portrait, 75 × 103 pixels, shown at 2× on a desktop
+   hand card of 150 × 206 and stretched to fit elsewhere) and board (square, 52 × 52, on a 104 × 104 cell) versions. Committed ones live in src/cardart.js (KCardArt) and show for everyone; Dithry saves
+   new ones in this browser (localStorage 'ks.faces'), which take precedence, so you see your edits at once. */
+var KFace = (function () {
+  'use strict';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  // SVG paths for the six suit icons (16x16 viewBox).
+  var ICON = {
+    Sceptre: '<path d="M2.5 13.5 10 6"/><circle cx="11.3" cy="4.7" r="2.2"/>',
+    Goblet: '<path d="M3 2h10l-1.2 4.5a3.9 3.9 0 0 1-7.6 0Z"/><path d="M8 10.5v3M5 14h6"/>',
+    Sword: '<path d="M8 1.5v9M4.5 10.5h7M8 10.5v4"/>',
+    Bone: '<path d="M3.5 7a4.5 4.5 0 1 1 9 0c0 1.6-.8 2.6-1.8 3.2V13H5.3v-2.8C4.3 9.6 3.5 8.6 3.5 7Z"/><circle cx="6.2" cy="7" r=".9"/><circle cx="9.8" cy="7" r=".9"/>',
+    Leaf: '<path d="M8 1.5c4 2.2 4.6 7.5 0 11.5-4.6-4-4-9.3 0-11.5Z"/><path d="M8 4v11"/>',
+    Tome: '<rect x="3" y="3.5" width="10" height="8.5"/><path d="M5 6.5h6M5 9h6"/><circle cx="3" cy="3.5" r="1.2"/><circle cx="13" cy="12" r="1.2"/>'
+  };
+  function icon(s) { return '<svg class="suitico si-' + esc(s) + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="' + esc(s) + '"><title>' + esc(s) + '</title>' + (ICON[s] || '') + '</svg>'; }
+  // Placement arrows shown in a card's footer.
+  function placeIcon(pl) {
+    if (pl === 'diag') return '✕';
+    if (!pl || pl.length === 4) return '✛';
+    var m = { 'N': '↑', 'S': '↓', 'E': '→', 'W': '←', 'NS': '↕', 'EW': '↔', 'NE': '↗' };
+    var k = ['N', 'E', 'S', 'W'].filter(function (s) { return pl.indexOf(s) >= 0; }).join('');
+    return m[k] || k;
+  }
+  // A card's score rule as readable text.
+  function scoreText(s) {
+    if (!s) return '';
+    var n = s.n, m = s.m;
+    switch (s.kind) {
+      case 'flat': return n + '◇';
+      case 'perAdjacentSuit': return n + '◇ per adjacent ' + s.suit;
+      case 'perSuitInKingdom': return n + '◇ per ' + s.suit + ' in Kingdom';
+      case 'perSuitSplit': return n + '◇ per ' + s.suit + ' in Kingdom, ' + m + '◇ per other ' + s.suit;
+      case 'perBuriedInKingdom': return n + '◇ per buried card in Kingdom';
+      case 'perDistinctSuitInKingdom': return n + '◇ per suit in Kingdom';
+      case 'largestRegion': return n + '◇ per card in largest region';
+      case 'perCardNorth': return n + '◇ per card north';
+      case 'flatDoubledIfSurrounded': return n + '◇, doubled if surrounded';
+      case 'flatMinusPerAdjacentNotOwned': return n + '◇ − ' + m + ' per foreign neighbor';
+      case 'flatMinusPerExtraClaimant': return n + '◇ − ' + m + ' per extra claimant';
+      case 'flatPlusTokens': return n + '◇ + tokens';
+      default: return '';
+    }
+  }
+
+  // Each suit's card colour, as in style.css (.card.s-*, .card.found.s-*): the base Dithry paints on.
+  var SUIT_BG = { Sceptre: '#fff6c2', Goblet: '#f6dcf2', Sword: '#ffdad5', Bone: '#ececec', Leaf: '#dcf2d4', Tome: '#d9e4ff' };
+  var FOUND_BG = { Sceptre: '#f0d45c', Goblet: '#dea0d4', Sword: '#f19a8e', Bone: '#c4c4c4', Leaf: '#a9db97', Tome: '#a1bbf0' };
+  // Painted art and textures are pixel art: CSS that stretches a picture over the whole card with hard edges.
+  function picCSS(url, fit) { return 'background-image:url(' + url + ');background-size:' + (fit || '100% 100%') + ';image-rendering:pixelated'; }
+  // Card art inside the art band. Pixel art (stored as PNG) is scaled with hard edges so it stays crisp.
+  function artStyle(art) { return 'background-image:url(' + art + ')' + (art.indexOf('data:image/png') === 0 ? ';image-rendering:pixelated' : ''); }
+
+  // Face for a card definition: in hand, the library, the builder. opts: { big, mid, value, cost, art (art-band
+  // picture), style (CSS for the card's background: its texture or painted face) }.
+  function handFace(d, o) {
+    o = o || {};
+    var art = o.art, tx = o.style || '';
+    var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + '"' + (tx ? ' style="' + tx + '"' : '') + '>';
+    h += '<div class="top"><span>' + esc(o.cost != null ? o.cost : d.cost) + '●</span>' + icon(d.suit) + '</div>';
+    if (art) h += '<div class="art" style="' + artStyle(art) + '"></div>';
+    h += '<div class="nm">' + esc(d.name) + '</div><div class="ty">' + esc(d.type) + ' · ' + esc(d.suit) + '</div>';
+    if (o.big) {
+      h += '<div class="txt">' + esc(d.text || '') + '</div>';
+      var bits = [];
+      if (scoreText(d.score)) bits.push('Value: ' + scoreText(d.score));
+      if (+d.income) bits.push('Income: ' + d.income + '● per turn');
+      if (+d.incomePerToken) bits.push('+' + d.incomePerToken + '● per token');
+      bits.push('Placement: ' + placeIcon(d.place));
+      if (d.overwhelm != null && d.overwhelm !== '') bits.push('Overwhelm number: ' + d.overwhelm);
+      if (d.type === 'Foundation') bits.push('Archetype: ' + d.archetype + ', weak to ' + d.weakTo);
+      if (d.note) bits.push('Note: ' + d.note);
+      h += '<div class="txt small muted" style="color:#444">' + bits.map(esc).join('<br>') + '</div>';
+    } else if (o.mid) {
+      h += '<div class="txt mid">' + esc(d.text || '') + '</div>';
+      if (scoreText(d.score) && d.score.kind !== 'flat') h += '<div class="ty" style="margin-top:3px">' + esc(scoreText(d.score)) + '</div>';
+    }
+    h += '<div class="foot"><span>' + esc(placeIcon(d.place)) + '</span><span class="val">' + (o.value != null ? esc(o.value) + '◇' : '') + (+d.income ? ' ' + d.income + '●' : '') + '</span></div>';
+    return h + '</div>';
+  }
+
+  // Face for a card as it first lands on the board (nobody's meeple on it yet): what Dithry shows over the square
+  // painting. The game draws its live board faces in boardFace (ui.js), with the same structure.
+  function boardBlank(d, o) {
+    o = o || {};
+    var h = '<div class="card s-' + esc(d.suit) + (d.type === 'Foundation' ? ' found' : '') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>';
+    h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(d.suit) + '</div>';
+    if (o.art) h += '<div class="art" style="' + artStyle(o.art) + '"></div>';
+    h += '<div class="nm">' + esc(d.name) + '</div><div class="ty">' + esc(d.type) + '</div>';
+    h += '<div class="foot"><span class="meeps"></span><span class="val">' + (+d.income ? d.income + '●' : '') + '</span></div>';
+    return h + '</div>';
+  }
+
+  /* ----- card texture: a faint two-tone dithered gradient, dark at the bottom, different for every card ----- */
+  // Each suit shapes the gradient's frontier and dithers it its own way; each card's id seeds small changes
+  // (phase, slope, where the bubbles go), so no two cards repeat. One pixel is 2 CSS pixels; the dark tone is
+  // a light brown wash over the card's own colour, so it suits every suit and Foundations alike.
+  var TEX_TONE = [70, 45, 10, 18];   // r, g, b, alpha (of 255) for the dark pixels
+  function rng(seed) { var a = 0; for (var i = 0; i < seed.length; i++) a = Math.imul(a ^ seed.charCodeAt(i), 2654435761) >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  var BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], HALFTONE = [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14];
+  function sig(x) { return 1 / (1 + Math.exp(-x)); }
+  // the frontier of each suit's gradient: darkness 0..1 at (u, v), u across and v down, both 0..1; a = width / height
+  var TEX_FIELD = {
+    // flames: pointed tongues licking up from the bottom, swept to one side as they rise
+    Sword: function (R) { var lean = (R() < .5 ? -1 : 1) * (.25 + R() * .2), base = .92, T = [];
+      for (var i = 0; i < 4; i++) T.push([-.1 + i * .36 + R() * .12, .16 + R() * .08, .3 + R() * .32]);   // centre, half-width, height
+      return function (u, v) { var f = 0, up = base - v;
+        T.forEach(function (t) { var x = (u - t[0] - lean * up * up * 2.2) / t[1], top = t[2] * Math.max(0, 1 - Math.abs(x)) * (1 - .25 * x * x);
+          f = Math.max(f, sig((top - up) / .035) * (.42 + .4 * Math.max(0, 1 - up / .7))); });   // lighter towards the tips, so the streaks show
+        return Math.max(f, sig((v - base) / .03) * .85); }; },
+    // a spearhead rising from the bottom
+    Sceptre: function (R) { var m = .38 + R() * .24, w = .2 + R() * .1, c = .82 + R() * .06, H = .5 + R() * .12;
+      return function (u, v) { return sig((v - (c - H * Math.max(0, 1 - Math.abs(u - m) / w))) / .04); }; },
+    // soft, uneven light falling through leaves (drawn as vines by TEX_MAP)
+    Leaf: function (R) { var spots = []; for (var i = 0; i < 7; i++) spots.push([R(), .15 + R() * .85, .08 + R() * .1, R() < .5 ? -1 : 1]);
+      return function (u, v, a) { var f = sig((v - .55) / .16); spots.forEach(function (s) { var d = Math.hypot((u - s[0]) * a, v - s[1]) / s[2]; if (d < 1) f += s[3] * .3 * (1 - d * d); }); return f; }; },
+    // a headstone, rounded on top, rising from the bottom
+    Bone: function (R) { var m = .4 + R() * .2, hw = .2 + R() * .08, top = .22 + R() * .14;
+      return function (u, v, a) { var x = (u - m) * a, r = hw * a, cy = top + r, d = v > cy ? Math.abs(x) - r : Math.hypot(x, v - cy) - r; return sig(-d / .035) * .9 + v * .1; }; },
+    // rolling waves: wavy lines, thicker and closer to solid as they go down
+    Tome: function (R) { var k = .9 + R() * 1.1, ph = R() * 6.3, c = .34 + R() * .06, gap = .14 + R() * .03, drift = .8 + R() * 1.2;
+      return function (u, v) { var f = v * v * .5; for (var i = 0; i < 5; i++) {   // wavy lines, each a little thicker than the one above
+        var g = c + i * gap + .045 * Math.sin(6.283 * k * u + ph + i * drift), w = .014 + i * .007; f += sig((w - Math.abs(v - g)) / .012) * .8; }
+        return f; }; },
+    // a liquid line, with light, rimmed bubbles rising through the dark below it
+    Goblet: function (R) { var c = .42 + R() * .1, bub = []; for (var i = 0; i < 5; i++) bub.push([.12 + R() * .76, c + .12 + R() * (.8 - c), .06 + R() * .06]);
+      return function (u, v, a) { var f = sig((v - (c + .02 * Math.sin(u * 9 + c * 40))) / .05); bub.forEach(function (b) { var d = Math.hypot((u - b[0]) * a, v - b[1]) / b[2]; if (d < .8) f -= .9; else if (d < 1.1) f += .4; }); return f; }; }
+  };
+  // how each suit dithers: a fine checker, a softened cross-hatch, halftone dots.
+  // Sword, Sceptre and Leaf draw a map per card instead (TEX_MAP, below).
+  var TEX_DITHER = {
+    Bone: function (x, y) { return ([0, 2, 3, 1][(y & 1) * 2 + (x & 1)] + .5) / 4; },
+    Tome: function (x, y) { return (BAYER4[(y & 3) * 4 + (x & 3)] * .6 + (x & 1) * 5 + .5) / 15; },
+    Goblet: function (x, y) { return (HALFTONE[(y & 3) * 4 + (x & 3)] + .5) / 16; }
+  };
+  // Per-card dither maps, (R, width, height) → threshold(x, y). A pixel turns dark where the gradient's darkness
+  // passes its threshold, so low thresholds show first: they draw the pattern, and the rest fills in as it darkens.
+  var TEX_MAP = {
+    // a swoosh: curved streaks that sweep up and over like the flames, with a fine cross-hatch between them
+    Sword: function (R, gw, gh) {
+      var dir = R() < .5 ? -1 : 1, P = 5 + Math.floor(R() * 2), ph = R() * P, k = (.8 + R() * .6) * dir;
+      return function (x, y) { var up = (gh - y) / gh, q = (x + k * up * up * gh * .9 + ph) / P, tri = Math.abs(2 * (q - Math.floor(q)) - 1);
+        return .08 + tri * .72 + (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16 * .18; };
+    },
+    // ashlar masonry: mortar joints darken first, then the stones fill in; each course is offset by half a stone
+    Sceptre: function (R, gw, gh) {
+      var bw = 7 + Math.floor(R() * 3), bh = 4, ox = Math.floor(R() * bw), oy = Math.floor(R() * bh);
+      return function (x, y) {
+        var row = Math.floor((y + oy) / bh), yy = (y + oy) % bh, xx = (x + ox + (row & 1 ? bw >> 1 : 0)) % bw;
+        if (yy === 0 || xx === 0) return .12;                                       // the joints
+        return .45 + (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16 * .55; };             // the stone face
+    },
+    // vines: sinuous diagonal stems (lower left to upper right), each with short side shoots and leaves
+    Leaf: function (R, gw, gh) {
+      var d = [], W = gw, H = gh, i, P = 11 + Math.floor(R() * 4), ph = R() * P;
+      for (i = 0; i < W * H; i++) d[i] = 9;
+      function dot(x, y, v) { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < W && y < H && v < d[y * W + x]) d[y * W + x] = v; }
+      for (var s = -H + ph; s < W + H; s += P) {                     // one stem per diagonal: x + y = s, wiggling
+        var wob = R() * 6.3, side = R() < .5 ? 1 : -1;
+        for (var t = -H; t < W + H; t += .5) {
+          var w = 1.1 * Math.sin(t * .22 + wob), x = (s + t) / 2 + w * .7, y = (s - t) / 2 + w * .7; dot(x, y, 0);
+          if (Math.abs(t % 9) < .25 && R() < .85) {                   // a shoot every few steps, on alternating sides,
+            side = -side;                                              // leaving the stem at 45°: right or up
+            var sx = side > 0 ? 1 : 0, sy = side > 0 ? 0 : -1, bx = x, by = y;
+            for (var b = 1; b <= 6; b++) { bx += sx * .9 + .1; by += sy * .9 - .1; dot(bx, by, 1); }
+            dot(bx + sx, by + sy, 0); dot(bx + sx + sy * -1, by + sy + sx, 0); dot(bx, by, 0);   // a leaf at the tip
+          }
+        }
+      }
+      for (var pass = 0; pass < 3; pass++) for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {   // grow outward: distance from the vine
+        var k = y * W + x, m = d[k];
+        if (x > 0) m = Math.min(m, d[k - 1] + 2); if (y > 0) m = Math.min(m, d[k - W] + 2); if (x < W - 1) m = Math.min(m, d[k + 1] + 2); if (y < H - 1) m = Math.min(m, d[k + W] + 2);
+        d[k] = m;
+      }
+      var T = [.06, .2, .5, .62, .74, .84, .9, .94, .97, .98];   // stem, shoot, then a thin halo, then the gaps fill last
+      return function (x, y) { return T[Math.min(9, d[y * W + x])]; };
+    }
+  };
+
+  // The texture's dark pixels for a card: RGBA bytes, gw × gh (the card's size in CSS pixels, halved).
+  function texPixels(suit, seed, gw, gh) {
+    var px = new Uint8ClampedArray(gw * gh * 4), F = TEX_FIELD[suit]; if (!F) return px;
+    var R = rng(seed + suit), field = F(R), N = rng('n' + seed), a = gw / gh;
+    var Dth = TEX_MAP[suit] ? TEX_MAP[suit](rng('m' + seed), gw, gh) : TEX_DITHER[suit];
+    for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) {
+      var u = (x + .5) / gw, v = (y + .5) / gh, f = Math.max(0, Math.min(1, field(u, v, a) * .85 + v * .15));
+      if (f > Dth(x, y, N)) { var i = (y * gw + x) * 4; px[i] = TEX_TONE[0]; px[i + 1] = TEX_TONE[1]; px[i + 2] = TEX_TONE[2]; px[i + 3] = TEX_TONE[3]; }
+    }
+    return px;
+  }
+
+  /* ----- painted faces ----- */
+  // { cardId: { hand: dataURL, board: dataURL } }: the committed ones, with this browser's on top.
+  function faces() {
+    var mine = null; try { mine = JSON.parse(localStorage.getItem('ks.faces') || 'null'); } catch (e) { }
+    var all = {}, k, base = typeof KCardArt !== 'undefined' ? KCardArt : {};
+    for (k in base) all[k] = base[k];
+    if (mine) for (k in mine) { if (mine[k]) all[k] = mine[k]; else delete all[k]; }   // null = reset to the plain texture
+    return all;
+  }
+
+  return { esc: esc, ICON: ICON, icon: icon, placeIcon: placeIcon, scoreText: scoreText, SUIT_BG: SUIT_BG, FOUND_BG: FOUND_BG, picCSS: picCSS, artStyle: artStyle,
+    handFace: handFace, boardBlank: boardBlank, rng: rng, BAYER4: BAYER4, texPixels: texPixels, faces: faces, HAND: [75, 103], BOARD: [52, 52] };
+})();
+if (typeof module !== 'undefined') module.exports = KFace;
+/* Painted card faces committed to the game, so every player sees them: { cardId: { hand, board } } as PNG data URLs.
+   Dithry's card mode exports an art pack; tools/cardart.js merges it in here. */
+var KCardArt = {
+};
+if (typeof module !== 'undefined') module.exports = KCardArt;
 /* Dithry engine: the pixel work behind the paint app, with no page or canvas code, so it also runs in Node.
    A picture is a stack of layers, each an RGBA byte array the size of the canvas. Every tool works the same way:
    it builds a mask (which pixels it touches), then paint() fills the mask with the current style.
@@ -579,7 +4143,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 
   /* ---------------- the window ---------------- */
   var MENUS = [
-    { id: 'file', name: 'File', items: [['new', 'New…', 'Ctrl+Alt+N'], ['open', 'Open…', 'Ctrl+O'], ['save', 'Save project', 'Ctrl+S'], '-', ['import', 'Import image as layer…'], ['export', 'Export PNG…', 'Ctrl+E'], ['copyPicture', 'Copy picture'], '-', ['example', 'Open the example scene']] },
+    { id: 'file', name: 'File', items: [['new', 'New…', 'Ctrl+Alt+N'], ['open', 'Open…', 'Ctrl+O'], ['save', 'Save project', 'Ctrl+S'], '-', ['import', 'Import image as layer…'], ['export', 'Export PNG…', 'Ctrl+E'], ['copyPicture', 'Copy picture'], '-', ['example', 'Open the example scene'], '-', ['cards', 'Paint the Kartenspiel cards…']] },
     { id: 'edit', name: 'Edit', items: [['undo', 'Undo', 'Ctrl+Z'], ['redo', 'Redo', 'Ctrl+Y'], '-', ['cut', 'Cut', 'Ctrl+X'], ['copy', 'Copy', 'Ctrl+C'], ['paste', 'Paste as new layer', 'Ctrl+V'], '-', ['selectAll', 'Select all', 'Ctrl+A'], ['deselect', 'Deselect', 'Ctrl+D'], '-', ['fillLayer', 'Fill with style', 'Shift+F'], ['clearLayer', 'Clear', 'Delete']] },
     { id: 'image', name: 'Image', items: [['resize', 'Canvas size…'], ['flipH', 'Flip layer left–right'], ['flipV', 'Flip layer upside down'], '-', ['ditherLayer', 'Dither layer by brightness'], ['mirror', 'Mirror drawing (symmetry)', 'Shift+M']] },
     { id: 'layer', name: 'Layer', items: [['addLayer', 'New layer', 'Ctrl+Shift+N'], ['dupLayer', 'Duplicate layer'], ['delLayer', 'Delete layer'], ['mergeDown', 'Merge down', 'Ctrl+M'], '-', ['layerUp', 'Move layer up'], ['layerDown', 'Move layer down']] },
@@ -672,7 +4236,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 
   function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.scrollTop = top; drawPreview(); drawThumbs(); }
   function renderOpts() { $('#opts').innerHTML = optsHTML(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
-  function renderTitle() { $('#title').textContent = 'Dithry — ' + app.name + (app.dirty ? ' *' : ''); document.title = app.name + (app.dirty ? ' * ' : ' ') + '· Dithry'; }
+  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; document.title = t + ' · Dithry'; }
 
   // The style preview: the current style across a strip, as it would paint a shape.
   function drawPreview() {
@@ -718,6 +4282,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
     art.style.width = W() * app.zoom + 'px'; art.style.height = H() * app.zoom + 'px';
     art.style.transform = 'translate(' + Math.round(app.panX) + 'px,' + Math.round(app.panY) + 'px)';
     $('#sZoom').textContent = Math.round(app.zoom * 100) + '%'; drawOverlay();
+    hooks.view.forEach(function (f) { f(); });
   }
   function fit() {
     var r = work.getBoundingClientRect(), z = Math.min((r.width - 32) / W(), (r.height - 32) / H());
@@ -736,6 +4301,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
   function toScreen(x, y) { return [app.panX + x * app.zoom, app.panY + y * app.zoom]; }
 
   // The overlay: pixel grid, brush outline, shape guides, gradient handles, polygon points, mirror axis.
+  var hooks = { view: [], overlay: [], change: [] };   // used by card mode (cards.js)
   var overFrame = null;
   function drawOverlay() { if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
   function paintOverlay() {
@@ -751,6 +4317,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
       for (var y = ya; y <= yb; y++) { var sy = Math.round(oy + y * z) + .5; g.moveTo(ox + xa * z, sy); g.lineTo(ox + xb * z, sy); }
       g.stroke();
     }
+    hooks.overlay.forEach(function (f) { f(g, toScreen, z); });
     if (app.sel) {   // the selection: black and white dashes
       var s0 = toScreen(app.sel.x0, app.sel.y0), s1 = toScreen(app.sel.x1, app.sel.y1), rx = Math.round(s0[0]) + .5, ry = Math.round(s0[1]) + .5, rw = Math.round(s1[0] - s0[0]) - 1, rh = Math.round(s1[1] - s0[1]) - 1;
       g.lineWidth = 1; g.setLineDash([]); g.strokeStyle = '#000'; g.strokeRect(rx, ry, rw, rh); g.setLineDash([4, 4]); g.strokeStyle = '#fff'; g.strokeRect(rx, ry, rw, rh); g.setLineDash([]);
@@ -799,6 +4366,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
   function show(fieldBox, style, erase) {
     var L = layer(op.li), region = D.union(op.shown, op.box); if (!region) return;
     restore(L.data, op.before, region);
+    if (op.box && app.allow) { var bx = op.box; for (var y = bx.y0; y < bx.y1; y++) for (var x = bx.x0; x < bx.x1; x++) { var k = y * W() + x; if (!app.allow[k]) op.mask[k] = 0; } }   // card mode: only the cards are paintable
     if (op.box) {
       var st = style || app.style, fb = fieldBox || op.box;
       var field = D.makeField(st, fb, st.grad.type === 'edge' && !fieldBox ? D.edgeDistance(op.mask, W(), op.box) : null);
@@ -977,7 +4545,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
         D.composite(out, [{ visible: true, opacity: low.opacity, data: low.data }, { visible: top.visible, opacity: top.opacity, data: top.data }], W(), H());
         low.data = out; low.opacity = 1; d.layers.splice(d.active, 1); d.active--; });
     },
-    clearLayer: function () { if (!begin('clear')) return; var b = app.sel || full(), d = layer().data; for (var y = b.y0; y < b.y1; y++) d.fill(0, (y * W() + b.x0) * 4, (y * W() + b.x1) * 4); redraw(); commit(); },
+    clearLayer: function () { if (!begin('clear')) return; var b = app.sel || full(), d = layer().data; for (var y = b.y0; y < b.y1; y++) for (var x = b.x0; x < b.x1; x++) if (!app.allow || app.allow[y * W() + x]) d.fill(0, (y * W() + x) * 4, (y * W() + x) * 4 + 4); redraw(); commit(); },
     fillLayer: function () { if (!begin('fillLayer')) return; op.mask.fill(1); op.box = full(); show(); commit(); },
     selectAll: function () { app.sel = full(); drawOverlay(); },
     deselect: function () { app.sel = null; drawOverlay(); },
@@ -999,11 +4567,12 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
     mirror: function () { app.mirror = !app.mirror; renderOpts(); drawOverlay(); toast('Mirror drawing ' + (app.mirror ? 'on: everything you draw is copied across the middle.' : 'off.')); },
     new: function () { newDialog(); }, open: function () { pickFile('.dithry,.json,image/*', openFile); }, save: saveProject,
     import: function () { pickFile('image/*', importImage); }, export: exportDialog, copyPicture: copyPicture, example: function () { confirmDiscard(function () { exampleScene(); }); },
+    cards: function () { if (hooks.enter) hooks.enter(); },
     resize: resizeDialog, guide: guideDialog, keys: keysDialog, about: aboutDialog
   };
 
   /* ---------------- files ---------------- */
-  function touched() { app.dirty = true; renderTitle(); scheduleAutosave(); }
+  function touched() { app.dirty = true; renderTitle(); scheduleAutosave(); hooks.change.forEach(function (f) { f(); }); }
   function layerPNG(l) { return toCanvas(l.data, W(), H()).toDataURL('image/png'); }
   function projectJSON() { return { app: 'Dithry', version: 1, name: app.name, w: W(), h: H(), active: app.doc.active, style: app.style,
     layers: app.doc.layers.map(function (l) { return { name: l.name, visible: l.visible, opacity: l.opacity, locked: l.locked, png: layerPNG(l) }; }) }; }
@@ -1012,10 +4581,11 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
       var g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(img, 0, 0); res({ data: g.getImageData(0, 0, c.width, c.height).data, w: img.width, h: img.height, img: img }); }; img.onerror = rej; img.src = url; });
   }
   function loadProject(p) {
+    if (hooks.leave) hooks.leave();
     if (!p || p.app !== 'Dithry' || !p.layers) return Promise.reject(new Error('not a Dithry project'));
     return Promise.all(p.layers.map(function (l) { return decode(l.png, p.w, p.h); })).then(function (imgs) {
       app.doc = { w: p.w, h: p.h, active: Math.min(p.active || 0, p.layers.length - 1), layers: p.layers.map(function (l, i) { var L = D.newLayer(p.w, p.h, l.name); L.visible = l.visible !== false; L.opacity = l.opacity == null ? 1 : l.opacity; L.locked = !!l.locked; L.data.set(imgs[i].data); return L; }) };
-      if (p.style) app.style = Object.assign(D.defaultStyle(), p.style);
+      if (p.style && app.mode !== 'cards') app.style = Object.assign(D.defaultStyle(), p.style);   // switching cards keeps your brush
       app.name = p.name || 'Untitled'; app.undo = []; app.redo = []; app.dirty = false; app.rampSel = 0;
       setupCanvas(); renderSide(); renderTitle();
     });
@@ -1023,12 +4593,14 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
   function download(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   function fileName(ext) { return (app.name || 'dithry').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() + ext; }
   function saveProject() {
+    if (hooks.save && app.mode === 'cards') return hooks.save();   // card mode saves to Kartenspiel
     var j = projectJSON(); download(new Blob([JSON.stringify(j)], { type: 'application/json' }), fileName('.dithry'));
     app.dirty = false; renderTitle(); autosave(); toast('Saved ' + fileName('.dithry') + ' to your downloads. Open it again with File → Open.');
   }
   var saveTimer = null, warnedFull = false;
-  function scheduleAutosave() { clearTimeout(saveTimer); saveTimer = setTimeout(autosave, 900); }
+  function scheduleAutosave() { clearTimeout(saveTimer); if (app.mode !== 'cards') saveTimer = setTimeout(autosave, 900); }   // card mode saves to Kartenspiel instead
   function autosave() {
+    if (app.mode === 'cards') return;   // the picture you had open stays saved while you paint cards
     if (!lsSet('dithry.autosave', projectJSON()) && !warnedFull) { warnedFull = true; toast('This picture is too big to keep in the browser between visits. Use File → Save project.'); }
   }
   function pickFile(accept, cb) { var i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.onchange = function () { if (i.files && i.files[0]) cb(i.files[0]); }; i.click(); }
@@ -1105,6 +4677,7 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
     };
   }
   function newDoc(w, h, bg, name) {
+    if (hooks.leave) hooks.leave();
     app.doc = { w: w, h: h, active: 0, layers: [D.newLayer(w, h, 'Background')] };
     var d = layer().data;
     if (bg === 'white' || bg === 'grey') { var c = bg === 'white' ? [255, 255, 255] : [192, 192, 192]; for (var i = 0; i < d.length; i += 4) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; } }
@@ -1317,11 +4890,12 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
     document.getElementById('app').innerHTML = shellHTML();
     art = $('#art'); over = $('#over'); octx = over.getContext('2d'); work = $('#work');
     var saved = lsGet('dithry.autosave');
-    var ready = saved ? loadProject(saved).catch(function () { exampleScene(); }) : Promise.resolve(exampleScene());
+    var cardsFirst = /^#card/.test(location.hash);   // opening straight into card mode: no example scene first
+    var ready = saved ? loadProject(saved).catch(function () { exampleScene(); }) : Promise.resolve(cardsFirst ? newDoc(64, 24, 'transparent') : exampleScene());
     app.doc = app.doc || { w: 64, h: 24, active: 0, layers: [D.newLayer(64, 24, 'Background')] };
     if (!saved) { /* exampleScene ran above */ } else setupCanvas();
     renderOpts(); renderSide(); renderTitle();
-    ready.then(function () { renderOpts(); window.dithryReady = true; });
+    ready.then(function () { renderOpts(); if (hooks.start) return hooks.start(); }).then(function () { window.dithryReady = true; });
 
     document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { setTool(b.getAttribute('data-tool')); }); });
     $('.menubar').addEventListener('click', function (e) {
@@ -1343,7 +4917,222 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
     window.addEventListener('beforeunload', function () { if (app.dirty) autosave(); });
   }
   var wheelAcc = 0;
-  window.DithryApp = { app: app, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject };
+  // For card mode (cards.js) and tests.
+  window.DithryApp = { app: app, D: D, hooks: hooks, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject,
+    setupCanvas: function () { setupCanvas(); }, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,
+    confirmDiscard: confirmDiscard, decode: decode, toCanvas: toCanvas, layerPNG: layerPNG, autosaved: function () { return lsGet('dithry.autosave'); }, fit: fit, applyView: applyView, drawOverlay: drawOverlay,
+    cancel: function () { if (op) cancel(); }, lsGet: lsGet, lsSet: lsSet, esc: esc, work: function () { return work; } };
   start();
+})();
+/* Dithry card mode: paint the Kartenspiel cards one by one, with each card's hand version (portrait) and board
+   version (square) side by side on one canvas, and the card's own text drawn in front, exactly as the game draws
+   it (KFace from src/cardface.js, with Kartenspiel's stylesheet inside a shadow root so it can't clash with
+   Dithry's). Saving writes the two pictures to this browser's painted faces ('ks.faces'), which Kartenspiel reads,
+   so the game shows them straight away, even in a tab that's already open. An art pack exports them for the repo
+   (tools/cardart.js), so every player sees them. Open with File → Paint the Kartenspiel cards, or dithry.html#cards,
+   or #card=<id> for one card. */
+(function () {
+  'use strict';
+  var A = window.DithryApp, D = A.D, app = A.app, F = window.KFace, $ = function (s, r) { return (r || document).querySelector(s); }, esc = A.esc;
+  // The canvas: hand picture at the left, a gap, the board picture at the right (top-aligned). One canvas pixel is
+  // two CSS pixels on a card, as in the game.
+  var HW = F.HAND[0], HH = F.HAND[1], BW = F.BOARD[0], BH = F.BOARD[1], GAP = 4, BX = HW + GAP, DW = BX + BW, DH = Math.max(HH, BH);
+  var cm = null;   // card mode: { list, i, bar, hosts, busy }
+
+  /* ----- the cards ----- */
+  // The built-in cards, with this browser's Kartenspiel library (custom and edited cards) on top, in suit order.
+  function library() {
+    var byId = {}, order = KData.SUITS, types = ['Foundation', 'Structure', 'Grounds', 'Action', 'Blessing', 'Curse'];
+    KData.STARTER.forEach(function (c) { byId[c.id] = c; });
+    (A.lsGet('ks.lib') || []).forEach(function (c) { if (c && c.id) byId[c.id] = c; });
+    return Object.keys(byId).map(function (k) { return byId[k]; }).sort(function (a, b) {
+      return order.indexOf(a.suit) - order.indexOf(b.suit) || types.indexOf(a.type) - types.indexOf(b.type) || String(a.name).localeCompare(b.name); });
+  }
+  function myFaces() { return A.lsGet('ks.faces') || {}; }
+
+  /* ----- entering and leaving ----- */
+  function enter(id) {
+    if (cm) { if (id) goTo(id); return; }
+    A.cancel();
+    A.confirmDiscard(function () {
+      cm = { list: library(), i: 0 };
+      var at = id || A.lsGet('dithry.cardmode.last'), k = cm.list.findIndex(function (c) { return c.id === at; }); cm.i = k < 0 ? 0 : k;
+      app.mode = 'cards'; buildBar(); buildHosts();
+      A.hooks.view.push(placeHosts); A.hooks.overlay.push(shadeGap); A.hooks.change.push(updateBar);
+      return load();
+    });
+  }
+  function leave() {
+    if (!cm || cm.busy) return;
+    var c = cm; cm = null; app.mode = null; app.allow = null;
+    c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); });
+    A.hooks.view.splice(A.hooks.view.indexOf(placeHosts), 1); A.hooks.overlay.splice(A.hooks.overlay.indexOf(shadeGap), 1); A.hooks.change.splice(A.hooks.change.indexOf(updateBar), 1);
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  }
+  // Leave card mode and go back to the picture that was open before.
+  function leaveToPicture() {
+    A.confirmDiscard(function () {
+      leave(); var p = A.autosaved();
+      (p ? A.loadProject(p) : Promise.resolve(A.run('example'))).then(function () { A.toast('Back to your picture.'); });
+    });
+  }
+
+  /* ----- the bar over the canvas ----- */
+  function buildBar() {
+    var bar = document.createElement('div'); bar.className = 'cardbar raised';
+    var groups = {}; cm.list.forEach(function (c, i) { (groups[c.suit] = groups[c.suit] || []).push('<option value="' + i + '">' + esc(c.name) + (c.type === 'Foundation' ? ' (Foundation)' : '') + '</option>'); });
+    bar.innerHTML = '<button class="btn" data-c="prev" title="Previous card (Page Up)">◀</button>' +
+      '<select data-c="pick" aria-label="Card">' + Object.keys(groups).map(function (s) { return '<optgroup label="' + esc(s) + '">' + groups[s].join('') + '</optgroup>'; }).join('') + '</select>' +
+      '<button class="btn" data-c="next" title="Next card (Page Down)">▶</button><span class="small muted" data-c="count"></span>' +
+      '<label class="row small"><input type="checkbox" data-c="text" checked> Card text</label>' +
+      '<span class="grow"></span><span class="small" data-c="state"></span>' +
+      '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)">Save to Kartenspiel</button>' +
+      '<button class="btn" data-c="reset" title="Go back to the plain suit texture">Reset…</button><button class="btn" data-c="pack" title="Export or import all painted cards">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button>';
+    var mb = $('.menubar'); mb.parentNode.insertBefore(bar, mb.nextSibling); cm.bar = bar;
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
+      ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]();
+    });
+    bar.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.getAttribute('data-c') === 'pick') goTo(cm.list[+t.value].id);
+      if (t.getAttribute('data-c') === 'text') cm.hosts.forEach(function (h) { h.style.display = t.checked ? '' : 'none'; });
+    });
+  }
+  function updateBar() {
+    if (!cm || !cm.bar) return;
+    var c = cm.list[cm.i], f = myFaces()[c.id], committed = typeof KCardArt !== 'undefined' && KCardArt[c.id];
+    $('[data-c="pick"]', cm.bar).value = String(cm.i);
+    $('[data-c="count"]', cm.bar).textContent = (cm.i + 1) + ' of ' + cm.list.length;
+    $('[data-c="state"]', cm.bar).textContent = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
+  }
+
+  /* ----- the card text in front of the paint ----- */
+  // Two shadow roots: Kartenspiel's stylesheet and the card's own face markup, made see-through so the paint shows.
+  var OVERLAY_CSS = '.card { background: transparent !important; box-shadow: none !important; }' +
+    '.bottom, .hand { display: block; padding: 0; margin: 0; border: 0; overflow: visible; height: auto; min-height: 0; background: none; }' +
+    '.hcard, .cell { position: absolute; left: 0; top: 0; margin: 0; }';
+  function buildHosts() {
+    var css = String(window.KCardCSS || '').replace(/:root/g, ':host');
+    cm.hosts = ['hand', 'board'].map(function (kind) {
+      var h = document.createElement('div'); h.className = 'cardtext'; h.setAttribute('aria-hidden', 'true');
+      h.style.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:1;width:' + (kind === 'hand' ? HW : BW) * 2 + 'px;height:' + (kind === 'hand' ? HH : BH) * 2 + 'px';
+      h.attachShadow({ mode: 'open' }).innerHTML = '<style>' + css + OVERLAY_CSS + '</style><div class="face"></div>';
+      A.work().insertBefore(h, $('#over')); return h;
+    });
+  }
+  function fillHosts(c) {
+    cm.hosts[0].shadowRoot.querySelector('.face').innerHTML = '<div class="bottom"><div class="hand"><div class="hcard">' + F.handFace(c, { mid: true, art: c.art }) + '</div></div></div>';
+    cm.hosts[1].shadowRoot.querySelector('.face').innerHTML = '<div class="boardinner"><div class="cell">' + F.boardBlank(c, { art: c.art }) + '</div></div>';
+  }
+  function placeHosts() {
+    if (!cm) return;
+    var z = app.zoom, s = z / 2;
+    cm.hosts[0].style.transform = 'translate(' + Math.round(app.panX) + 'px,' + Math.round(app.panY) + 'px) scale(' + s + ')';
+    cm.hosts[1].style.transform = 'translate(' + Math.round(app.panX + BX * z) + 'px,' + Math.round(app.panY) + 'px) scale(' + s + ')';
+  }
+  // Shade what isn't card: the gap between them, and below the (shorter) board picture.
+  function shadeGap(g, toScreen, z) {
+    if (!cm) return;
+    g.fillStyle = getComputedStyle(A.work()).backgroundColor;
+    function box(x0, y0, x1, y1) { var a = toScreen(x0, y0), b = toScreen(x1, y1); g.fillRect(Math.floor(a[0]) - 1, Math.floor(a[1]), Math.ceil(b[0]) - Math.floor(a[0]) + 2, Math.ceil(b[1]) - Math.floor(a[1]) + 1); }   // rounded out, so no hairline shows
+    box(HW, 0, BX, DH); if (BH < DH) box(BX, BH, DW, DH);
+    g.fillStyle = '#fff'; g.font = '12px DotGothic16, sans-serif'; g.textBaseline = 'bottom';
+    var l1 = toScreen(0, 0), l2 = toScreen(BX, 0); if (l1[1] > 16) { g.fillText('In hand', l1[0], l1[1] - 3); g.fillText('On the board', l2[0], l2[1] - 3); }
+  }
+
+  /* ----- loading a card ----- */
+  function goTo(id) { var k = cm.list.findIndex(function (c) { return c.id === id; }); if (k < 0) return A.toast('There’s no card with the id “' + id + '”.'); if (k === cm.i && app.doc.w === DW) return; A.confirmDiscard(function () { cm.i = k; load(); }); }
+  function step(d) { A.confirmDiscard(function () { cm.i = (cm.i + d + cm.list.length) % cm.list.length; load(); }); }
+  // A card's canvas: its layers saved in Dithry, else its painted face, else its plain suit colour and texture.
+  function load() {
+    var c = cm.list[cm.i], draft = A.lsGet('dithry.card.' + c.id), face = F.faces()[c.id];
+    A.lsSet('dithry.cardmode.last', c.id); history.replaceState(null, '', '#card=' + encodeURIComponent(c.id));
+    app.allow = new Uint8Array(DW * DH);
+    for (var y = 0; y < DH; y++) for (var x = 0; x < DW; x++) app.allow[y * DW + x] = (x < HW && y < HH) || (x >= BX && y < BH) ? 1 : 0;
+    cm.busy = true;
+    var done;
+    if (draft && draft.w === DW && draft.h === DH) done = A.loadProject(draft);
+    else done = (face ? Promise.all([A.decode(face.hand, HW, HH), A.decode(face.board, BW, BH)]) : Promise.resolve(null)).then(function (imgs) {
+      var base = D.newLayer(DW, DH, imgs ? 'Painted face' : 'Card'), paint = D.newLayer(DW, DH, 'Paint');
+      if (imgs) { blit(base.data, imgs[0].data, HW, HH, 0); blit(base.data, imgs[1].data, BW, BH, BX); }
+      else { plain(base.data, c, HW, HH, 0); plain(base.data, c, BW, BH, BX); }
+      app.doc = { w: DW, h: DH, active: 1, layers: [base, paint] }; app.undo = []; app.redo = []; app.dirty = false;
+      A.setupCanvas(); A.renderSide();
+    });
+    return done.then(function () {
+      cm.busy = false; app.name = c.name; app.dirty = false; A.renderTitle(); fillHosts(c); A.fit(); placeHosts(); updateBar();
+      if (app.doc.layers.length > 1 && app.doc.active === 0) { app.doc.active = app.doc.layers.length - 1; A.renderSide(); }
+    }, function () { cm.busy = false; A.toast('That card’s saved painting couldn’t be read.'); });
+  }
+  function blit(dst, src, w, h, ox) { for (var y = 0; y < h; y++) dst.set(src.subarray(y * w * 4, (y + 1) * w * 4), (y * DW + ox) * 4); }
+  // The card as the game draws it with no painting: its suit colour, with the suit's dithered texture on top.
+  function plain(dst, c, w, h, ox) {
+    var bg = D.rgba((c.type === 'Foundation' ? F.FOUND_BG : F.SUIT_BG)[c.suit] || '#ffffff', 1), t = F.texPixels(c.suit, c.id, w, h);
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var i = (y * w + x) * 4, j = (y * DW + x + ox) * 4, a = t[i + 3] / 255;
+      dst[j] = Math.round(bg[0] * (1 - a) + t[i] * a); dst[j + 1] = Math.round(bg[1] * (1 - a) + t[i + 1] * a); dst[j + 2] = Math.round(bg[2] * (1 - a) + t[i + 2] * a); dst[j + 3] = 255;
+    }
+  }
+
+  /* ----- saving to Kartenspiel ----- */
+  function crop(flat, x0, w, h) { var out = new Uint8ClampedArray(w * h * 4); for (var y = 0; y < h; y++) out.set(flat.subarray((y * DW + x0) * 4, (y * DW + x0 + w) * 4), y * w * 4); return A.toCanvas(out, w, h).toDataURL('image/png'); }
+  function save() {
+    if (!cm) return;
+    var c = cm.list[cm.i], flat = A.flatten(), mine = myFaces();
+    mine[c.id] = { hand: crop(flat, 0, HW, HH), board: crop(flat, BX, BW, BH) };
+    if (!A.lsSet('ks.faces', mine)) return A.toast('This browser’s storage is full, so the card couldn’t be saved. Export an art pack to keep your work.');
+    A.lsSet('dithry.card.' + c.id, A.projectJSON());   // the layers, so you can keep working on them later
+    app.dirty = false; A.renderTitle(); updateBar();
+    A.toast('Saved “' + c.name + '” to Kartenspiel. Open Kartenspiel in this browser to see it (an open tab updates by itself).');
+  }
+  function resetCard() {
+    var c = cm.list[cm.i], committed = typeof KCardArt !== 'undefined' && KCardArt[c.id];
+    var m = A.modal('Reset “' + c.name + '”', '<p>This removes the painting you saved in this browser' + (committed ? '. The card goes back to the art that’s built into the game.' : ', and the card goes back to its plain suit texture.') + '</p>' +
+      (committed ? '<label class="row"><input type="checkbox" id="rPlain"> Also hide the built-in art (use the plain texture)</label>' : ''),
+      '<button class="btn" data-close>Cancel</button><button class="btn def" id="rGo">Reset</button>');
+    $('#rGo', m).onclick = function () {
+      var mine = myFaces(), plainToo = committed && $('#rPlain', m).checked; if (plainToo) mine[c.id] = null; else delete mine[c.id];
+      A.lsSet('ks.faces', mine); try { localStorage.removeItem('dithry.card.' + c.id); } catch (e) { }
+      A.closeModal(); app.dirty = false; load().then(function () { A.toast('Reset “' + c.name + '”.'); });
+    };
+  }
+
+  /* ----- art packs: every painted card in one file ----- */
+  function packDialog() {
+    var all = F.faces(), n = Object.keys(all).length;
+    var m = A.modal('Card art pack', '<p>' + n + ' card' + (n === 1 ? ' is' : 's are') + ' painted in this browser (including any built into the game).</p>' +
+      '<p><b>Download</b> saves them all in one file: a backup, or a way to move them to another device or browser.</p>' +
+      '<p>To put them in the game for <i>every</i> player, add the file to the repository with <code>node tools/cardart.js kartenspiel-card-art.json</code> and push: it writes <code>src/cardart.js</code>, which the site builds in.</p>',
+      '<button class="btn" data-close>Close</button><button class="btn" id="pIn">Import…</button><button class="btn def" id="pOut"' + (n ? '' : ' disabled') + '>Download</button>');
+    $('#pOut', m).onclick = function () {
+      var blob = new Blob([JSON.stringify({ app: 'Kartenspiel card art', version: 1, faces: all })], { type: 'application/json' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'kartenspiel-card-art.json'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+      A.closeModal(); A.toast('Downloaded kartenspiel-card-art.json.');
+    };
+    $('#pIn', m).onclick = function () {
+      var i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+      i.onchange = function () {
+        var r = new FileReader(); r.onload = function () {
+          try { var p = JSON.parse(r.result); if (!p || !p.faces) throw 0; var mine = myFaces(), k = 0; for (var id in p.faces) if (p.faces[id] && p.faces[id].hand && p.faces[id].board) { mine[id] = p.faces[id]; k++; }
+            A.lsSet('ks.faces', mine); A.closeModal(); app.dirty = false; load(); A.toast('Imported ' + k + ' painted card' + (k === 1 ? '' : 's') + '.'); }
+          catch (e) { A.toast('That file isn’t a card art pack.'); }
+        }; r.readAsText(i.files[0]);
+      };
+      i.click();
+    };
+  }
+
+  /* ----- wiring ----- */
+  A.hooks.enter = function () { enter(); };
+  A.hooks.leave = function () { if (cm && !cm.busy) leave(); };
+  A.hooks.save = function () { save(); };
+  A.hooks.start = function () { var m = /^#card(?:s|=(.+))$/.exec(location.hash); if (m) return enter(m[1] ? decodeURIComponent(m[1]) : null); };
+  window.addEventListener('hashchange', function () { var m = /^#card=(.+)$/.exec(location.hash); if (m && (!cm || cm.list[cm.i].id !== decodeURIComponent(m[1]))) enter(decodeURIComponent(m[1])); });
+  document.addEventListener('keydown', function (e) {
+    if (!cm || $('#modal') || /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.key === 'PageUp') { e.preventDefault(); step(-1); } else if (e.key === 'PageDown') { e.preventDefault(); step(1); }
+  });
+  window.DithryCards = { enter: enter, leave: leaveToPicture, save: save, goTo: goTo, step: step, current: function () { return cm && cm.list[cm.i]; }, size: [DW, DH, BX] };
 })();
 </script></body></html>

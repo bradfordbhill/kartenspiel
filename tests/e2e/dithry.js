@@ -154,6 +154,60 @@ const URL = 'file://' + path.join(REPO, 'dithry.html');
   const artBg = await kp.$eval('.card.big .art', e => [e.style.backgroundImage.slice(0, 30), e.style.imageRendering]);
   ok(/data:image\/png/.test(artBg[0]) && artBg[1] === 'pixelated', 'and keeps an uploaded Dithry PNG as crisp pixel art (' + artBg.join(', ') + ')');
 
+  // card mode: paint a card's hand and board faces, with its text in front, and save them into Kartenspiel
+  const cc = await b.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
+  const ks = await cc.newPage(); ks.on('pageerror', e => errs.push('kartenspiel: ' + e.message)); await ks.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
+  await ks.goto('file://' + path.join(REPO, 'index.html')); await ks.click('[data-page="library"]'); await ks.fill('[data-lib="q"]', 'Tithing'); await ks.waitForTimeout(300); await ks.click('[data-row="tithing-hall"]'); await ks.waitForTimeout(200);
+  ok(!!(await ks.$('a[href="dithry.html#cards"]')), 'Kartenspiel’s Library links to Dithry’s card mode');
+  const libBg = () => ks.$eval('.card.big', e => e.style.backgroundImage.slice(0, 40));
+  const bg0 = await libBg();
+  const cp = await cc.newPage(); cp.on('pageerror', e => errs.push('cards: ' + e.message)); await cp.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
+  await cp.goto(URL + '#card=tithing-hall'); await cp.waitForFunction(() => window.dithryReady);
+  const cs = () => cp.evaluate(() => { const a = DithryApp.app; return { mode: a.mode, w: a.doc.w, h: a.doc.h, layers: a.doc.layers.map(l => l.name).join(','), card: (DithryCards.current() || {}).id, dirty: a.dirty, state: (document.querySelector('[data-c="state"]') || {}).textContent }; });
+  let c0 = await cs();
+  ok(c0.mode === 'cards' && c0.card === 'tithing-hall' && c0.w === 131 && c0.h === 103 && c0.layers === 'Card,Paint', '#card=tithing-hall opens card mode: hand and board side by side (131 × 103), a Card layer and a Paint layer');
+  const texts = await cp.evaluate(() => [...document.querySelectorAll('.cardtext')].map(h => h.shadowRoot.querySelector('.nm').textContent + '|' + (h.shadowRoot.querySelector('.txt') ? 'rules' : 'no rules')));
+  ok(texts.join(',') === 'Tithing Hall|rules,Tithing Hall|no rules', 'the card’s own text is drawn in front: the hand version with its rules, the board version without (' + texts.join(', ') + ')');
+  const cpt = (x, y) => cp.evaluate(([x, y]) => { const r = document.getElementById('art').getBoundingClientRect(), a = DithryApp.app; return [r.left + (x + .5) * a.zoom, r.top + (y + .5) * a.zoom]; }, [x, y]);
+  const cpx = (x, y) => cp.evaluate(([x, y]) => { const a = DithryApp.app, L = a.doc.layers[a.doc.active], i = (y * a.doc.w + x) * 4; return Array.from(L.data.slice(i, i + 4)); }, [x, y]);
+  await cp.evaluate(() => { const st = DithryApp.app.style; st.mode = 'solid'; st.ramp = [{ c: '#123456', a: 1 }]; st.opacity = 1; });
+  await cp.click('[data-tool="rect"]'); { const a = await cpt(0, 0), z = await cpt(130, 102); await cp.mouse.move(a[0], a[1]); await cp.mouse.down(); await cp.mouse.move((a[0] + z[0]) / 2, (a[1] + z[1]) / 2); await cp.mouse.move(z[0], z[1]); await cp.mouse.up(); }
+  ok((await cpx(10, 10))[3] === 255 && (await cpx(100, 30))[3] === 255 && (await cpx(77, 10))[3] === 0 && (await cpx(100, 80))[3] === 0, 'paint lands on both cards but not in the gap or below the square card');
+  c0 = await cs(); ok(c0.dirty && /Unsaved/.test(c0.state), 'the bar shows unsaved changes');
+  await cp.click('[data-c="save"]'); await cp.waitForTimeout(300);
+  const faces = await cp.evaluate(() => JSON.parse(localStorage.getItem('ks.faces')));
+  const dims = async u => { const bf = Buffer.from(u.split(',')[1], 'base64'); return bf.readUInt32BE(16) + '×' + bf.readUInt32BE(20); };
+  ok(faces['tithing-hall'] && await dims(faces['tithing-hall'].hand) === '75×103' && await dims(faces['tithing-hall'].board) === '52×52', 'Save to Kartenspiel stores a 75 × 103 hand face and a 52 × 52 board face');
+  ok(!(await cs()).dirty && /this browser/.test((await cs()).state), 'and the bar shows it’s painted');
+  await ks.waitForTimeout(300); const bg1 = await libBg();
+  ok(bg1 !== bg0 && /data:image\/png/.test(bg1), 'the open Kartenspiel tab redraws the card with its new face by itself');
+  // in a game: the hand card and the board card use the two faces
+  await ks.evaluate(() => { const D = KData, E = KEngine; let g = E.newGame(D.STARTER, { seed: 2, players: [{ name: 'A', arch: 'Archbishop', color: '#d42020' }, { name: 'B', arch: 'Hedonist', color: '#1f4fd1' }] }); g = E.apply(g, { t: 'startTurn' });
+    const th = Object.keys(g.cards).filter(u => g.cards[u].def === 'tithing-hall'); g.deck = g.deck.filter(u => u !== th[0]); g.players[0].hand.unshift(th[0]); g = E.apply(g, { t: 'sbPlace', id: 'tithing-hall', k: '1,0' }); localStorage.setItem('ks.game', JSON.stringify(g)); });
+  await ks.reload(); await ks.click('[data-page="new"]').catch(() => {}); await ks.click('[data-act="resume"]'); await ks.waitForTimeout(300);
+  const inGame = await ks.evaluate(() => { const f = JSON.parse(localStorage.getItem('ks.faces'))['tithing-hall'], hc = [...document.querySelectorAll('.bottom .hcard .card')].find(e => e.querySelector('.nm').textContent === 'Tithing Hall'), bc = document.querySelector('.cell:has([data-cell="1,0"]) .card');
+    return [hc && hc.style.backgroundImage.indexOf(f.hand.slice(0, 80)) >= 0, bc && bc.style.backgroundImage.indexOf(f.board.slice(0, 80)) >= 0]; });
+  ok(inGame[0] && inGame[1], 'in a game, the hand card shows the hand face and the board card the board face');
+  // the layers are kept for next time; moving on asks about unsaved work
+  await cp.click('[data-c="next"]'); await cp.waitForTimeout(300); const c1 = await cs();
+  await cp.click('[data-c="prev"]'); await cp.waitForTimeout(400); const c2 = await cs();
+  ok(c1.card !== 'tithing-hall' && c2.card === 'tithing-hall' && c2.layers === 'Card,Paint', 'Next and Previous move through the library, and a saved card reopens with its layers');
+  await cp.evaluate(() => { DithryApp.app.style.ramp = [{ c: '#fedcba', a: 1 }]; }); await cp.click('[data-tool="pencil"]'); { const a = await cpt(5, 5); await cp.mouse.click(a[0], a[1]); }
+  await cp.click('[data-c="next"]'); ok(!!(await cp.$('#modal')) && /Unsaved/.test(await cp.textContent('#modal')), 'leaving a card with unsaved paint asks first');
+  await cp.click('#mGo'); await cp.waitForTimeout(300);
+  // art pack → the repo's src/cardart.js
+  await cp.click('[data-c="pack"]'); const [pk] = await Promise.all([cp.waitForEvent('download'), cp.click('#pOut')]);
+  const packFile = path.join(SHOTS, 'kartenspiel-card-art.json'); await pk.saveAs(packFile);
+  const tmpArt = path.join(SHOTS, 'cardart.js'); require('child_process').execFileSync('node', [path.join(REPO, 'tools', 'cardart.js'), packFile, tmpArt]);
+  const merged = require(tmpArt);
+  ok(merged['tithing-hall'] && merged['tithing-hall'].hand === faces['tithing-hall'].hand, 'Art pack → Download, then tools/cardart.js, puts the painted card in src/cardart.js for every player');
+  // reset
+  await cp.evaluate(() => DithryCards.goTo('tithing-hall')); await cp.waitForTimeout(400); await cp.click('[data-c="reset"]'); await cp.click('#rGo'); await cp.waitForTimeout(400);
+  ok(!(await cp.evaluate(() => JSON.parse(localStorage.getItem('ks.faces')))['tithing-hall']) && (await cs()).layers === 'Card,Paint', 'Reset takes the card back to its plain texture');
+  await cp.click('[data-c="leave"]'); await cp.waitForTimeout(400);
+  ok((await cs()).mode !== 'cards' && !(await cp.$('.cardbar')), 'Leave card mode goes back to the picture you had');
+  await cc.close();
+
   // phone: everything reachable, no sideways scroll, a finger can draw
   const pc = await b.newContext({ ...devices['iPhone 13'] }), ph = await pc.newPage(); ph.on('pageerror', e => errs.push('phone: ' + e.message));
   await ph.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
