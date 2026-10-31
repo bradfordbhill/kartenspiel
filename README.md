@@ -165,6 +165,11 @@ The tools are:
 
 Layers have visibility, lock and opacity. Undo and redo cover pixel changes and layer-structure changes. Mirror drawing, selections (with copy, cut and paste), and **Dither layer by brightness** (which turns an imported picture into pixel art) round it out.
 
+**On phones**, either way up (`(max-width: 820px), (max-height: 520px)`):
+- **Layout.** The canvas fills the screen, with a top bar (☰ menu, Undo, Redo, Fit) and a strip of tools. A tab bar (Tool, Colour, Style, Layers, Card) opens the panels in a sheet: from the bottom when the phone is upright, from the right when it's on its side. The picture slides out from under the sheet.
+- **Gestures.** Tap with two fingers to undo and three to redo, pinch to zoom, and press and hold to pick a colour. A Finish / Last point / Cancel bar finishes polygons, and a "Snap" option stands in for Shift.
+- **Taps.** Buttons act when a finger lifts (`onTap`), because Chrome drops a tap that comes straight after a stroke. Fields are 16px, so iPhones don't zoom in when you tap one.
+
 Projects save as `.dithry` files (JSON with a PNG per layer) and autosave in the browser. **Export PNG** scales by whole steps so pixels stay square. The Card Builder keeps PNGs with 256 colours or fewer as crisp, unsmoothed pixel art (`isPixelArt` in `ui.js`), and draws them with `image-rendering: pixelated`.
 
 ### Painting the cards

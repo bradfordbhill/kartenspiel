@@ -15,14 +15,14 @@
   var app = {
     doc: null,                       // { w, h, layers: [{ name, visible, opacity, locked, data }], active }
     style: prefs.style || D.defaultStyle(),
-    tool: prefs.tool || 'brush', size: prefs.size || 1, round: prefs.round !== false, shape: prefs.shape || 'fill', mirror: false,
+    tool: prefs.tool || 'brush', size: prefs.size || 1, round: prefs.round !== false, shape: prefs.shape || 'fill', snap: !!prefs.snap, mirror: false, sheet: null,
     sampleAll: !!prefs.sampleAll, tol: prefs.tol || 0, gradTarget: prefs.gradTarget || 'layer',
     zoom: 4, panX: 0, panY: 0, grid: prefs.grid !== false, bg: prefs.bg || 'checker',
     rampSel: 0, palette: prefs.palette || 'kartenspiel', custom: prefs.custom || [], userPresets: prefs.userPresets || [], shut: prefs.shut || {},
     undo: [], redo: [], name: 'Untitled', dirty: false, hover: null
   };
   function savePrefs() {
-    lsSet('dithry.prefs', { style: app.style, tool: app.tool, size: app.size, round: app.round, shape: app.shape, sampleAll: app.sampleAll, tol: app.tol, gradTarget: app.gradTarget,
+    lsSet('dithry.prefs', { style: app.style, tool: app.tool, size: app.size, round: app.round, shape: app.shape, snap: app.snap, sampleAll: app.sampleAll, tol: app.tol, gradTarget: app.gradTarget,
       grid: app.grid, bg: app.bg, palette: app.palette, custom: app.custom, userPresets: app.userPresets, shut: app.shut });
   }
   function W() { return app.doc.w; } function H() { return app.doc.h; }
@@ -87,11 +87,15 @@
   ];
   function shellHTML() {
     var h = '<div class="win raised"><div class="titlebar"><svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="14" height="14" fill="#fff" stroke="#000"/><path d="M2 2h12v3H2z" fill="#1c1f3a"/><path d="M2 5h2v1H2zM6 5h2v1H6zM10 5h2v1h-2zM4 6h2v1H4zM8 6h2v1H8zM12 6h2v1h-2zM2 7h2v1H2zM6 7h2v1H6zM10 7h2v1h-2zM4 9h2v1H4zM10 9h2v1h-2z" fill="#1c1f3a"/></svg><span id="title">Dithry</span><span class="grow"></span><span class="tip small" style="font-weight:400">Pixel Art and Dithered Gradient Tool</span></div>';
+    h += '<div class="mtop"><button class="btn mb" data-m="menu" aria-label="Menu">☰</button><span class="mname" id="mname"></span><span class="grow"></span>' +
+      '<button class="btn mb" data-m="undo" aria-label="Undo" title="Undo (or tap with two fingers)">↶</button><button class="btn mb" data-m="redo" aria-label="Redo" title="Redo (or tap with three fingers)">↷</button><button class="btn mb" data-m="fit" aria-label="Fit to the screen">⤢</button></div>';
     h += '<div class="menubar">' + MENUS.map(function (m) { return '<div class="mi" data-menu="' + m.id + '"><button>' + m.name + '</button><div class="menu raised">' +
       m.items.map(function (it) { return it === '-' ? '<hr>' : '<button data-cmd="' + it[0] + '"><span>' + esc(it[1]) + '</span><span class="k">' + esc(it[2] || '') + '</span></button>'; }).join('') + '</div></div>'; }).join('') + '</div>';
     h += '<div class="main"><div class="toolbox raised"><div class="tools">' + TOOLS.map(function (t) { return '<button class="btn tool" data-tool="' + t.id + '" title="' + esc(t.name + ' (' + t.key + ')') + '" aria-label="' + esc(t.name) + '">' + t.icon + '</button>'; }).join('') + '</div><div class="opts" id="opts"></div></div>';
-    h += '<div class="work sunken" id="work"><canvas id="art"></canvas><canvas id="over"></canvas></div>';
+    h += '<div class="work sunken" id="work"><canvas id="art"></canvas><canvas id="over"></canvas>' +
+      '<div class="polybar raised" id="polybar"><button class="btn" data-poly="done">✓ Finish</button><button class="btn" data-poly="back">⌫ Last point</button><button class="btn" data-poly="cancel">✕ Cancel</button></div></div>';
     h += '<div class="side" id="side"></div></div>';
+    h += '<div class="mtabs" id="mtabs"></div>';
     h += '<div class="statusbar"><div class="sunken" id="sPos" style="width:96px">–</div><div class="sunken" id="sSize" style="width:96px"></div><div class="sunken" id="sZoom" style="width:70px"></div><div class="sunken grow" id="sHint"></div></div></div>';
     return h;
   }
@@ -101,11 +105,12 @@
     var t = app.tool, h = '<div class="lbl">' + esc(TOOL[t].name) + '</div>';
     if (/^(brush|eraser|line|rect|ellipse|polygon|lasso)$/.test(t)) {
       var outline = /^(rect|ellipse|polygon|lasso)$/.test(t) && app.shape === 'outline';
-      if (/^(brush|eraser|line)$/.test(t) || outline) h += '<label>Size <input type="number" min="1" max="64" value="' + app.size + '" data-opt="size" style="width:46px"></label><label><input type="checkbox" data-opt="round"' + (app.round ? ' checked' : '') + '> Round</label>';
+      if (/^(brush|eraser|line)$/.test(t) || outline) h += '<label class="sizer">Size <input type="range" min="1" max="32" value="' + Math.min(32, app.size) + '" data-opt="size" aria-label="Size"><b data-optv="size">' + app.size + '</b></label><label><input type="checkbox" data-opt="round"' + (app.round ? ' checked' : '') + '> Round</label>';
       if (/^(rect|ellipse|polygon|lasso)$/.test(t)) h += '<label><select data-opt="shape"><option value="fill"' + (app.shape === 'fill' ? ' selected' : '') + '>Filled</option><option value="outline"' + (app.shape === 'outline' ? ' selected' : '') + '>Outline</option></select></label>';
     }
     if (t === 'fill') h += '<label>Match ± <input type="number" min="0" max="255" value="' + app.tol + '" data-opt="tol" style="width:46px"></label><label><input type="checkbox" data-opt="sampleAll"' + (app.sampleAll ? ' checked' : '') + '> All layers</label>';
     if (t === 'gradient') h += '<label><select data-opt="gradTarget"><option value="layer"' + (app.gradTarget === 'layer' ? ' selected' : '') + '>Whole layer</option><option value="region"' + (app.gradTarget === 'region' ? ' selected' : '') + '>Area under start</option></select></label><div class="small muted">Uses the Gradient panel’s type, softness and ripples.</div>';
+    if (/^(line|rect|ellipse|polygon|gradient)$/.test(t)) h += '<label title="The same as holding Shift"><input type="checkbox" data-opt="snap"' + (app.snap ? ' checked' : '') + '> ' + (/^(rect|ellipse)$/.test(t) ? 'Square / circle' : 'Snap to 45°') + '</label>';
     if (/^(pencil|brush|eraser|line|rect|ellipse|polygon|lasso)$/.test(t)) h += '<label><input type="checkbox" data-opt="mirror"' + (app.mirror ? ' checked' : '') + '> Mirror</label>';
     return h;
   }
@@ -122,20 +127,22 @@
     return '<div class="ctl"><span>' + esc(label) + '</span><select data-k="' + k + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(v) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></div>';
   }
   function check(k, label) { return '<label class="row"><input type="checkbox" data-k="' + k + '"' + (getPath(app.style, k) ? ' checked' : '') + '> ' + esc(label) + '</label>'; }
-  function panel(id, title, body, extra) { return '<div class="panel raised' + (app.shut[id] ? ' shut' : '') + '" data-panel="' + id + '"><div class="ph"><span>' + (app.shut[id] ? '▸' : '▾') + '</span><span class="grow">' + esc(title) + '</span>' + (extra || '') + '</div><div class="pb">' + body + '</div></div>'; }
+  function panel(id, title, body, extra) { var shut = app.shut[id] && !mobile(); return '<div class="panel raised' + (shut ? ' shut' : '') + '" data-panel="' + id + '"><div class="ph"><span>' + (shut ? '▸' : '▾') + '</span><span class="grow">' + esc(title) + '</span>' + (extra || '') + '</div><div class="pb">' + body + '</div></div>'; }
   function swatchBG(c, a) { var x = D.rgba(c, a); return 'rgba(' + x[0] + ',' + x[1] + ',' + x[2] + ',' + (x[3] / 255).toFixed(3) + ')'; }
 
+  // On a phone the panels open one group at a time, in a sheet over the canvas (app.sheet; the tabs at the bottom).
+  var SHEETS = { tool: 'Tool', colours: 'Colour', style: 'Style', layers: 'Layers', card: 'Card', menu: 'Menu' };
   function sideHTML() {
-    var st = app.style, g = st.grad, h = '';
+    var st = app.style, g = st.grad, h = '', P = {};
     // style: preview, mode, presets
     var pres = '<option value="">Style presets…</option><optgroup label="Kartenspiel">' + D.PRESETS.map(function (p, i) { return '<option value="b' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' +
       (app.userPresets.length ? '<optgroup label="Yours">' + app.userPresets.map(function (p, i) { return '<option value="u' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' : '');
-    h += panel('style', 'Style', '<canvas id="preview" width="150" height="28" aria-label="Preview of the current style"></canvas>' +
+    P.style = panel('style', 'Style', '<canvas id="preview" width="150" height="28" aria-label="Preview of the current style"></canvas>' +
       '<div class="row"><label><input type="radio" name="mode" data-mode="gradient"' + (st.mode !== 'solid' ? ' checked' : '') + '> Dithered gradient</label><label><input type="radio" name="mode" data-mode="solid"' + (st.mode === 'solid' ? ' checked' : '') + '> Solid</label></div>' +
       '<div class="row"><select data-act="preset" style="flex:1">' + pres + '</select><button class="btn" data-act="savePreset" title="Save this style as a preset">Save…</button></div>');
     // colours: the ramp, the selected colour, the palette
     var sel = st.ramp[Math.min(app.rampSel, st.ramp.length - 1)];
-    h += panel('colours', 'Colours', '<div class="ramp">' + st.ramp.map(function (r, i) { return '<button class="sw' + (i === app.rampSel ? ' sel' : '') + '" data-ramp="' + i + '" title="Colour ' + (i + 1) + (i === 0 ? ' (gradient start)' : i === st.ramp.length - 1 ? ' (gradient end)' : '') + '"><i style="background:' + swatchBG(r.c, r.a) + '"></i><span class="n">' + (i + 1) + '</span></button>'; }).join('') +
+    P.colours = panel('colours', 'Colours', '<div class="ramp">' + st.ramp.map(function (r, i) { return '<button class="sw' + (i === app.rampSel ? ' sel' : '') + '" data-ramp="' + i + '" title="Colour ' + (i + 1) + (i === 0 ? ' (gradient start)' : i === st.ramp.length - 1 ? ' (gradient end)' : '') + '"><i style="background:' + swatchBG(r.c, r.a) + '"></i><span class="n">' + (i + 1) + '</span></button>'; }).join('') +
       '<span class="grow" style="flex:1"></span><button class="btn" data-act="rampAdd" title="Add a colour to the ramp (up to 4)"' + (st.ramp.length >= 4 ? ' disabled' : '') + '>+</button><button class="btn" data-act="rampDel" title="Remove the selected colour"' + (st.ramp.length <= 1 ? ' disabled' : '') + '>−</button><button class="btn" data-act="rampRev" title="Reverse the ramp (X)">⇄</button></div>' +
       '<div class="row"><input type="color" data-act="colour" value="' + esc(sel.c) + '" aria-label="Selected colour"><input type="text" data-act="hex" value="' + esc(sel.c) + '" style="width:80px" aria-label="Hex colour"><span class="small muted">' + (st.mode === 'solid' && app.rampSel > 0 ? 'Solid uses colour 1' : '') + '</span></div>' +
       '<div class="slider"><span>Alpha</span><input type="range" data-act="alpha" min="0" max="1" step="0.01" value="' + sel.a + '"><span class="v" id="alphaV">' + Math.round(sel.a * 100) + '%</span></div>' +
@@ -144,35 +151,73 @@
       '<div class="palette"><button data-pal="transparent" title="Transparent"><i></i></button>' + paletteColours().map(function (c) { return '<button data-pal="' + c + '" title="' + c + '"><i style="background:' + c + '"></i></button>'; }).join('') + '</div>' +
       '<div class="small muted">Click a swatch in the ramp, then pick its colour. The gradient runs from colour 1 to the last.</div>');
     // gradient
-    h += panel('gradient', 'Gradient', select('grad.type', 'Type', [['linear', 'Linear'], ['radial', 'Radial'], ['diamond', 'Diamond'], ['conic', 'Around a point'], ['edge', 'Follows the shape’s edge'], ['flat', 'Flat (an even mix)']]) +
+    P.gradient = panel('gradient', 'Gradient', select('grad.type', 'Type', [['linear', 'Linear'], ['radial', 'Radial'], ['diamond', 'Diamond'], ['conic', 'Around a point'], ['edge', 'Follows the shape’s edge'], ['flat', 'Flat (an even mix)']]) +
       select('grad.anchor', 'Spans', [['shape', 'Each shape'], ['canvas', 'Gradient-tool handles']]) +
       (g.type === 'flat' ? slider('grad.mix', 'Mix', 0, 1, .01, '%') : '') +
       (g.anchor === 'shape' && /^(linear|conic)$/.test(g.type) ? slider('grad.angle', 'Angle', 0, 359, 1, '°') : '') +
       slider('grad.start', 'Start', -.5, 1.5, .01, '%') + slider('grad.end', 'End', -.5, 1.5, .01, '%') + slider('grad.mid', 'Midpoint', .05, .95, .01, '%') +
       slider('grad.contrast', 'Softness', .02, 1, .01, '%') +
       select('grad.repeat', 'Beyond the ends', [['none', 'Stop'], ['repeat', 'Repeat'], ['mirror', 'Bounce back']]) + check('grad.reverse', 'Reverse'));
-    h += panel('ripple', 'Ripples', slider('ripple.amp', 'Amount', 0, .5, .01) + slider('ripple.freq', 'Waves', .5, 16, .5) + slider('ripple.phase', 'Shift', 0, 1, .01) +
+    P.ripple = panel('ripple', 'Ripples', slider('ripple.amp', 'Amount', 0, .5, .01) + slider('ripple.freq', 'Waves', .5, 16, .5) + slider('ripple.phase', 'Shift', 0, 1, .01) +
       slider('ripple.turb', 'Turbulence', 0, .6, .01) + slider('ripple.turbScale', 'Turb. size', 2, 64, 1) +
       '<div class="small muted">Ripples bend the gradient’s frontier into waves; turbulence roughens it.</div>');
-    h += panel('dither', 'Dither', select('dither.pattern', 'Pattern', D.PATTERNS.map(function (p) { return [p.id, p.name]; })) + slider('dither.scale', 'Pattern size', 1, 6, 1, 'x') +
+    P.dither = panel('dither', 'Dither', select('dither.pattern', 'Pattern', D.PATTERNS.map(function (p) { return [p.id, p.name]; })) + slider('dither.scale', 'Pattern size', 1, 6, 1, 'x') +
       slider('dither.level', 'Dithering', 0, 1, .01, '%') +
       '<div class="ctl"><span>Seed</span><span class="row"><input type="number" data-k="dither.seed" value="' + (st.dither.seed | 0) + '" style="width:70px"><button class="btn" data-act="dice" title="New random seed">🎲</button></span></div>' +
       slider('opacity', 'Opacity', 0, 1, .01, '%') + check('ditherOpacity', 'Dither the opacity') +
       '<div class="small muted">0% dithering gives hard bands; 100% blends the colours with the pattern. Dithered opacity skips pixels instead of fading them, so the art stays crisp.</div>');
     // layers
     var L = app.doc.layers, a = app.doc.active;
-    h += panel('layers', 'Layers', '<div class="layers" id="layerList">' + L.map(function (l, i) { return i; }).reverse().map(function (i) { var l = L[i];
+    P.layers = panel('layers', 'Layers', '<div class="layers" id="layerList">' + L.map(function (l, i) { return i; }).reverse().map(function (i) { var l = L[i];
       return '<div class="layer' + (i === a ? ' act' : '') + '" data-layer="' + i + '"><input type="checkbox" data-vis="' + i + '"' + (l.visible ? ' checked' : '') + ' title="Show or hide" aria-label="Visible"><canvas data-thumb="' + i + '" width="34" height="24"></canvas><span class="nm" title="Double-click to rename">' + esc(l.name) + '</span><button class="ib" data-lock="' + i + '" title="' + (l.locked ? 'Unlock' : 'Lock') + '">' + (l.locked ? '🔒' : '<span style="opacity:.35">🔓</span>') + '</button></div>'; }).join('') + '</div>' +
       '<div class="row"><button class="btn" data-cmd="addLayer" title="New layer">New</button><button class="btn" data-cmd="dupLayer" title="Duplicate">Copy</button><button class="btn" data-cmd="delLayer" title="Delete"' + (L.length < 2 ? ' disabled' : '') + '>Delete</button><button class="btn" data-cmd="layerUp" title="Move up">▲</button><button class="btn" data-cmd="layerDown" title="Move down">▼</button><button class="btn" data-cmd="mergeDown" title="Merge down"' + (a === 0 ? ' disabled' : '') + '>Merge ↓</button></div>' +
       '<div class="slider"><span>Layer opacity</span><input type="range" data-act="layerOpacity" min="0" max="1" step="0.01" value="' + L[a].opacity + '"><span class="v" id="lopV">' + Math.round(L[a].opacity * 100) + '%</span></div>');
-    return h;
+    if (!mobile()) return P.style + P.colours + P.gradient + P.ripple + P.dither + P.layers;
+    if (!app.sheet) return '';
+    var body = { tool: function () { return '<div class="pb"><div class="small muted">' + esc(TOOL[app.tool].hint) + '</div><div class="opts">' + optsHTML() + '</div></div>'; },
+      colours: function () { return P.colours + P.style; }, style: function () { return P.gradient + P.ripple + P.dither; }, layers: function () { return P.layers; },
+      card: function () { return hooks.cardSheet ? hooks.cardSheet() : ''; }, menu: menuSheet }[app.sheet];
+    return '<div class="sheethead"><b>' + esc(app.sheet === 'tool' ? TOOL[app.tool].name : SHEETS[app.sheet]) + '</b><span class="grow"></span><button class="btn" data-m="close" aria-label="Close">Done</button></div>' + (body ? body() : '');
+  }
+  // The menus as one list, for the phone's ☰ button.
+  function menuSheet() {
+    return '<div class="pb menusheet">' + MENUS.map(function (m) { return '<div class="msec"><div class="small muted">' + m.name + '</div>' +
+      m.items.filter(function (it) { return it !== '-' && !/^(grid|bg|zoomIn|zoomOut|actual|keys)$/.test(it[0]); }).map(function (it) { return '<button class="btn" data-cmd="' + it[0] + '">' + esc(it[1]) + '</button>'; }).join('') + '</div>'; }).join('') + '</div>';
+  }
+  var PHONE = window.matchMedia ? matchMedia('(max-width: 820px), (max-height: 520px)') : { matches: false };   // phones, either way up (as in dithry.css)
+  function mobile() { return PHONE.matches; }
+  var TAB_ICON = {
+    style: svg('<rect x="2.5" y="3.5" width="15" height="13" fill="#fff" stroke="#000"/><path d="M3 4h2v2H3zM7 4h2v2H7zM11 4h2v2h-2zM5 6h2v2H5zM9 6h2v2H9zM3 8h4v2H3zM9 8h2v2H9zM13 8h2v2h-2zM3 10h12v2H3zM3 12h14v4H3z" fill="#1c1f3a"/>'),
+    layers: svg('<path d="M10 3 L18 7 L10 11 L2 7 Z" fill="#8a90a8" stroke="#000"/><path d="M2 10 L10 14 L18 10" fill="none" stroke="#000"/><path d="M2 13 L10 17 L18 13" fill="none" stroke="#000"/>'),
+    card: svg('<rect x="4.5" y="2.5" width="11" height="15" fill="#f6dcf2" stroke="#000"/><path d="M6 6h8M6 8h5" stroke="#000"/><path d="M6 12h8v4H6z" fill="#c03aa8"/>')
+  };
+  // The phone's tab bar: the tool's options, colours, style, layers, and the card when painting cards.
+  function renderTabs() {
+    var t = $('#mtabs'); if (!t) return;
+    var tabs = ['tool', 'colours', 'style', 'layers'].concat(app.mode === 'cards' ? ['card'] : []), r = app.style.ramp;
+    t.innerHTML = tabs.map(function (k) {
+      var icon = k === 'tool' ? TOOL[app.tool].icon : k === 'colours' ? '<span class="tabsw">' + r.map(function (x) { return '<i style="background:' + swatchBG(x.c, x.a) + '"></i>'; }).join('') + '</span>' : TAB_ICON[k] || '';
+      return '<button class="btn' + (app.sheet === k ? ' on' : '') + '" data-sheet="' + k + '">' + icon + '<span>' + SHEETS[k] + '</span></button>'; }).join('');
   }
   function getPath(o, k) { return k.split('.').reduce(function (x, p) { return x == null ? x : x[p]; }, o); }
   function setPath(o, k, v) { var ps = k.split('.'), last = ps.pop(); ps.reduce(function (x, p) { return x[p]; }, o)[last] = v; }
 
-  function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.scrollTop = top; drawPreview(); drawThumbs(); }
-  function renderOpts() { $('#opts').innerHTML = optsHTML(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
-  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; document.title = t + ' · Dithry'; }
+  function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.classList.toggle('open', mobile() && !!app.sheet); s.scrollTop = top; drawPreview(); drawThumbs(); renderTabs(); }
+  function openSheet(k) { app.sheet = app.sheet === k ? null : k; var s = $('#side'); renderSide(); s.scrollTop = 0; keepInView(); }
+  // A sheet covers the lower part of the canvas: slide the picture up into the part you can still see, and back down
+  // when the sheet closes (unless you've moved it in the meantime).
+  var sheetPan = null;
+  function keepInView() {
+    if (!mobile()) return;
+    if (!app.sheet) { if (sheetPan && app.panX === sheetPan.mx && app.panY === sheetPan.my) { app.panX = sheetPan.x; app.panY = sheetPan.y; applyView(); } sheetPan = null; return; }
+    var wr = work.getBoundingClientRect(), sr = $('#side').getBoundingClientRect(), side = sr.left > wr.left + 10;   // a phone on its side: the sheet is on the right
+    if (!sheetPan) sheetPan = { x: app.panX, y: app.panY };
+    if (side) { var room = wr.width - Math.max(0, wr.right - sr.left), w = W() * app.zoom, wantX = w <= room - 16 ? (room - w) / 2 : 8; if (app.panX > wantX) app.panX = wantX; }
+    else { var roomY = wr.height - Math.max(0, wr.bottom - sr.top), h = H() * app.zoom, want = h <= roomY - 16 ? (roomY - h) / 2 : 8; if (app.panY > want) app.panY = want; }
+    applyView(); sheetPan.mx = app.panX; sheetPan.my = app.panY;
+  }
+  function renderOpts() { $('#opts').innerHTML = optsHTML(); if (mobile() && app.sheet === 'tool') renderSide(); else renderTabs(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
+  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; $('#mname').textContent = t; document.title = t + ' · Dithry'; }
 
   // The style preview: the current style across a strip, as it would paint a shape.
   function drawPreview() {
@@ -221,8 +266,10 @@
     hooks.view.forEach(function (f) { f(); });
   }
   function fit() {
-    var r = work.getBoundingClientRect(), z = Math.min((r.width - 32) / W(), (r.height - 32) / H());
-    var best = ZOOMS[0]; ZOOMS.forEach(function (q) { if (q <= z) best = q; }); app.zoom = best;
+    var r = work.getBoundingClientRect(), pad = mobile() ? 12 : 32, z = Math.min((r.width - pad) / W(), (r.height - pad) / H()), dpr = window.devicePixelRatio || 1;
+    var best = ZOOMS[0]; ZOOMS.forEach(function (q) { if (q <= z) best = q; });
+    if (dpr > 1 && z >= 1) best = Math.max(best, Math.floor(z * dpr) / dpr);   // on sharp screens, any zoom that's a whole number of device pixels keeps the pixels even
+    app.zoom = best;
     app.panX = (r.width - W() * app.zoom) / 2; app.panY = (r.height - H() * app.zoom) / 2; applyView();
   }
   // Zoom to level z, keeping the point (sx, sy) of the work area (default: its centre) still.
@@ -239,7 +286,7 @@
   // The overlay: pixel grid, brush outline, shape guides, gradient handles, polygon points, mirror axis.
   var hooks = { view: [], overlay: [], change: [] };   // used by card mode (cards.js)
   var overFrame = null;
-  function drawOverlay() { if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
+  function drawOverlay() { var pb = $('#polybar'); if (pb) pb.style.display = op && op.kind === 'polygon' ? 'flex' : 'none'; if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
   function paintOverlay() {
     overFrame = null;
     var r = work.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -348,7 +395,9 @@
 
   /* ---------------- pointer input ---------------- */
   var pointers = {}, pinch = null, panning = null, spaceDown = false, lastPencil = null;
+  var lastPointerType = 'mouse';
   function onDown(e) {
+    lastPointerType = e.pointerType;
     work.setPointerCapture && work.setPointerCapture(e.pointerId);
     pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     closeMenus();
@@ -356,9 +405,10 @@
     if (ids.length === 2) {   // two fingers: stop drawing, pinch and pan instead
       if (op && op.kind !== 'polygon') cancel();
       var p = ids.map(function (i) { return pointers[i]; }), r = work.getBoundingClientRect();
-      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: app.zoom, mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top, px: app.panX, py: app.panY };
-      return;
+      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: app.zoom, mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top, px: app.panX, py: app.panY, t0: e.timeStamp, moved: 0, fingers: 2 };
+      endLongPress(); return;
     }
+    if (ids.length === 3 && pinch) { pinch.fingers = 3; return; }
     if (ids.length > 2) return;
     var a = toArt(e), pi = [Math.floor(a[0]), Math.floor(a[1])], t = app.tool;
     if (e.button === 1 || t === 'hand' || spaceDown) { panning = { x: e.clientX, y: e.clientY, px: app.panX, py: app.panY }; work.classList.add('panning'); e.preventDefault(); return; }
@@ -371,18 +421,19 @@
       else {
         var f = op.pts[0], near = Math.hypot(pi[0] - f[0], pi[1] - f[1]) * app.zoom < 10;
         if (near && op.pts.length > 2) { finishPolygon(); return; }
-        var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) op.pts.push(e.shiftKey ? snap45(lp, pi) : pi);
+        var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) op.pts.push(e.shiftKey || app.snap ? snap45(lp, pi) : pi);
       }
       polyMask(op.pts); show(); drawOverlay(); return;
     }
     if (!begin(t)) return;
     op.start = pi;
+    if (e.pointerType === 'touch' && /^(pencil|brush|eraser|line|rect|ellipse|lasso)$/.test(t)) startLongPress(e, pi);
     if (t === 'pencil' || t === 'brush' || t === 'eraser') {
       var sz = t === 'pencil' ? 1 : app.size, rd = t !== 'pencil' && app.round;
       var from = t === 'pencil' && e.shiftKey && lastPencil ? lastPencil : pi;
       op.box = mirrored(D.line(op.mask, W(), H(), from[0], from[1], pi[0], pi[1], sz, rd)); op.last = pi; op.sz = sz; op.rd = rd;
       show(full(), null, t === 'eraser');
-    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, pi, pi, e.shiftKey); show(); }
+    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, pi, pi, e.shiftKey || app.snap); show(); }
     else if (t === 'lasso') { op.pts = [pi]; }
     else if (t === 'fill') { op.box = regionMask(pi[0], pi[1]); show(); commit(); }
     else if (t === 'gradient') {
@@ -391,12 +442,24 @@
       drawOverlay();
     } else if (t === 'move') { op.box = full(); }
   }
+  // Press and hold a drawing tool on a touch screen to pick the colour under your finger (no keyboard for the picker).
+  var hold = null;
+  function startLongPress(e, pi) {
+    endLongPress();
+    hold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: setTimeout(function () {
+      if (!hold) return; hold = null; if (op) cancel(); app.rampSel = Math.min(app.rampSel, app.style.ramp.length - 1); pick(pi);
+      if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) { }
+    }, 550) };
+  }
+  function endLongPress() { if (hold) { clearTimeout(hold.t); hold = null; } }
   function onMove(e) {
     if (pointers[e.pointerId]) { pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY; }
+    if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) endLongPress();
     if (pinch) {
       var ids = Object.keys(pointers); if (ids.length < 2) return;
       var p = ids.map(function (i) { return pointers[i]; }), r = work.getBoundingClientRect(), mx = (p[0].x + p[1].x) / 2 - r.left, my = (p[0].y + p[1].y) / 2 - r.top;
-      var z = clamp(pinch.z * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / pinch.d, ZOOMS[0], ZOOMS[ZOOMS.length - 1]);
+      var spread = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), z = clamp(pinch.z * spread / pinch.d, ZOOMS[0], ZOOMS[ZOOMS.length - 1]);
+      pinch.moved = Math.max(pinch.moved, Math.abs(spread - pinch.d) + Math.hypot(mx - pinch.mx, my - pinch.my));
       var ax = (pinch.mx - pinch.px) / pinch.z, ay = (pinch.my - pinch.py) / pinch.z;
       app.zoom = z; app.panX = mx - ax * z; app.panY = my - ay * z; applyView(); return;
     }
@@ -411,16 +474,21 @@
       if (pi[0] === op.last[0] && pi[1] === op.last[1]) return;
       op.box = D.union(op.box, mirrored(D.line(op.mask, W(), H(), op.last[0], op.last[1], pi[0], pi[1], op.sz, op.rd))); op.last = pi;
       show(full(), null, t === 'eraser');
-    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, op.start, pi, e.shiftKey); show(); }
+    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, op.start, pi, e.shiftKey || app.snap); show(); }
     else if (t === 'lasso') { var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) { op.pts.push(pi); polyMask(op.pts); show(); } }
-    else if (t === 'polygon') { polyMask(op.pts.concat([e.shiftKey ? snap45(op.pts[op.pts.length - 1], pi) : pi])); show(); }
-    else if (t === 'gradient') { op.end = e.shiftKey ? snapVec(op.start, a) : a; show(full(), handleStyle(op.start, op.end)); }
+    else if (t === 'polygon') { polyMask(op.pts.concat([e.shiftKey || app.snap ? snap45(op.pts[op.pts.length - 1], pi) : pi])); show(); }
+    else if (t === 'gradient') { op.end = e.shiftKey || app.snap ? snapVec(op.start, a) : a; show(full(), handleStyle(op.start, op.end)); }
     else if (t === 'move') { D.shift(layer(op.li).data, op.before, W(), H(), pi[0] - op.start[0], pi[1] - op.start[1]); redraw(); }
   }
   function snapVec(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), len = Math.hypot(dx, dy); return [a[0] + Math.cos(ang) * len, a[1] + Math.sin(ang) * len]; }
   function onUp(e) {
-    delete pointers[e.pointerId];
-    if (pinch) { if (Object.keys(pointers).length === 0) pinch = null; return; }
+    delete pointers[e.pointerId]; endLongPress();
+    if (pinch) {
+      if (Object.keys(pointers).length) return;
+      // a quick tap with two fingers undoes, with three redoes (fingers that barely moved: not a pinch)
+      if (e.timeStamp - pinch.t0 < 350 && pinch.moved < 16) { app.zoom = pinch.z; app.panX = pinch.px; app.panY = pinch.py; applyView(); if (pinch.fingers === 3) redo(); else undo(); }
+      pinch = null; return;
+    }
     if (panning) { panning = null; work.classList.remove('panning'); return; }
     if (selDrag) { if (!selDrag.moved) app.sel = null; selDrag = null; drawOverlay(); status(app.sel ? 'Selected ' + (app.sel.x1 - app.sel.x0) + ' × ' + (app.sel.y1 - app.sel.y0) + ' pixels: drawing stays inside.' : null); return; }
     if (!op || op.kind === 'polygon') return;
@@ -717,6 +785,7 @@
   /* ---------------- side-panel and option events ---------------- */
   function onSideInput(e) {
     var t = e.target, k = t.getAttribute('data-k');
+    if (t.hasAttribute('data-opt')) return onOpt(e);   // the tool's options, in the phone's Tool sheet
     if (k) {
       var v = t.type === 'checkbox' ? t.checked : t.tagName === 'SELECT' ? t.value : parseFloat(t.value);
       if (t.type === 'number' && isNaN(v)) return;
@@ -745,7 +814,8 @@
     if (e.target.tagName === 'INPUT') return;   // checkboxes and fields act through onSideInput
     var t = e.target.closest('button, .ph, .layer'); if (!t) return;
     if (t.classList.contains('ph')) { var p = t.parentNode.getAttribute('data-panel'); app.shut[p] = !app.shut[p]; savePrefs(); renderSide(); return; }
-    if (t.hasAttribute('data-cmd')) return run(t.getAttribute('data-cmd'));
+    if (t.getAttribute('data-m') === 'close') { app.sheet = null; renderSide(); keepInView(); return; }
+    if (t.hasAttribute('data-cmd')) { if (app.sheet === 'menu') { app.sheet = null; renderSide(); keepInView(); } return run(t.getAttribute('data-cmd')); }
     if (t.hasAttribute('data-ramp')) { app.rampSel = +t.getAttribute('data-ramp'); renderSide(); return; }
     if (t.hasAttribute('data-pal')) {
       var r = app.style.ramp[Math.min(app.rampSel, app.style.ramp.length - 1)], c = t.getAttribute('data-pal');
@@ -779,8 +849,9 @@
     var t = e.target, k = t.getAttribute('data-opt'); if (!k) return;
     var v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? parseInt(t.value, 10) : t.value;
     if (t.type === 'number' && isNaN(v)) return;
-    if (k === 'size') v = clamp(v, 1, 64); if (k === 'tol') v = clamp(v, 0, 255);
-    app[k] = v; savePrefs(); if (k === 'shape' || k === 'mirror') renderOpts(); drawOverlay();
+    if (t.type === 'range') v = parseInt(t.value, 10);
+    if (k === 'size') { v = clamp(v, 1, 64); document.querySelectorAll('[data-optv="size"]').forEach(function (b) { b.textContent = v; }); } if (k === 'tol') v = clamp(v, 0, 255);
+    app[k] = v; savePrefs(); if ((k === 'shape' || k === 'mirror' || k === 'snap') && e.type === 'change') renderOpts(); drawOverlay();
   }
 
   /* ---------------- the example scene ---------------- */
@@ -833,17 +904,25 @@
     renderOpts(); renderSide(); renderTitle();
     ready.then(function () { renderOpts(); if (hooks.start) return hooks.start(); }).then(function () { window.dithryReady = true; });
 
-    document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { setTool(b.getAttribute('data-tool')); }); });
+    // on a phone, tapping the tool you already have opens its options
+    onTap($('.tools'), '[data-tool]', function (b) { var id = b.getAttribute('data-tool'); if (mobile() && app.tool === id) openSheet('tool'); else { setTool(id); if (mobile() && app.sheet === 'tool') renderSide(); } });
+    onTap($('.mtop'), '[data-m]', function (b) { var m = b.getAttribute('data-m');
+      if (m === 'menu') openSheet('menu'); else if (m === 'undo') undo(); else if (m === 'redo') redo(); else if (m === 'fit') fit(); });
+    onTap($('#mtabs'), '[data-sheet]', function (b) { openSheet(b.getAttribute('data-sheet')); });
+    onTap($('#polybar'), '[data-poly]', function (b) { if (!op || op.kind !== 'polygon') return; var a = b.getAttribute('data-poly');
+      if (a === 'done') finishPolygon(); else if (a === 'cancel') cancel(); else { op.pts.pop(); if (!op.pts.length) cancel(); else { polyMask(op.pts); show(); drawOverlay(); } } });
+    $('#polybar').addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    if (PHONE.addEventListener) PHONE.addEventListener('change', function () { app.sheet = null; renderSide(); renderOpts(); setTimeout(fit, 50); });
     $('.menubar').addEventListener('click', function (e) {
       var cmd = e.target.closest('[data-cmd]'); if (cmd) return run(cmd.getAttribute('data-cmd'));
       var mi = e.target.closest('.mi'); if (!mi) return; var was = mi.classList.contains('open'); closeMenus(); if (!was) mi.classList.add('open');
     });
     $('.menubar').addEventListener('mouseover', function (e) { var mi = e.target.closest('.mi'); if (mi && document.querySelector('.mi.open') && !mi.classList.contains('open')) { closeMenus(); mi.classList.add('open'); } });
     document.addEventListener('pointerdown', function (e) { if (!e.target.closest('.menubar')) closeMenus(); }, true);
-    var side = $('#side'); side.addEventListener('input', onSideInput); side.addEventListener('change', onSideInput); side.addEventListener('click', onSideClick); side.addEventListener('dblclick', onSideDbl);
+    var side = $('#side'); side.addEventListener('input', onSideInput); side.addEventListener('change', onSideInput); onTap(side, 'button, .ph, .layer', function (b, e) { onSideClick({ target: e.target.tagName === 'INPUT' ? e.target : b }); }); side.addEventListener('dblclick', onSideDbl);
     var opts = $('#opts'); opts.addEventListener('change', onOpt); opts.addEventListener('input', onOpt);
     work.addEventListener('pointerdown', onDown); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp);
-    work.addEventListener('dblclick', function () { finishPolygon(); });
+    work.addEventListener('dblclick', function () { if (lastPointerType !== 'touch') finishPolygon(); });   // on touch, quick taps on nearby corners look like a double-click: the Finish bar ends a polygon there
     work.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     work.addEventListener('pointerleave', function () { if (!op) { app.hover = null; status(); drawOverlay(); } });
     work.addEventListener('wheel', function (e) { e.preventDefault(); var r = work.getBoundingClientRect(); if (e.ctrlKey || Math.abs(e.deltaY) >= Math.abs(e.deltaX)) { wheelAcc += e.deltaY; if (Math.abs(wheelAcc) >= (e.ctrlKey ? 8 : 40)) { zoomStep(wheelAcc < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); wheelAcc = 0; } } else { app.panX -= e.deltaX; applyView(); } }, { passive: false });
@@ -853,6 +932,19 @@
     window.addEventListener('beforeunload', function () { if (app.dirty) autosave(); });
   }
   var wheelAcc = 0;
+  // Buttons that act when a finger lifts off them, not on the click that follows: Chrome drops a tap that comes just
+  // after a stroke (it waits to see if it's a double-tap), and you often reach for Undo right after drawing.
+  // A click without a pointer before it (the keyboard) still works.
+  function onTap(root, sel, fn) {
+    var down = null, last = -1e9;
+    root.addEventListener('pointerdown', function (e) { var b = e.target.closest(sel); down = b && root.contains(b) ? { b: b, id: e.pointerId, x: e.clientX, y: e.clientY } : null; });
+    root.addEventListener('pointerup', function (e) {
+      var d = down; down = null; if (!d || e.pointerId !== d.id || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+      last = e.timeStamp; fn(d.b, e);
+    });
+    root.addEventListener('pointercancel', function () { down = null; });
+    root.addEventListener('click', function (e) { var b = e.target.closest(sel); if (b && root.contains(b) && e.timeStamp - last > 700) fn(b, e); });
+  }
   // For card mode (cards.js) and tests.
   window.DithryApp = { app: app, D: D, hooks: hooks, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject,
     setupCanvas: function () { setupCanvas(); }, PALETTES: PALETTES, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,

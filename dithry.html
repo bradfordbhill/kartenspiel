@@ -51,6 +51,8 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .cardbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px; flex-wrap: wrap; flex: 0 0 auto; }
 .cardbar select { max-width: 260px; }
 .cardbar .grow { flex: 1; }
+.cardbar .narrow { display: none; }
+.cardbar .btn.dirty { font-weight: 700; }
 .main { flex: 1; min-height: 0; display: flex; gap: 4px; padding: 2px; }
 .toolbox { flex: 0 0 auto; width: 92px; padding: 4px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
@@ -109,19 +111,77 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .modal table { border-collapse: collapse; } .modal td { padding: 1px 10px 1px 0; vertical-align: top; }
 .presetlist { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .presetlist .btn { text-align: left; }
-.toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 6px 12px; z-index: 60; max-width: 90vw; }
+.toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 6px 12px; z-index: 60; max-width: 90vw; pointer-events: none; }   /* taps go through it */
 
-/* phones and narrow windows: tools across the top, panels below the canvas */
-@media (max-width: 820px) {
-  .win { inset: 0; }
-  .main { flex-direction: column; overflow: auto; }
-  .toolbox { width: auto; flex-direction: column; overflow: visible; }
-  .tools { display: flex; overflow-x: auto; gap: 2px; padding-bottom: 2px; }
-  .tool { flex: 0 0 auto; width: 40px; height: 36px; }
-  .opts { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  .work { flex: 0 0 52vh; min-height: 260px; }
-  .side { flex: 0 0 auto; overflow: visible; }
-  .titlebar .tip { display: none; }
+/* Parts only phones use; hidden on wider screens. */
+.mtop, .mtabs, .sheethead { display: none; }
+.polybar { display: none; position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); gap: 6px; z-index: 6; padding: 4px; white-space: nowrap; }
+.sizer { display: flex; align-items: center; gap: 6px; } .sizer input { flex: 1; min-width: 70px; } .sizer b { min-width: 2ch; text-align: right; }
+.tabsw { display: inline-flex; border: 1px solid var(--dk); } .tabsw i { width: 9px; height: 16px; display: block; }
+
+/* Phones, either way up (and narrow windows): the canvas fills the screen, with a top bar (menu, undo, redo, fit), a strip of tools,
+   and a tab bar at the bottom whose tabs open the panels in a sheet over the lower part of the canvas. */
+@media (max-width: 820px), (max-height: 520px) {
+  html, body { touch-action: manipulation; overscroll-behavior: none; }
+  .win { inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); border: 0; box-shadow: none; }
+  .titlebar, .menubar, .statusbar { display: none; }
+  .mtop { display: flex; align-items: center; gap: 4px; padding: 4px; flex: 0 0 auto; }
+  .mtop .mb { min-width: 44px; min-height: 40px; font-size: 18px; line-height: 1; padding: 0 8px; }
+  .mtop .grow { flex: 1; }
+  .mname { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .main { flex-direction: column; overflow: hidden; padding: 0 2px; gap: 2px; }
+  .toolbox { width: auto; flex: 0 0 auto; padding: 3px; overflow: visible; }
+  .toolbox .opts { display: none; }
+  .tools { display: flex; overflow-x: auto; gap: 3px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tools::-webkit-scrollbar { display: none; }
+  .tool { flex: 0 0 auto; width: 46px; height: 42px; }
+  .work { flex: 1 1 auto; min-height: 0; }
+  .side { position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom)); max-height: 58vh; overflow: auto; display: none; z-index: 40; gap: 0;
+    background: var(--face); border-top: 2px solid var(--hi); box-shadow: 0 -2px 0 var(--dk), 0 -6px 12px rgba(0, 0, 0, .25); padding: 0 0 8px; -webkit-overflow-scrolling: touch; }
+  .side.open { display: flex; }
+  .sheethead { display: flex; align-items: center; gap: 6px; padding: 6px 10px; position: sticky; top: 0; z-index: 2; background: var(--face); border-bottom: 1px solid var(--lo); font-size: 15px; }
+  .sheethead .grow { flex: 1; }
+  .side .panel { border: 0; box-shadow: none; }
+  .side .panel > .ph { cursor: default; }
+  .side .panel > .ph > span:first-child { display: none; }
+  .side .pb { padding: 8px 12px 0; gap: 8px; }
+  .side .opts { display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+  .mtabs { display: flex; gap: 3px; padding: 3px 3px calc(3px + env(safe-area-inset-bottom)); flex: 0 0 auto; }
+  .mtabs .btn { flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 12px; padding: 2px; }
+  .mtabs .btn svg { width: 18px; height: 18px; }
+  /* bigger targets, and 16px text in fields so iPhones don't zoom the page when you tap one */
+  input[type="number"], input[type="text"], select { font-size: 16px; min-height: 34px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  input[type="range"] { height: 30px; }
+  .btn { min-height: 36px; }
+  .slider { grid-template-columns: 96px 1fr 52px; }
+  .ctl { grid-template-columns: 96px 1fr; }
+  .sw { width: 42px; height: 42px; }
+  .palette { grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .layers { max-height: none; }
+  .layer { grid-template-columns: 28px 48px 1fr 36px; padding: 6px; min-height: 44px; }
+  .layer canvas { width: 48px; height: 32px; }
+  .menusheet { display: flex; flex-direction: column; gap: 10px; }
+  .menusheet .msec { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .menusheet .msec > div { grid-column: 1 / -1; }
+  .menusheet .btn { text-align: left; min-height: 42px; }
+  .toast { bottom: auto; top: calc(env(safe-area-inset-top) + 98px); }   /* clear of the polygon bar and the sheets at the bottom */
+  .polybar { bottom: 8px; }
+  .polybar .btn { min-height: 40px; }
+  .modal .body { font-size: 15px; }
+  .cardbar { flex-wrap: nowrap; padding: 3px 4px; gap: 4px; }
+  .cardbar .wide { display: none; } .cardbar .narrow { display: inline; }
+  .cardbar select { flex: 1; min-width: 0; max-width: none; }
+  .cardbar .btn { min-width: 40px; padding: 0 8px; }
+  .cardbar [data-c="count"] { display: none; }
+}
+/* a phone on its side: less height, so slimmer bars and a taller sheet */
+@media (max-height: 520px) {
+  .mtop { padding: 2px 4px; } .mtop .mb { min-height: 32px; }
+  .tool { height: 34px; width: 42px; }
+  .mtabs .btn { min-height: 36px; flex-direction: row; gap: 6px; }
+  .side { max-height: none; top: calc(env(safe-area-inset-top) + 40px); bottom: calc(44px + env(safe-area-inset-bottom)); left: auto; width: min(430px, 56vw); border-top: 0; border-left: 2px solid var(--hi); box-shadow: -2px 0 0 var(--dk), -6px 0 12px rgba(0, 0, 0, .25); }
+  .cardbar { padding: 2px 4px; }
 }
 </style></head><body><div id="app"></div><script>
 var KCardCSS = "/* Kartenspiel styles: a Windows 95 look. Colors are variables here, redefined for dark mode below. */\n/* Rules later in the file override earlier ones, so the newer tweaks sit near the bottom. */\n:root {\n  --desk: #008080; --face: #c0c0c0; --hi: #ffffff; --lo: #808080; --dk: #000000;\n  --text: #000000; --field: #ffffff; --title1: #000080; --title2: #1084d0; --titletext: #ffffff;\n  --sel: #000080; --seltext: #ffffff; --tip: #ffffe1; --muted: #4a4a4a;\n  --see: #e8c400; --seefill: rgba(255, 230, 0, .38); --seenby: #00a6c8; --legal: rgba(0, 170, 0, .28); --legaledge: #008a00;\n  --opt: #ff7a00; --focus: #000080;\n  color-scheme: light;\n  box-sizing: border-box;\n  padding-top: env(safe-area-inset-top, 0px);\n  padding-bottom: env(safe-area-inset-bottom, 0px);\n}\n/* Dark mode follows the system unless data-theme=\"light\"; data-theme=\"dark\" forces it. */\n@media (prefers-color-scheme: dark) {\n  :root:not([data-theme=\"light\"]) {\n    --desk: #0c3434; --face: #4b4b4b; --hi: #757575; --lo: #2a2a2a; --dk: #0a0a0a;\n    --text: #f1f1f1; --field: #2c2c2c; --title1: #1b1b62; --title2: #3d63ad; --sel: #3d63ad; --tip: #3d3b25; --muted: #c8c8c8;\n    --focus: #9ab8ff; color-scheme: dark;\n  }\n}\n:root[data-theme=\"dark\"] {\n  --desk: #0c3434; --face: #4b4b4b; --hi: #757575; --lo: #2a2a2a; --dk: #0a0a0a;\n  --text: #f1f1f1; --field: #2c2c2c; --title1: #1b1b62; --title2: #3d63ad; --sel: #3d63ad; --tip: #3d3b25; --muted: #c8c8c8;\n  --focus: #9ab8ff; color-scheme: dark;\n}\n*, *::before, *::after { box-sizing: border-box; }\nhtml { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }\n/* Text is DotGothic16, whose digits are easy to tell apart. Its ● is an oversized full-width glyph, so build.sh\n   loads Tiny5 with just that one character (text=●), listed first so only ● comes from it. */\nbody {\n  height: 100%; margin: 0; background: var(--desk); color: var(--text);\n  font-family: \"Tiny5\", \"DotGothic16\", Tahoma, \"MS Sans Serif\", Geneva, sans-serif; font-size: 13px; line-height: 1.3;\n}\nbutton, input, select, textarea { font: inherit; color: var(--text); }\n\n/* bevels */\n.raised { border: 2px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); box-shadow: inset -1px -1px var(--lo), inset 1px 1px var(--face); background: var(--face); }\n.sunken { border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); background: var(--field); }\n.etched { border: 1px solid var(--lo); box-shadow: 1px 1px 0 var(--hi), inset 1px 1px 0 var(--hi); }\n\n.btn {\n  background: var(--face); border: 2px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi);\n  box-shadow: inset -1px -1px var(--lo), inset 1px 1px var(--face); padding: 2px 9px; min-height: 24px; cursor: pointer; white-space: nowrap;\n}\n.btn:active:not(:disabled), .btn.on { border-color: var(--dk) var(--hi) var(--hi) var(--dk); box-shadow: inset 1px 1px var(--lo); }\n.btn:disabled { color: var(--lo); text-shadow: 1px 1px 0 var(--hi); cursor: default; }\n.btn:focus-visible, .cellbtn:focus-visible, .tab:focus-visible { outline: 1px dotted var(--text); outline-offset: -5px; }\n.btn.sm { padding: 0 6px; min-height: 20px; }\n.btn.def { outline: 1px solid var(--dk); }\n/* form fields */\ninput[type=text], input[type=number], select, textarea { background: var(--field); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); padding: 2px 4px; min-height: 22px; }\ntextarea { width: 100%; resize: vertical; }\ninput[type=number] { width: 64px; }\nlabel { cursor: default; }\nfieldset { border: 1px solid var(--lo); box-shadow: 1px 1px 0 var(--hi), inset 1px 1px 0 var(--hi); margin: 0 0 8px; padding: 6px 8px 8px; }\nlegend { padding: 0 3px; }\n\n/* window */\n.win { position: fixed; inset: max(6px, env(safe-area-inset-top, 0px)) 6px max(6px, env(safe-area-inset-bottom, 0px)) 6px; display: flex; flex-direction: column; padding: 3px; }\n.titlebar { background: linear-gradient(90deg, var(--title1), var(--title2)); color: var(--titletext); display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 6px; font-weight: 700; }\n.titlebar .grow { flex: 1; }\n.titlebar .tb { width: 18px; height: 16px; padding: 0; min-height: 0; line-height: 10px; font-size: 11px; }\n.menubar { display: flex; gap: 2px; padding: 3px 2px; flex-wrap: wrap; align-items: center; }\n.tab { background: transparent; border: 1px solid transparent; padding: 2px 9px; cursor: pointer; }\n.tab:hover { border-color: var(--hi) var(--lo) var(--lo) var(--hi); }\n.tab.on { border-color: var(--lo) var(--hi) var(--hi) var(--lo); background: var(--field); }\n.content { flex: 1; min-height: 0; display: flex; flex-direction: column; }\n.statusbar { display: flex; gap: 3px; padding-top: 3px; }\n.statusbar > div { padding: 1px 6px; flex: 0 0 auto; }\n.statusbar > div.grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n\n/* panels */\n.page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px 0; }\n.scroll { overflow: auto; }\n.pane { padding: 6px; overflow: auto; }\n.row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }\n.col { display: flex; flex-direction: column; gap: 6px; }\n.muted { color: var(--muted); }\n.small { font-size: 12px; }\n.h { font-weight: 700; margin: 0 0 4px; font-size: 13px; }\n.panelhead { background: var(--lo); color: var(--hi); padding: 1px 6px; font-weight: 700; margin: -6px -6px 6px; }\n.err { background: var(--tip); border: 1px solid var(--dk); padding: 3px 6px; color: var(--text); }\n\n/* game layout */\n.gamegrid { flex: 1; min-height: 0; display: grid; grid-template-columns: 228px minmax(0, 1fr) 282px; grid-template-rows: minmax(0, 1fr) auto; gap: 4px; }\n.gamegrid > .left { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 4px; min-height: 0; }\n.gamegrid > .center { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-height: 0; gap: 4px; }\n.gamegrid > .right { grid-column: 3; grid-row: 1 / span 2; min-height: 0; }\n.gamegrid > .bottom { grid-column: 2; grid-row: 2; }\n@media (max-width: 900px) {\n  .gamegrid { grid-template-columns: 1fr; grid-template-rows: auto; }\n  .gamegrid > .left, .gamegrid > .center, .gamegrid > .right, .gamegrid > .bottom { grid-row: auto; grid-column: auto; }\n  .page { overflow: auto; }\n  .gamegrid > .center { min-height: 70vh; }\n  .boardwrap { min-height: 60vh; }\n}\n/* players panel and log */\n.players { width: 100%; border-collapse: collapse; }\n.players td, .players th { padding: 2px 3px; text-align: left; white-space: nowrap; }\n.players th { font-weight: 400; color: var(--muted); }\n.players tr.cur td { background: var(--sel); color: var(--seltext); }\n.swatch { display: inline-block; width: 10px; height: 10px; border: 1px solid var(--dk); vertical-align: -1px; }\n.log { flex: 1; min-height: 80px; overflow: auto; padding: 4px; font-size: 12px; }\n.log div { padding: 1px 0; border-bottom: 1px dotted var(--lo); }\n.log div.turn { font-weight: 700; border-bottom: none; padding-top: 4px; }\n\n/* board */\n.boardbar { padding: 2px 4px; }\n.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; }\n.boardsizer { position: relative; }\n.boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }\n.cell { position: absolute; width: 104px; height: 104px; }\n.cell.empty { border: 1px dashed rgba(128, 128, 128, .35); }\n.cell .coord { position: absolute; left: 3px; bottom: 2px; font-size: 9px; color: #888; }\n.cellbtn { position: absolute; inset: 0; background: transparent; border: 0; padding: 0; cursor: pointer; }\n.cell.legal { background: var(--legal); border: 2px solid var(--legaledge); }\n.cell.legal .cost { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; color: #064; font-size: 15px; }\n.cell.legal.poor { background: rgba(128, 128, 128, .22); border: 2px dashed #8a8a8a; }\n.cell.legal.poor .cost { color: #6a6a6a; font-size: 12px; text-align: center; }\n.cell.opt::after { content: \"\"; position: absolute; inset: -4px; border: 3px solid var(--opt); pointer-events: none; }\n.cell.optempty { background: rgba(255, 122, 0, .2); border: 2px solid var(--opt); }\n.cell.see::before { content: \"\"; position: absolute; inset: -3px; border: 2px dashed var(--see); pointer-events: none; z-index: 2; }\n.cell.counted::before { background: var(--seefill); border-style: solid; }\n.cell.seenby::after { content: \"\"; position: absolute; inset: -5px; border: 2px solid var(--seenby); pointer-events: none; }\n.cell.focus .card { outline: 3px solid var(--focus); outline-offset: 1px; }\n.boardsizer.claiming, .boardsizer.claiming .cellbtn { cursor: var(--meep), pointer; }\n.boardsizer.claiming .cell:not(.claimable) .cellbtn { cursor: var(--meep), default; }\n\n/* cards */\n.card { position: absolute; inset: 0; color: #111; background: #fff; border: 1px solid #000; box-shadow: 2px 2px 0 rgba(0, 0, 0, .35); padding: 3px 4px; display: flex; flex-direction: column; overflow: hidden; font-size: 11px; line-height: 1.15; }\n.card.s-Sceptre { background: #fff6c2; } .card.s-Goblet { background: #f6dcf2; } .card.s-Sword { background: #ffdad5; }\n.card.s-Bone { background: #ececec; } .card.s-Leaf { background: #dcf2d4; } .card.s-Tome { background: #d9e4ff; }\n.card .top { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }\n.card .nm { font-weight: 700; margin-top: 2px; word-break: break-word; }\n.card .ty { color: #555; font-size: 10px; }\n.card .art { height: 30px; margin: 2px 0; background-size: cover; background-position: center; border: 1px solid rgba(0, 0, 0, .25); }\n.card .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 2px; }\n.card .val { font-weight: 700; }\n.card .meeps { display: flex; gap: 2px; }\n.meep { width: 11px; height: 13px; border: 1px solid #000; border-radius: 5px 5px 1px 1px; display: inline-block; }\n.card .stackn { position: absolute; right: 2px; bottom: 17px; background: #333; color: #fff; font-size: 9px; padding: 0 3px; }\n.card .owc { position: absolute; left: 2px; bottom: 17px; font-size: 9px; padding: 0 2px; background: #fff; border: 1px solid #999; }\n.card .owc.hot { background: #ffd0d0; border-color: #c00; color: #900; font-weight: 700; }\n.card .badge { position: absolute; left: 0; right: 0; bottom: 33px; text-align: center; font-size: 10px; font-weight: 700; }\n.card .badge.curse { background: #5b2a86; color: #fff; }\n.card.ruined { background: repeating-linear-gradient(45deg, #9a9a9a 0 4px, #b4b4b4 4px 8px) !important; color: #222; }\n.card.ruined .nm { text-decoration: line-through; }\n.card.big { position: relative; inset: auto; width: 100%; min-height: 300px; font-size: 13px; line-height: 1.3; padding: 8px 10px; }\n.card.big .ty { font-size: 12px; }\n.card.big .art { height: 120px; }\n.card.big .txt { margin-top: 6px; }\n.card.big .nm { font-size: 16px; }\n.suitico { width: 13px; height: 13px; vertical-align: -2px; }\n.card.big .suitico { width: 18px; height: 18px; }\n\n/* hand */\n.hand { display: flex; gap: 6px; padding: 6px; overflow-x: auto; min-height: 134px; align-items: flex-start; }\n.hcard { position: relative; width: 88px; height: 118px; flex: 0 0 auto; }\n.hcard .cellbtn { z-index: 3; }\n.hcard.sel .card { outline: 3px solid var(--focus); outline-offset: 1px; transform: translateY(-4px); }\n.hcard.blocked .card { opacity: .55; }\n.hcard.pick .card { outline: 3px solid var(--opt); }\n.prompt { padding: 4px 6px; background: var(--tip); color: var(--text); border: 1px solid var(--dk); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }\n\n/* modal */\n.modalbg { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: grid; place-items: center; z-index: 50; padding: 12px; }\n.modal { min-width: 280px; max-width: min(760px, 96vw); max-height: 90vh; display: flex; flex-direction: column; padding: 3px; }\n.modal .body { padding: 10px 12px; overflow: auto; }\n.modal .btns { display: flex; gap: 6px; justify-content: flex-end; padding: 0 12px 10px; flex-wrap: wrap; }\n\n/* tables */\ntable.list { border-collapse: collapse; width: 100%; background: var(--field); }\ntable.list th { position: sticky; top: 0; text-align: left; font-weight: 400; padding: 2px 6px; background: var(--face); border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); cursor: pointer; }\ntable.list td { padding: 2px 6px; white-space: nowrap; border-bottom: 1px dotted var(--lo); }\ntable.list tr.sel td { background: var(--sel); color: var(--seltext); }\ntable.list tr { cursor: default; }\n\n/* two-column pages (library, card builder) and forms */\n.split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 4px; }\n@media (max-width: 800px) { .split { grid-template-columns: 1fr; } }\n.form { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 5px 8px; align-items: center; }\n.form > .full { grid-column: 1 / -1; }\n.help { max-width: 78ch; }\n.help h2 { font-size: 15px; margin: 14px 0 4px; }\n.help p, .help li { margin: 4px 0; }\n.kbd { border: 1px solid var(--lo); padding: 0 4px; background: var(--field); }\n.banner { padding: 6px 8px; background: var(--tip); color: var(--text); border: 1px solid var(--dk); }\n\n.form select { max-width: 360px; }\n\n/* hand cards at reading size */\n.hand { min-height: 224px; }\n.hcard { width: 150px; height: 206px; }\n.card .txt.mid { margin-top: 4px; font-size: 11.5px; line-height: 1.25; }\n.hand .card .nm { font-size: 12.5px; }\n\n/* hover magnifier */\n.hovercard { position: fixed; z-index: 70; width: 250px; pointer-events: none; display: none; filter: drop-shadow(3px 3px 0 rgba(0, 0, 0, .4)); }\n.hovercard .card.big { min-height: 0; }\n.hovercard .hovinfo { background: var(--tip); color: var(--text); border: 1px solid var(--dk); border-top: 0; padding: 4px 8px; font-size: 12px; }\n\n/* ability available */\n.cell.ready .card { box-shadow: 0 0 0 4px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }\n\n/* overlays */\n.cell.ovl-dim .card { opacity: .3; }\n.cell.ovl-on .card { box-shadow: 0 0 0 4px #ffcc00, 2px 2px 0 rgba(0, 0, 0, .35); }\n.ovl { position: absolute; inset: 22px 2px auto; z-index: 3; pointer-events: none; text-align: center; font-size: 26px; font-weight: 700; color: #000; background: rgba(255, 255, 255, .85); border: 2px solid #000; padding: 2px 0; line-height: 1.05; }\n.ovl span { display: block; font-size: 10px; font-weight: 400; }\n\n/* log colors */\n.loglegend { font-size: 11px; padding-bottom: 3px; border-bottom: 1px solid var(--lo); margin-bottom: 2px; display: flex; flex-wrap: wrap; gap: 6px; }\n.lg-play { color: #1f4fd1; } .lg-claim { color: #137a30; } .lg-ap { color: #9a5b00; } .lg-vp { color: #a07400; font-weight: 700; }\n.lg-ruin { color: #b01010; } .lg-curse { color: #6a2a9a; } .lg-card { color: #555; } .lg-ref { color: #777; font-style: italic; }\n.lg-win { color: #fff; background: #137a30; font-weight: 700; padding: 1px 3px; }\n.log div.turn { color: #000080; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .lg-play { color: #8fb0ff; } :root:not([data-theme=\"light\"]) .lg-claim { color: #6fdc8c; } :root:not([data-theme=\"light\"]) .lg-ap { color: #f2b35c; } :root:not([data-theme=\"light\"]) .lg-vp { color: #ffd54a; } :root:not([data-theme=\"light\"]) .lg-ruin { color: #ff7b7b; } :root:not([data-theme=\"light\"]) .lg-curse { color: #d2a0ff; } :root:not([data-theme=\"light\"]) .lg-card { color: #bdbdbd; } :root:not([data-theme=\"light\"]) .lg-ref { color: #a8a8a8; } :root:not([data-theme=\"light\"]) .log div.turn { color: #a9c1ff; } }\n:root[data-theme=\"dark\"] .lg-play { color: #8fb0ff; } :root[data-theme=\"dark\"] .lg-claim { color: #6fdc8c; } :root[data-theme=\"dark\"] .lg-ap { color: #f2b35c; } :root[data-theme=\"dark\"] .lg-vp { color: #ffd54a; } :root[data-theme=\"dark\"] .lg-ruin { color: #ff7b7b; } :root[data-theme=\"dark\"] .lg-curse { color: #d2a0ff; } :root[data-theme=\"dark\"] .lg-card { color: #bdbdbd; } :root[data-theme=\"dark\"] .lg-ref { color: #a8a8a8; } :root[data-theme=\"dark\"] .log div.turn { color: #a9c1ff; }\n.ovl b { display: block; }\n.ovl .who { display: block; font-size: 10px; font-weight: 400; }\n.tok { display: inline-block; background: #ffd54a; color: #000; border: 1px solid #8a6a00; border-radius: 9px; padding: 0 6px; font-weight: 700; }\n.ovl .tok { font-size: 16px; margin-top: 2px; }\n/* full-card overlays (Quickview, War): cover the card, no names */\n.cell.ovl-on.ovl-full .card { box-shadow: 2px 2px 0 rgba(0, 0, 0, .35); }\n.ovl.full { inset: 0; border: 1px solid #000; padding: 4px; background: #fff; display: flex; flex-direction: column; justify-content: center; gap: 2px; }\n.ovl.quick .qv { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }\n.ovl.quick .qv + .qv { border-top: 1px dotted #999; padding-top: 3px; margin-top: 2px; }\n.ovl.quick .qv b { font-size: 24px; }\n.ovl.quick .qv:only-child b { font-size: 28px; }\n.ovl.war { justify-content: stretch; }\n.ovl.war .strip { flex: 1; border: 1px solid rgba(0, 0, 0, .45); background: rgba(0, 0, 0, .06); }\n.ovl.war .wn { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; color: #000; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; }\n.ovl.war.safe { justify-content: center; }\n.ovl.war.safe .wn { font-size: 14px; position: static; }\n.ovl.war.hot { outline: 3px solid #c00; outline-offset: 1px; }\n.hcard .freetag { position: absolute; left: 4px; right: 4px; top: 40%; z-index: 2; background: #19e619; color: #000; border: 1px solid #000; text-align: center; font-weight: 700; font-size: 11px; pointer-events: none; }\n\n/* ---------- type scale: important things are bigger ---------- */\nbody { font-size: 13px; }\n.titlebar { font-size: 15px; }\n.tab { font-size: 15px; padding: 3px 12px; }\n.prompt { font-size: 14px; }\n.btn.big { font-size: 16px; padding: 4px 16px; min-height: 34px; font-weight: 700; }\n.btn.def { font-weight: 700; }\n.bignum { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: .5px; }\n.bignum .unit { font-size: 20px; margin-left: 2px; }\n.panelhead { font-size: 13px; }\n.hand + .row, .bottom .row.small b { font-size: 14px; }\n.pix { image-rendering: pixelated; display: block; }\n.pix.jar { width: 60px; height: 72px; flex: 0 0 auto; }\n.pix.pile { width: 84px; height: 58px; flex: 0 0 auto; }\n.apbox { display: flex; gap: 10px; align-items: flex-end; }\n.claimstate { margin-top: 4px; font-size: 13px; color: var(--muted); }\n.claimstate.avail { color: #137a30; font-weight: 700; }\n.plist { display: flex; flex-direction: column; gap: 4px; }\n.pcard { border: 1px solid var(--lo); padding: 3px 5px; background: var(--field); }\n.pcard.cur { border: 2px solid var(--sel); box-shadow: inset 0 0 0 1px var(--hi); }\n.pcard.out { opacity: .45; }\n.pname { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 14px; }\n.turnmark { margin-left: auto; background: var(--sel); color: var(--seltext); padding: 0 5px; font-size: 12px; }\n.pbody { display: flex; align-items: flex-end; gap: 8px; }\n.pstats { min-width: 0; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .claimstate.avail { color: #6fdc8c; } }\n:root[data-theme=\"dark\"] .claimstate.avail { color: #6fdc8c; }\n\n/* ---------- QoL: affordable cards, aiming, effects ---------- */\n.hcard.afford .card { box-shadow: 0 0 0 3px #19e619, 2px 2px 0 rgba(0, 0, 0, .35); }\n.hcard.afford.sel .card { box-shadow: 0 0 0 3px #19e619, 0 0 0 6px var(--focus); outline: none; }\n.boardsizer.aiming, .boardsizer.aiming .cellbtn { cursor: var(--sword), crosshair; }\n/* animation layer (FX in ui.js) */\n.fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }\n.fx { position: fixed; left: 0; top: 0; }\n.fx.shard { border: 1px solid rgba(0, 0, 0, .35); }\n.fx.dust { width: 8px; height: 8px; background: rgba(140, 130, 115, .55); border-radius: 50%; }\n.fx.gem { width: 8px; height: 6px; border: 1px solid #000; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .6); }\n.fx.marble { width: 7px; height: 7px; border-radius: 50%; border: 1px solid #000; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, .6); }\n.fx.pop { font-weight: 700; font-size: 20px; white-space: nowrap; padding: 1px 6px; border: 2px solid #000; background: #fff; color: #000; }\n.fx.pop.vp { background: #ffe58a; }\n.fx.pop.ap { background: #cfe0ff; }\n.fx.pop.ruin { background: #ffd0d0; color: #900; }\n\n/* Foundations: deeper suit color and a raised bevel */\n.card.found { border: 3px solid; border-color: rgba(255,255,255,.85) rgba(0,0,0,.65) rgba(0,0,0,.65) rgba(255,255,255,.85); box-shadow: inset -2px -2px 0 rgba(0,0,0,.25), inset 2px 2px 0 rgba(255,255,255,.45), 2px 2px 0 rgba(0,0,0,.45); }\n.card.found.s-Sceptre { background: #f0d45c; } .card.found.s-Goblet { background: #dea0d4; } .card.found.s-Sword { background: #f19a8e; }\n.card.found.s-Bone { background: #c4c4c4; } .card.found.s-Leaf { background: #a9db97; } .card.found.s-Tome { background: #a1bbf0; }\n.card.found .nm { letter-spacing: .3px; }\n.card.found.ruined { background: repeating-linear-gradient(45deg, #7d7d7d 0 4px, #9a9a9a 4px 8px) !important; }\n\n/* suit icons: each suit has its own dark color */\n.suitico { width: 15px; height: 15px; }\n.si-Sceptre { color: #8a6500; } .si-Goblet { color: #86206f; } .si-Sword { color: #9b1c10; }\n.si-Bone { color: #2e2e2e; } .si-Leaf { color: #1e6b1e; } .si-Tome { color: #1b3f91; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .suitico.si-Sceptre { color: #f2c94c; } :root:not([data-theme=\"light\"]) .suitico.si-Goblet { color: #f29ade; } :root:not([data-theme=\"light\"]) .suitico.si-Sword { color: #ff8a7a; } :root:not([data-theme=\"light\"]) .suitico.si-Bone { color: #e0e0e0; } :root:not([data-theme=\"light\"]) .suitico.si-Leaf { color: #7fd67f; } :root:not([data-theme=\"light\"]) .suitico.si-Tome { color: #8fb0ff; } }\n:root[data-theme=\"dark\"] .suitico.si-Sceptre { color: #f2c94c; } :root[data-theme=\"dark\"] .suitico.si-Goblet { color: #f29ade; } :root[data-theme=\"dark\"] .suitico.si-Sword { color: #ff8a7a; } :root[data-theme=\"dark\"] .suitico.si-Bone { color: #e0e0e0; } :root[data-theme=\"dark\"] .suitico.si-Leaf { color: #7fd67f; } :root[data-theme=\"dark\"] .suitico.si-Tome { color: #8fb0ff; }\n.card .suitico.si-Sceptre { color: #8a6500 !important; } .card .suitico.si-Goblet { color: #86206f !important; } .card .suitico.si-Sword { color: #9b1c10 !important; }\n.card .suitico.si-Bone { color: #2e2e2e !important; } .card .suitico.si-Leaf { color: #1e6b1e !important; } .card .suitico.si-Tome { color: #1b3f91 !important; }\n.card.big .suitico { width: 22px; height: 22px; }\n\n/* defense tokens and Ascension */\n.card .defb { position: absolute; right: 2px; top: 30px; background: transparent; border: 0; color: #1b3f91; font-size: 10px; font-weight: 700; padding: 0 2px; display: inline-flex; align-items: center; gap: 1px; }\n.card .ascb { position: absolute; left: 0; right: 0; bottom: 33px; text-align: center; font-size: 10px; font-weight: 700; color: #fff; background: linear-gradient(90deg, #d0123a, #e0a400, #1aa35a, #1d5fd6, #8a2be2); }\n.card.ascended { background: linear-gradient(120deg, #ffd6e0, #fff2b3, #d6ffd9, #d4e6ff, #ecd6ff, #ffd6e0) !important; background-size: 300% 300% !important; animation: poly 4s linear infinite; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #8a2be2, 2px 2px 0 rgba(0, 0, 0, .35); }\n@keyframes poly { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }\n@media (prefers-reduced-motion: reduce) { .card.ascended { animation: none; } }\n.fx.pop.asc { background: linear-gradient(90deg, #ffd6e0, #fff2b3, #d6ffd9, #d4e6ff, #ecd6ff); }\n.fx.pop.def { background: #d4e6ff; color: #1b3f91; }\n\n/* weak-suit cards in discard choices */\n.hcard.weak .card { filter: grayscale(1); opacity: .55; }\n.hcard.weak.pick .card { opacity: .8; }\n.hcard .weaktag { position: absolute; left: 4px; right: 4px; top: 40%; z-index: 2; background: #808080; color: #fff; border: 1px solid #000; text-align: center; font-size: 11px; font-weight: 700; pointer-events: none; }\n/* burying: suit cursor, dashed border where suits differ */\n.boardsizer.burying, .boardsizer.burying .cellbtn { cursor: var(--bury), copy; }\n.cell.opt.optdash::after { border-style: dashed; }\n/* stacked shields */\n.card .defb { padding: 1px 2px; gap: 2px; }\n.card .defb b { font-size: 10px; }\n/* ● orbs: ghostly mint glow; ◇ gems: cut-stone diamonds */\n.fx.marble { width: 9px; height: 9px; border: 0; background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, #b6ffe4 35%, rgba(127,245,201,.75) 60%, rgba(127,245,201,0) 72%) !important; box-shadow: 0 0 8px 3px rgba(127,245,201,.75), 0 0 16px 6px rgba(127,245,201,.35); border-radius: 50%; }\n.fx.gem { width: 9px; height: 9px; border: 1px solid rgba(0,0,0,.7); clip-path: polygon(50% 0, 100% 38%, 50% 100%, 0 38%); box-shadow: inset 2px 2px 0 rgba(255,255,255,.65), inset -2px -2px 0 rgba(0,0,0,.25); }\n.pix.jar { filter: drop-shadow(0 0 3px rgba(127,245,201,.55)); }\n\n/* Curses: purple flame flare, then a soft steady glow */\n.card.cursed { box-shadow: 0 0 0 2px #8a3ff0, 0 0 10px 3px rgba(150, 70, 255, .55), 2px 2px 0 rgba(0, 0, 0, .35); }\n.fx.flare { border: 3px solid #a24bff; border-radius: 3px; }\n.fx.flame { width: 8px; height: 12px; border-radius: 50% 50% 40% 40% / 70% 70% 30% 30%; background: radial-gradient(circle at 50% 70%, #fff 0 15%, #e3a6ff 30%, #a24bff 60%, rgba(120, 30, 220, 0) 75%); }\n.fx.pop.curse { background: #5b2a86; color: #fff; }\n.reserve { margin-top: 3px; font-size: 14px; font-weight: 700; color: #9b1c10; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .reserve { color: #ff8a7a; } }\n:root[data-theme=\"dark\"] .reserve { color: #ff8a7a; }\n.card .bonusb { position: absolute; left: 2px; bottom: 16px; background: #fff; border: 1px solid #555; color: #000; font-size: 10px; font-weight: 700; padding: 0 2px; }\n\n/* ---------- public site: home, online pages, profiles ---------- */\ninput[type=password] { background: var(--field); border: 2px solid; border-color: var(--lo) var(--hi) var(--hi) var(--lo); box-shadow: inset 1px 1px var(--dk); padding: 2px 4px; }\n.linkbtn { background: none; border: 0; padding: 0; color: var(--sel); text-decoration: underline; cursor: pointer; font: inherit; }\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .linkbtn { color: #9ab8ff; } }\n:root[data-theme=\"dark\"] .linkbtn { color: #9ab8ff; }\n.home { max-width: 820px; margin: 0 auto; padding: 16px; }\n.home h1 { font-size: 34px; margin: 4px 0 6px; }\n.home > p { font-size: 15px; }\n.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 16px 0; }\n.choice { padding: 12px 14px; }\n.choice h2 { margin: 0 0 6px; font-size: 20px; }\n.choice p { min-height: 3.2em; }\n.online { max-width: 900px; }\n.online h2 { margin: 0; font-size: 18px; }\n.row.spread { justify-content: space-between; margin-bottom: 6px; }\n.split2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin-top: 8px; }\n.tag { font-size: 11px; padding: 0 5px; border: 1px solid var(--lo); background: var(--field); }\n.tag.off { color: #9b1c10; border-color: #9b1c10; }\n.code { font-size: 16px; letter-spacing: 2px; background: var(--field); border: 1px solid var(--lo); padding: 0 6px; }\n.codein { width: 110px; text-transform: uppercase; letter-spacing: 2px; }\n.archpick { display: flex; flex-wrap: wrap; gap: 8px; }\n.archpick .hcard .card { cursor: pointer; }\n.archpick .archtag { position: absolute; left: 0; right: 0; bottom: -2px; text-align: center; font-size: 11px; font-weight: 700; background: var(--face); border: 1px solid var(--dk); z-index: 2; }\n.stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }\n.stat { padding: 8px 14px; min-width: 130px; }\n.won { color: #137a30; }\ntable.list td.wrap { white-space: normal; }\ntable.keys td { white-space: normal; }\ntable.keys td:first-child { width: 110px; }\n\n/* ---------- drag and drop ---------- */\n.hcard { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }\n.draglayer { position: fixed; inset: 0; pointer-events: none; z-index: 95; }\n.dragghost { position: fixed; left: 0; top: 0; width: 88px; height: 118px; opacity: .93; filter: drop-shadow(4px 6px 0 rgba(0, 0, 0, .35)); }\n.dragghost.meepghost { width: 30px; height: 34px; display: grid; place-items: center; }\n.dragghost.meepghost .meep { width: 22px; height: 26px; border-radius: 10px 10px 2px 2px; }\n.dragghost:not([data-tip=\"\"])::after { content: attr(data-tip); position: absolute; left: 50%; top: -26px; transform: translateX(-50%); background: var(--tip); color: var(--text); border: 1px solid #000; padding: 1px 6px; font-size: 12px; white-space: nowrap; }\n.dropzone { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); max-width: 90vw; padding: 12px 16px; background: var(--face); color: var(--text); border: 2px dashed #000; font-weight: 700; text-align: center; }\n.dropzone.drophover { background: #ffd0d0; color: #000; }\n.cell.drophover { outline: 4px solid var(--focus); outline-offset: 2px; z-index: 4; }\nbody.dragging, body.dragging * { cursor: grabbing !important; user-select: none; }\n.meepchip { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; width: 30px; height: 30px; border: 2px solid var(--dk); background: var(--field); cursor: grab; touch-action: none; }\n.meepchip .meep { width: 14px; height: 17px; }\n\n/* ---------- phones: the game screen (gamePageMobile) ---------- */\n@media (max-width: 900px), (max-height: 520px) {\n  body { touch-action: manipulation; }\n  .win.mwin { inset: 0; padding: 0; border: 0; box-shadow: none; }\n  .win.mwin > .titlebar, .win.mwin > .menubar, .win.mwin > .statusbar { display: none; }\n  .page.mgame { position: relative; padding: 0; gap: 0; overflow: hidden; }\n  .mtop { display: flex; align-items: center; gap: 6px; padding: 4px 6px; padding-top: max(4px, env(safe-area-inset-top, 0px)); }\n  .mtop .mname { max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n  .mtop .mstat { font-size: 16px; font-weight: 700; white-space: nowrap; }\n  .mtop .grow { flex: 1; }\n  .mgame .btn { min-height: 40px; min-width: 40px; padding: 0 10px; }\n  .mgame .prompt { font-size: 13px; padding: 4px 6px; }\n  .mgame .boardwrap { flex: 1; min-height: 0; touch-action: none; }\n  .mhand { flex: 0 0 auto; }\n  .mhand .hand { min-height: 0; padding: 4px 6px 6px; gap: 6px; }\n  .mhand .hcard { width: 104px; height: 142px; touch-action: pan-x; }\n  .mhand .card .txt.mid { font-size: 10px; line-height: 1.15; }\n  .mhand .row.small { padding: 2px 6px 0; font-size: 12px; }\n  .mtabs { display: flex; gap: 4px; padding: 4px; padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)); background: var(--face); border-top: 2px solid var(--hi); }\n  .mtabs .btn { flex: 1; }\n  .msheet { position: absolute; left: 0; right: 0; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); max-height: 62%; overflow: auto; z-index: 30; padding: 6px; }\n  .msheet .log { max-height: 50vh; }\n  .msheet .boardbar { border: 0; box-shadow: none; padding: 0; background: none; }\n  .msheet .card.big { min-height: 0; }\n  .modal { max-height: 92vh; }\n}\n/* a phone held sideways: a shorter hand strip */\n@media (max-height: 520px) {\n  .mhand .hcard { width: 78px; height: 106px; }\n  .mhand .card .txt.mid, .mhand .row.small { display: none; }\n}\n\n/* ---------- QC fixes ---------- */\n/* short desktop windows: the left column scrolls instead of spilling past the window */\n.gamegrid > .left { overflow: auto; }\n.gamegrid > .left .log { min-height: 120px; }\n/* Quickview totals: a light chip so each player's colour reads in dark mode too */\n.qtot { background: #fff; border: 1px solid #000; padding: 0 5px; }\n/* short desktop screens: give the board the room (the highlight legend is on the Help page) */\n@media (min-width: 901px) and (max-height: 800px) {\n  .boardbar .legend { display: none; }\n  .bottom .hand { min-height: 0; }\n  .bottom .hcard { width: 128px; height: 176px; }\n  .bottom .card .txt.mid { font-size: 10.5px; }\n}\n\na.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }\n.appbox { margin: 0 0 12px; }\n.guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }\n\n/* ---------- placement chevrons: green = this card would pressure that one, red = that one would pressure this card ---------- */\n.chev { position: absolute; width: 6px; height: 20px; z-index: 3; pointer-events: none; opacity: .8; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 50% 0, 100% 50%, 50% 100%, 0 100%, 50% 50%); }\n.chev.g { background: #16b416; } .chev.r { background: #e01010; }\n.cell.legal:hover .chev, .cell.drophover .chev { opacity: 1; }\n/* Overwhelm pressure: chevrons in the gutter between cards (pressMarks in ui.js), the same shape as the placement ones.\n   They point at the pressured card; .hot = that card is one step from Overwhelm; .dg = a Foundation's diagonal. */\n.gchev { position: absolute; width: 6px; height: 20px; z-index: 3; pointer-events: none; opacity: .85; filter: drop-shadow(0 0 1px #000); clip-path: polygon(0 0, 50% 0, 100% 50%, 50% 100%, 0 100%, 50% 50%); }\n.gchev.hot { width: 8px; height: 26px; opacity: 1; }\n.gchev.dg { width: 5px; height: 14px; } .gchev.dg.hot { width: 6px; height: 18px; }\n.chev.d-E { right:3px;top:50%;margin-top:-10px; } .chev.g.d-E { transform: rotate(0deg); } .chev.r.d-E { transform: rotate(180deg); }\n.chev.g.both.d-E { margin-top:-22px; } .chev.r.both.d-E { margin-top:2px; }\n.chev.d-SE { bottom:1px;right:8px; } .chev.g.d-SE { transform: rotate(45deg); } .chev.r.d-SE { transform: rotate(225deg); }\n.chev.g.both.d-SE { right:2px;bottom:6px; } .chev.r.both.d-SE { right:14px;bottom:-4px; }\n.chev.d-S { bottom:-4px;left:50%;margin-left:-3px; } .chev.g.d-S { transform: rotate(90deg); } .chev.r.d-S { transform: rotate(270deg); }\n.chev.g.both.d-S { margin-left:-15px; } .chev.r.both.d-S { margin-left:9px; }\n.chev.d-SW { bottom:1px;left:8px; } .chev.g.d-SW { transform: rotate(135deg); } .chev.r.d-SW { transform: rotate(315deg); }\n.chev.g.both.d-SW { left:2px;bottom:6px; } .chev.r.both.d-SW { left:14px;bottom:-4px; }\n.chev.d-W { left:3px;top:50%;margin-top:-10px; } .chev.g.d-W { transform: rotate(180deg); } .chev.r.d-W { transform: rotate(360deg); }\n.chev.g.both.d-W { margin-top:-22px; } .chev.r.both.d-W { margin-top:2px; }\n.chev.d-NW { top:1px;left:8px; } .chev.g.d-NW { transform: rotate(-135deg); } .chev.r.d-NW { transform: rotate(45deg); }\n.chev.g.both.d-NW { left:14px;top:-4px; } .chev.r.both.d-NW { left:2px;top:6px; }\n.chev.d-N { top:-4px;left:50%;margin-left:-3px; } .chev.g.d-N { transform: rotate(-90deg); } .chev.r.d-N { transform: rotate(90deg); }\n.chev.g.both.d-N { margin-left:-15px; } .chev.r.both.d-N { margin-left:9px; }\n.chev.d-NE { top:1px;right:8px; } .chev.g.d-NE { transform: rotate(-45deg); } .chev.r.d-NE { transform: rotate(135deg); }\n.chev.g.both.d-NE { right:14px;top:-4px; } .chev.r.both.d-NE { right:2px;top:6px; }\n/* the suit wheel */\n.wheelbox { max-width: 460px; }\n.suitwheel { width: 100%; max-width: 420px; display: block; margin: 4px auto; color: var(--text); }\n.suitwheel line.arch { stroke: currentColor; stroke-width: 2.2; } .suitwheel line.sword { stroke: #b01010; stroke-width: 1.6; stroke-dasharray: 5 4; }\n.suitwheel .wh-head.arch { fill: currentColor; } .suitwheel .wh-head.sword { fill: #b01010; }\n.suitwheel .wh-node circle { fill: #fff; stroke: currentColor; stroke-width: 2; }\n.suitwheel .wh-name { font-size: 13px; font-weight: 700; fill: currentColor; } .suitwheel .wh-arch { font-size: 11px; fill: var(--muted); }\n\n/* ---------- a light medieval touch: Fraktur logo, crest, blackletter headings, pixel ornaments ---------- */\n.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }\n.pix { display: block; flex: 0 0 auto; }\n/* the logo is a 140 x 30 bitmap, shown at whole multiples (3x, 2x on phones) so its pixels stay square */\nh1.logo { width: 420px; max-width: 100%; aspect-ratio: 140 / 30; margin: 6px auto 0; background: var(--logo) no-repeat center / contain; image-rendering: pixelated; }\nh1.logo.small { width: 280px; }\n@media (max-width: 460px) { h1.logo { width: 280px; } }\n.fleuron { display: flex; justify-content: center; margin: 2px 0 12px; }\n.titlebar .crest { margin-right: 2px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .45)); }\n/* section headings in a pixel blackletter; user-chosen names stay in the plain font */\nh2:not(.plain) { font-family: \"Jacquard 24\", \"DotGothic16\", serif; font-weight: 400; font-size: 26px; letter-spacing: .3px; line-height: 1.05; }\n.help h2:not(.plain) { font-size: 24px; margin: 16px 0 4px; }\n.online h2:not(.plain) { font-size: 26px; }\n/* Win95 message-box layout: an icon on the left, the text beside it */\n.msgbox { display: flex; gap: 14px; align-items: flex-start; }\n.msgbox .pix { margin-top: 2px; }\n.msgbox p:first-child { margin-top: 0; }\n.prompt.winner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }\n.prompt.winner b { font-family: \"Jacquard 24\", \"DotGothic16\", serif; font-weight: 400; font-size: 26px; }\n/* the board in light mode: a faded vellum war-table instead of grey paper */\n/* the board's backdrop is a dithered night landscape, painted by paintScene in ui.js; these are its tones before it's drawn */\n.boardwrap { background: #c9c9c9 no-repeat 0 0; image-rendering: pixelated; }\n.boardsizer { image-rendering: auto; }   /* the pixelated setting is for the backdrop only */\n@media (prefers-color-scheme: dark) { :root:not([data-theme=\"light\"]) .boardwrap { background-color: #262a2a; } }\n:root[data-theme=\"dark\"] .boardwrap { background-color: #262a2a; }\n";
@@ -4094,14 +4154,14 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   var app = {
     doc: null,                       // { w, h, layers: [{ name, visible, opacity, locked, data }], active }
     style: prefs.style || D.defaultStyle(),
-    tool: prefs.tool || 'brush', size: prefs.size || 1, round: prefs.round !== false, shape: prefs.shape || 'fill', mirror: false,
+    tool: prefs.tool || 'brush', size: prefs.size || 1, round: prefs.round !== false, shape: prefs.shape || 'fill', snap: !!prefs.snap, mirror: false, sheet: null,
     sampleAll: !!prefs.sampleAll, tol: prefs.tol || 0, gradTarget: prefs.gradTarget || 'layer',
     zoom: 4, panX: 0, panY: 0, grid: prefs.grid !== false, bg: prefs.bg || 'checker',
     rampSel: 0, palette: prefs.palette || 'kartenspiel', custom: prefs.custom || [], userPresets: prefs.userPresets || [], shut: prefs.shut || {},
     undo: [], redo: [], name: 'Untitled', dirty: false, hover: null
   };
   function savePrefs() {
-    lsSet('dithry.prefs', { style: app.style, tool: app.tool, size: app.size, round: app.round, shape: app.shape, sampleAll: app.sampleAll, tol: app.tol, gradTarget: app.gradTarget,
+    lsSet('dithry.prefs', { style: app.style, tool: app.tool, size: app.size, round: app.round, shape: app.shape, snap: app.snap, sampleAll: app.sampleAll, tol: app.tol, gradTarget: app.gradTarget,
       grid: app.grid, bg: app.bg, palette: app.palette, custom: app.custom, userPresets: app.userPresets, shut: app.shut });
   }
   function W() { return app.doc.w; } function H() { return app.doc.h; }
@@ -4166,11 +4226,15 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   ];
   function shellHTML() {
     var h = '<div class="win raised"><div class="titlebar"><svg width="16" height="16" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="1" width="14" height="14" fill="#fff" stroke="#000"/><path d="M2 2h12v3H2z" fill="#1c1f3a"/><path d="M2 5h2v1H2zM6 5h2v1H6zM10 5h2v1h-2zM4 6h2v1H4zM8 6h2v1H8zM12 6h2v1h-2zM2 7h2v1H2zM6 7h2v1H6zM10 7h2v1h-2zM4 9h2v1H4zM10 9h2v1h-2z" fill="#1c1f3a"/></svg><span id="title">Dithry</span><span class="grow"></span><span class="tip small" style="font-weight:400">Pixel Art and Dithered Gradient Tool</span></div>';
+    h += '<div class="mtop"><button class="btn mb" data-m="menu" aria-label="Menu">☰</button><span class="mname" id="mname"></span><span class="grow"></span>' +
+      '<button class="btn mb" data-m="undo" aria-label="Undo" title="Undo (or tap with two fingers)">↶</button><button class="btn mb" data-m="redo" aria-label="Redo" title="Redo (or tap with three fingers)">↷</button><button class="btn mb" data-m="fit" aria-label="Fit to the screen">⤢</button></div>';
     h += '<div class="menubar">' + MENUS.map(function (m) { return '<div class="mi" data-menu="' + m.id + '"><button>' + m.name + '</button><div class="menu raised">' +
       m.items.map(function (it) { return it === '-' ? '<hr>' : '<button data-cmd="' + it[0] + '"><span>' + esc(it[1]) + '</span><span class="k">' + esc(it[2] || '') + '</span></button>'; }).join('') + '</div></div>'; }).join('') + '</div>';
     h += '<div class="main"><div class="toolbox raised"><div class="tools">' + TOOLS.map(function (t) { return '<button class="btn tool" data-tool="' + t.id + '" title="' + esc(t.name + ' (' + t.key + ')') + '" aria-label="' + esc(t.name) + '">' + t.icon + '</button>'; }).join('') + '</div><div class="opts" id="opts"></div></div>';
-    h += '<div class="work sunken" id="work"><canvas id="art"></canvas><canvas id="over"></canvas></div>';
+    h += '<div class="work sunken" id="work"><canvas id="art"></canvas><canvas id="over"></canvas>' +
+      '<div class="polybar raised" id="polybar"><button class="btn" data-poly="done">✓ Finish</button><button class="btn" data-poly="back">⌫ Last point</button><button class="btn" data-poly="cancel">✕ Cancel</button></div></div>';
     h += '<div class="side" id="side"></div></div>';
+    h += '<div class="mtabs" id="mtabs"></div>';
     h += '<div class="statusbar"><div class="sunken" id="sPos" style="width:96px">–</div><div class="sunken" id="sSize" style="width:96px"></div><div class="sunken" id="sZoom" style="width:70px"></div><div class="sunken grow" id="sHint"></div></div></div>';
     return h;
   }
@@ -4180,11 +4244,12 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     var t = app.tool, h = '<div class="lbl">' + esc(TOOL[t].name) + '</div>';
     if (/^(brush|eraser|line|rect|ellipse|polygon|lasso)$/.test(t)) {
       var outline = /^(rect|ellipse|polygon|lasso)$/.test(t) && app.shape === 'outline';
-      if (/^(brush|eraser|line)$/.test(t) || outline) h += '<label>Size <input type="number" min="1" max="64" value="' + app.size + '" data-opt="size" style="width:46px"></label><label><input type="checkbox" data-opt="round"' + (app.round ? ' checked' : '') + '> Round</label>';
+      if (/^(brush|eraser|line)$/.test(t) || outline) h += '<label class="sizer">Size <input type="range" min="1" max="32" value="' + Math.min(32, app.size) + '" data-opt="size" aria-label="Size"><b data-optv="size">' + app.size + '</b></label><label><input type="checkbox" data-opt="round"' + (app.round ? ' checked' : '') + '> Round</label>';
       if (/^(rect|ellipse|polygon|lasso)$/.test(t)) h += '<label><select data-opt="shape"><option value="fill"' + (app.shape === 'fill' ? ' selected' : '') + '>Filled</option><option value="outline"' + (app.shape === 'outline' ? ' selected' : '') + '>Outline</option></select></label>';
     }
     if (t === 'fill') h += '<label>Match ± <input type="number" min="0" max="255" value="' + app.tol + '" data-opt="tol" style="width:46px"></label><label><input type="checkbox" data-opt="sampleAll"' + (app.sampleAll ? ' checked' : '') + '> All layers</label>';
     if (t === 'gradient') h += '<label><select data-opt="gradTarget"><option value="layer"' + (app.gradTarget === 'layer' ? ' selected' : '') + '>Whole layer</option><option value="region"' + (app.gradTarget === 'region' ? ' selected' : '') + '>Area under start</option></select></label><div class="small muted">Uses the Gradient panel’s type, softness and ripples.</div>';
+    if (/^(line|rect|ellipse|polygon|gradient)$/.test(t)) h += '<label title="The same as holding Shift"><input type="checkbox" data-opt="snap"' + (app.snap ? ' checked' : '') + '> ' + (/^(rect|ellipse)$/.test(t) ? 'Square / circle' : 'Snap to 45°') + '</label>';
     if (/^(pencil|brush|eraser|line|rect|ellipse|polygon|lasso)$/.test(t)) h += '<label><input type="checkbox" data-opt="mirror"' + (app.mirror ? ' checked' : '') + '> Mirror</label>';
     return h;
   }
@@ -4201,20 +4266,22 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     return '<div class="ctl"><span>' + esc(label) + '</span><select data-k="' + k + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(o[0]) === String(v) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></div>';
   }
   function check(k, label) { return '<label class="row"><input type="checkbox" data-k="' + k + '"' + (getPath(app.style, k) ? ' checked' : '') + '> ' + esc(label) + '</label>'; }
-  function panel(id, title, body, extra) { return '<div class="panel raised' + (app.shut[id] ? ' shut' : '') + '" data-panel="' + id + '"><div class="ph"><span>' + (app.shut[id] ? '▸' : '▾') + '</span><span class="grow">' + esc(title) + '</span>' + (extra || '') + '</div><div class="pb">' + body + '</div></div>'; }
+  function panel(id, title, body, extra) { var shut = app.shut[id] && !mobile(); return '<div class="panel raised' + (shut ? ' shut' : '') + '" data-panel="' + id + '"><div class="ph"><span>' + (shut ? '▸' : '▾') + '</span><span class="grow">' + esc(title) + '</span>' + (extra || '') + '</div><div class="pb">' + body + '</div></div>'; }
   function swatchBG(c, a) { var x = D.rgba(c, a); return 'rgba(' + x[0] + ',' + x[1] + ',' + x[2] + ',' + (x[3] / 255).toFixed(3) + ')'; }
 
+  // On a phone the panels open one group at a time, in a sheet over the canvas (app.sheet; the tabs at the bottom).
+  var SHEETS = { tool: 'Tool', colours: 'Colour', style: 'Style', layers: 'Layers', card: 'Card', menu: 'Menu' };
   function sideHTML() {
-    var st = app.style, g = st.grad, h = '';
+    var st = app.style, g = st.grad, h = '', P = {};
     // style: preview, mode, presets
     var pres = '<option value="">Style presets…</option><optgroup label="Kartenspiel">' + D.PRESETS.map(function (p, i) { return '<option value="b' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' +
       (app.userPresets.length ? '<optgroup label="Yours">' + app.userPresets.map(function (p, i) { return '<option value="u' + i + '">' + esc(p.name) + '</option>'; }).join('') + '</optgroup>' : '');
-    h += panel('style', 'Style', '<canvas id="preview" width="150" height="28" aria-label="Preview of the current style"></canvas>' +
+    P.style = panel('style', 'Style', '<canvas id="preview" width="150" height="28" aria-label="Preview of the current style"></canvas>' +
       '<div class="row"><label><input type="radio" name="mode" data-mode="gradient"' + (st.mode !== 'solid' ? ' checked' : '') + '> Dithered gradient</label><label><input type="radio" name="mode" data-mode="solid"' + (st.mode === 'solid' ? ' checked' : '') + '> Solid</label></div>' +
       '<div class="row"><select data-act="preset" style="flex:1">' + pres + '</select><button class="btn" data-act="savePreset" title="Save this style as a preset">Save…</button></div>');
     // colours: the ramp, the selected colour, the palette
     var sel = st.ramp[Math.min(app.rampSel, st.ramp.length - 1)];
-    h += panel('colours', 'Colours', '<div class="ramp">' + st.ramp.map(function (r, i) { return '<button class="sw' + (i === app.rampSel ? ' sel' : '') + '" data-ramp="' + i + '" title="Colour ' + (i + 1) + (i === 0 ? ' (gradient start)' : i === st.ramp.length - 1 ? ' (gradient end)' : '') + '"><i style="background:' + swatchBG(r.c, r.a) + '"></i><span class="n">' + (i + 1) + '</span></button>'; }).join('') +
+    P.colours = panel('colours', 'Colours', '<div class="ramp">' + st.ramp.map(function (r, i) { return '<button class="sw' + (i === app.rampSel ? ' sel' : '') + '" data-ramp="' + i + '" title="Colour ' + (i + 1) + (i === 0 ? ' (gradient start)' : i === st.ramp.length - 1 ? ' (gradient end)' : '') + '"><i style="background:' + swatchBG(r.c, r.a) + '"></i><span class="n">' + (i + 1) + '</span></button>'; }).join('') +
       '<span class="grow" style="flex:1"></span><button class="btn" data-act="rampAdd" title="Add a colour to the ramp (up to 4)"' + (st.ramp.length >= 4 ? ' disabled' : '') + '>+</button><button class="btn" data-act="rampDel" title="Remove the selected colour"' + (st.ramp.length <= 1 ? ' disabled' : '') + '>−</button><button class="btn" data-act="rampRev" title="Reverse the ramp (X)">⇄</button></div>' +
       '<div class="row"><input type="color" data-act="colour" value="' + esc(sel.c) + '" aria-label="Selected colour"><input type="text" data-act="hex" value="' + esc(sel.c) + '" style="width:80px" aria-label="Hex colour"><span class="small muted">' + (st.mode === 'solid' && app.rampSel > 0 ? 'Solid uses colour 1' : '') + '</span></div>' +
       '<div class="slider"><span>Alpha</span><input type="range" data-act="alpha" min="0" max="1" step="0.01" value="' + sel.a + '"><span class="v" id="alphaV">' + Math.round(sel.a * 100) + '%</span></div>' +
@@ -4223,35 +4290,73 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       '<div class="palette"><button data-pal="transparent" title="Transparent"><i></i></button>' + paletteColours().map(function (c) { return '<button data-pal="' + c + '" title="' + c + '"><i style="background:' + c + '"></i></button>'; }).join('') + '</div>' +
       '<div class="small muted">Click a swatch in the ramp, then pick its colour. The gradient runs from colour 1 to the last.</div>');
     // gradient
-    h += panel('gradient', 'Gradient', select('grad.type', 'Type', [['linear', 'Linear'], ['radial', 'Radial'], ['diamond', 'Diamond'], ['conic', 'Around a point'], ['edge', 'Follows the shape’s edge'], ['flat', 'Flat (an even mix)']]) +
+    P.gradient = panel('gradient', 'Gradient', select('grad.type', 'Type', [['linear', 'Linear'], ['radial', 'Radial'], ['diamond', 'Diamond'], ['conic', 'Around a point'], ['edge', 'Follows the shape’s edge'], ['flat', 'Flat (an even mix)']]) +
       select('grad.anchor', 'Spans', [['shape', 'Each shape'], ['canvas', 'Gradient-tool handles']]) +
       (g.type === 'flat' ? slider('grad.mix', 'Mix', 0, 1, .01, '%') : '') +
       (g.anchor === 'shape' && /^(linear|conic)$/.test(g.type) ? slider('grad.angle', 'Angle', 0, 359, 1, '°') : '') +
       slider('grad.start', 'Start', -.5, 1.5, .01, '%') + slider('grad.end', 'End', -.5, 1.5, .01, '%') + slider('grad.mid', 'Midpoint', .05, .95, .01, '%') +
       slider('grad.contrast', 'Softness', .02, 1, .01, '%') +
       select('grad.repeat', 'Beyond the ends', [['none', 'Stop'], ['repeat', 'Repeat'], ['mirror', 'Bounce back']]) + check('grad.reverse', 'Reverse'));
-    h += panel('ripple', 'Ripples', slider('ripple.amp', 'Amount', 0, .5, .01) + slider('ripple.freq', 'Waves', .5, 16, .5) + slider('ripple.phase', 'Shift', 0, 1, .01) +
+    P.ripple = panel('ripple', 'Ripples', slider('ripple.amp', 'Amount', 0, .5, .01) + slider('ripple.freq', 'Waves', .5, 16, .5) + slider('ripple.phase', 'Shift', 0, 1, .01) +
       slider('ripple.turb', 'Turbulence', 0, .6, .01) + slider('ripple.turbScale', 'Turb. size', 2, 64, 1) +
       '<div class="small muted">Ripples bend the gradient’s frontier into waves; turbulence roughens it.</div>');
-    h += panel('dither', 'Dither', select('dither.pattern', 'Pattern', D.PATTERNS.map(function (p) { return [p.id, p.name]; })) + slider('dither.scale', 'Pattern size', 1, 6, 1, 'x') +
+    P.dither = panel('dither', 'Dither', select('dither.pattern', 'Pattern', D.PATTERNS.map(function (p) { return [p.id, p.name]; })) + slider('dither.scale', 'Pattern size', 1, 6, 1, 'x') +
       slider('dither.level', 'Dithering', 0, 1, .01, '%') +
       '<div class="ctl"><span>Seed</span><span class="row"><input type="number" data-k="dither.seed" value="' + (st.dither.seed | 0) + '" style="width:70px"><button class="btn" data-act="dice" title="New random seed">🎲</button></span></div>' +
       slider('opacity', 'Opacity', 0, 1, .01, '%') + check('ditherOpacity', 'Dither the opacity') +
       '<div class="small muted">0% dithering gives hard bands; 100% blends the colours with the pattern. Dithered opacity skips pixels instead of fading them, so the art stays crisp.</div>');
     // layers
     var L = app.doc.layers, a = app.doc.active;
-    h += panel('layers', 'Layers', '<div class="layers" id="layerList">' + L.map(function (l, i) { return i; }).reverse().map(function (i) { var l = L[i];
+    P.layers = panel('layers', 'Layers', '<div class="layers" id="layerList">' + L.map(function (l, i) { return i; }).reverse().map(function (i) { var l = L[i];
       return '<div class="layer' + (i === a ? ' act' : '') + '" data-layer="' + i + '"><input type="checkbox" data-vis="' + i + '"' + (l.visible ? ' checked' : '') + ' title="Show or hide" aria-label="Visible"><canvas data-thumb="' + i + '" width="34" height="24"></canvas><span class="nm" title="Double-click to rename">' + esc(l.name) + '</span><button class="ib" data-lock="' + i + '" title="' + (l.locked ? 'Unlock' : 'Lock') + '">' + (l.locked ? '🔒' : '<span style="opacity:.35">🔓</span>') + '</button></div>'; }).join('') + '</div>' +
       '<div class="row"><button class="btn" data-cmd="addLayer" title="New layer">New</button><button class="btn" data-cmd="dupLayer" title="Duplicate">Copy</button><button class="btn" data-cmd="delLayer" title="Delete"' + (L.length < 2 ? ' disabled' : '') + '>Delete</button><button class="btn" data-cmd="layerUp" title="Move up">▲</button><button class="btn" data-cmd="layerDown" title="Move down">▼</button><button class="btn" data-cmd="mergeDown" title="Merge down"' + (a === 0 ? ' disabled' : '') + '>Merge ↓</button></div>' +
       '<div class="slider"><span>Layer opacity</span><input type="range" data-act="layerOpacity" min="0" max="1" step="0.01" value="' + L[a].opacity + '"><span class="v" id="lopV">' + Math.round(L[a].opacity * 100) + '%</span></div>');
-    return h;
+    if (!mobile()) return P.style + P.colours + P.gradient + P.ripple + P.dither + P.layers;
+    if (!app.sheet) return '';
+    var body = { tool: function () { return '<div class="pb"><div class="small muted">' + esc(TOOL[app.tool].hint) + '</div><div class="opts">' + optsHTML() + '</div></div>'; },
+      colours: function () { return P.colours + P.style; }, style: function () { return P.gradient + P.ripple + P.dither; }, layers: function () { return P.layers; },
+      card: function () { return hooks.cardSheet ? hooks.cardSheet() : ''; }, menu: menuSheet }[app.sheet];
+    return '<div class="sheethead"><b>' + esc(app.sheet === 'tool' ? TOOL[app.tool].name : SHEETS[app.sheet]) + '</b><span class="grow"></span><button class="btn" data-m="close" aria-label="Close">Done</button></div>' + (body ? body() : '');
+  }
+  // The menus as one list, for the phone's ☰ button.
+  function menuSheet() {
+    return '<div class="pb menusheet">' + MENUS.map(function (m) { return '<div class="msec"><div class="small muted">' + m.name + '</div>' +
+      m.items.filter(function (it) { return it !== '-' && !/^(grid|bg|zoomIn|zoomOut|actual|keys)$/.test(it[0]); }).map(function (it) { return '<button class="btn" data-cmd="' + it[0] + '">' + esc(it[1]) + '</button>'; }).join('') + '</div>'; }).join('') + '</div>';
+  }
+  var PHONE = window.matchMedia ? matchMedia('(max-width: 820px), (max-height: 520px)') : { matches: false };   // phones, either way up (as in dithry.css)
+  function mobile() { return PHONE.matches; }
+  var TAB_ICON = {
+    style: svg('<rect x="2.5" y="3.5" width="15" height="13" fill="#fff" stroke="#000"/><path d="M3 4h2v2H3zM7 4h2v2H7zM11 4h2v2h-2zM5 6h2v2H5zM9 6h2v2H9zM3 8h4v2H3zM9 8h2v2H9zM13 8h2v2h-2zM3 10h12v2H3zM3 12h14v4H3z" fill="#1c1f3a"/>'),
+    layers: svg('<path d="M10 3 L18 7 L10 11 L2 7 Z" fill="#8a90a8" stroke="#000"/><path d="M2 10 L10 14 L18 10" fill="none" stroke="#000"/><path d="M2 13 L10 17 L18 13" fill="none" stroke="#000"/>'),
+    card: svg('<rect x="4.5" y="2.5" width="11" height="15" fill="#f6dcf2" stroke="#000"/><path d="M6 6h8M6 8h5" stroke="#000"/><path d="M6 12h8v4H6z" fill="#c03aa8"/>')
+  };
+  // The phone's tab bar: the tool's options, colours, style, layers, and the card when painting cards.
+  function renderTabs() {
+    var t = $('#mtabs'); if (!t) return;
+    var tabs = ['tool', 'colours', 'style', 'layers'].concat(app.mode === 'cards' ? ['card'] : []), r = app.style.ramp;
+    t.innerHTML = tabs.map(function (k) {
+      var icon = k === 'tool' ? TOOL[app.tool].icon : k === 'colours' ? '<span class="tabsw">' + r.map(function (x) { return '<i style="background:' + swatchBG(x.c, x.a) + '"></i>'; }).join('') + '</span>' : TAB_ICON[k] || '';
+      return '<button class="btn' + (app.sheet === k ? ' on' : '') + '" data-sheet="' + k + '">' + icon + '<span>' + SHEETS[k] + '</span></button>'; }).join('');
   }
   function getPath(o, k) { return k.split('.').reduce(function (x, p) { return x == null ? x : x[p]; }, o); }
   function setPath(o, k, v) { var ps = k.split('.'), last = ps.pop(); ps.reduce(function (x, p) { return x[p]; }, o)[last] = v; }
 
-  function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.scrollTop = top; drawPreview(); drawThumbs(); }
-  function renderOpts() { $('#opts').innerHTML = optsHTML(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
-  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; document.title = t + ' · Dithry'; }
+  function renderSide() { var s = $('#side'), top = s.scrollTop; s.innerHTML = sideHTML(); s.classList.toggle('open', mobile() && !!app.sheet); s.scrollTop = top; drawPreview(); drawThumbs(); renderTabs(); }
+  function openSheet(k) { app.sheet = app.sheet === k ? null : k; var s = $('#side'); renderSide(); s.scrollTop = 0; keepInView(); }
+  // A sheet covers the lower part of the canvas: slide the picture up into the part you can still see, and back down
+  // when the sheet closes (unless you've moved it in the meantime).
+  var sheetPan = null;
+  function keepInView() {
+    if (!mobile()) return;
+    if (!app.sheet) { if (sheetPan && app.panX === sheetPan.mx && app.panY === sheetPan.my) { app.panX = sheetPan.x; app.panY = sheetPan.y; applyView(); } sheetPan = null; return; }
+    var wr = work.getBoundingClientRect(), sr = $('#side').getBoundingClientRect(), side = sr.left > wr.left + 10;   // a phone on its side: the sheet is on the right
+    if (!sheetPan) sheetPan = { x: app.panX, y: app.panY };
+    if (side) { var room = wr.width - Math.max(0, wr.right - sr.left), w = W() * app.zoom, wantX = w <= room - 16 ? (room - w) / 2 : 8; if (app.panX > wantX) app.panX = wantX; }
+    else { var roomY = wr.height - Math.max(0, wr.bottom - sr.top), h = H() * app.zoom, want = h <= roomY - 16 ? (roomY - h) / 2 : 8; if (app.panY > want) app.panY = want; }
+    applyView(); sheetPan.mx = app.panX; sheetPan.my = app.panY;
+  }
+  function renderOpts() { $('#opts').innerHTML = optsHTML(); if (mobile() && app.sheet === 'tool') renderSide(); else renderTabs(); document.querySelectorAll('[data-tool]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tool') === app.tool); }); status(); }
+  function renderTitle() { var t = (app.mode === 'cards' ? 'Card: ' : '') + app.name + (app.dirty ? ' *' : ''); $('#title').textContent = 'Dithry — ' + t; $('#mname').textContent = t; document.title = t + ' · Dithry'; }
 
   // The style preview: the current style across a strip, as it would paint a shape.
   function drawPreview() {
@@ -4300,8 +4405,10 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     hooks.view.forEach(function (f) { f(); });
   }
   function fit() {
-    var r = work.getBoundingClientRect(), z = Math.min((r.width - 32) / W(), (r.height - 32) / H());
-    var best = ZOOMS[0]; ZOOMS.forEach(function (q) { if (q <= z) best = q; }); app.zoom = best;
+    var r = work.getBoundingClientRect(), pad = mobile() ? 12 : 32, z = Math.min((r.width - pad) / W(), (r.height - pad) / H()), dpr = window.devicePixelRatio || 1;
+    var best = ZOOMS[0]; ZOOMS.forEach(function (q) { if (q <= z) best = q; });
+    if (dpr > 1 && z >= 1) best = Math.max(best, Math.floor(z * dpr) / dpr);   // on sharp screens, any zoom that's a whole number of device pixels keeps the pixels even
+    app.zoom = best;
     app.panX = (r.width - W() * app.zoom) / 2; app.panY = (r.height - H() * app.zoom) / 2; applyView();
   }
   // Zoom to level z, keeping the point (sx, sy) of the work area (default: its centre) still.
@@ -4318,7 +4425,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   // The overlay: pixel grid, brush outline, shape guides, gradient handles, polygon points, mirror axis.
   var hooks = { view: [], overlay: [], change: [] };   // used by card mode (cards.js)
   var overFrame = null;
-  function drawOverlay() { if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
+  function drawOverlay() { var pb = $('#polybar'); if (pb) pb.style.display = op && op.kind === 'polygon' ? 'flex' : 'none'; if (!overFrame) overFrame = requestAnimationFrame(paintOverlay); }
   function paintOverlay() {
     overFrame = null;
     var r = work.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -4427,7 +4534,9 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
 
   /* ---------------- pointer input ---------------- */
   var pointers = {}, pinch = null, panning = null, spaceDown = false, lastPencil = null;
+  var lastPointerType = 'mouse';
   function onDown(e) {
+    lastPointerType = e.pointerType;
     work.setPointerCapture && work.setPointerCapture(e.pointerId);
     pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
     closeMenus();
@@ -4435,9 +4544,10 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     if (ids.length === 2) {   // two fingers: stop drawing, pinch and pan instead
       if (op && op.kind !== 'polygon') cancel();
       var p = ids.map(function (i) { return pointers[i]; }), r = work.getBoundingClientRect();
-      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: app.zoom, mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top, px: app.panX, py: app.panY };
-      return;
+      pinch = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, z: app.zoom, mx: (p[0].x + p[1].x) / 2 - r.left, my: (p[0].y + p[1].y) / 2 - r.top, px: app.panX, py: app.panY, t0: e.timeStamp, moved: 0, fingers: 2 };
+      endLongPress(); return;
     }
+    if (ids.length === 3 && pinch) { pinch.fingers = 3; return; }
     if (ids.length > 2) return;
     var a = toArt(e), pi = [Math.floor(a[0]), Math.floor(a[1])], t = app.tool;
     if (e.button === 1 || t === 'hand' || spaceDown) { panning = { x: e.clientX, y: e.clientY, px: app.panX, py: app.panY }; work.classList.add('panning'); e.preventDefault(); return; }
@@ -4450,18 +4560,19 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       else {
         var f = op.pts[0], near = Math.hypot(pi[0] - f[0], pi[1] - f[1]) * app.zoom < 10;
         if (near && op.pts.length > 2) { finishPolygon(); return; }
-        var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) op.pts.push(e.shiftKey ? snap45(lp, pi) : pi);
+        var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) op.pts.push(e.shiftKey || app.snap ? snap45(lp, pi) : pi);
       }
       polyMask(op.pts); show(); drawOverlay(); return;
     }
     if (!begin(t)) return;
     op.start = pi;
+    if (e.pointerType === 'touch' && /^(pencil|brush|eraser|line|rect|ellipse|lasso)$/.test(t)) startLongPress(e, pi);
     if (t === 'pencil' || t === 'brush' || t === 'eraser') {
       var sz = t === 'pencil' ? 1 : app.size, rd = t !== 'pencil' && app.round;
       var from = t === 'pencil' && e.shiftKey && lastPencil ? lastPencil : pi;
       op.box = mirrored(D.line(op.mask, W(), H(), from[0], from[1], pi[0], pi[1], sz, rd)); op.last = pi; op.sz = sz; op.rd = rd;
       show(full(), null, t === 'eraser');
-    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, pi, pi, e.shiftKey); show(); }
+    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, pi, pi, e.shiftKey || app.snap); show(); }
     else if (t === 'lasso') { op.pts = [pi]; }
     else if (t === 'fill') { op.box = regionMask(pi[0], pi[1]); show(); commit(); }
     else if (t === 'gradient') {
@@ -4470,12 +4581,24 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       drawOverlay();
     } else if (t === 'move') { op.box = full(); }
   }
+  // Press and hold a drawing tool on a touch screen to pick the colour under your finger (no keyboard for the picker).
+  var hold = null;
+  function startLongPress(e, pi) {
+    endLongPress();
+    hold = { id: e.pointerId, x: e.clientX, y: e.clientY, t: setTimeout(function () {
+      if (!hold) return; hold = null; if (op) cancel(); app.rampSel = Math.min(app.rampSel, app.style.ramp.length - 1); pick(pi);
+      if (navigator.vibrate) try { navigator.vibrate(12); } catch (x) { }
+    }, 550) };
+  }
+  function endLongPress() { if (hold) { clearTimeout(hold.t); hold = null; } }
   function onMove(e) {
     if (pointers[e.pointerId]) { pointers[e.pointerId].x = e.clientX; pointers[e.pointerId].y = e.clientY; }
+    if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 8) endLongPress();
     if (pinch) {
       var ids = Object.keys(pointers); if (ids.length < 2) return;
       var p = ids.map(function (i) { return pointers[i]; }), r = work.getBoundingClientRect(), mx = (p[0].x + p[1].x) / 2 - r.left, my = (p[0].y + p[1].y) / 2 - r.top;
-      var z = clamp(pinch.z * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / pinch.d, ZOOMS[0], ZOOMS[ZOOMS.length - 1]);
+      var spread = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), z = clamp(pinch.z * spread / pinch.d, ZOOMS[0], ZOOMS[ZOOMS.length - 1]);
+      pinch.moved = Math.max(pinch.moved, Math.abs(spread - pinch.d) + Math.hypot(mx - pinch.mx, my - pinch.my));
       var ax = (pinch.mx - pinch.px) / pinch.z, ay = (pinch.my - pinch.py) / pinch.z;
       app.zoom = z; app.panX = mx - ax * z; app.panY = my - ay * z; applyView(); return;
     }
@@ -4490,16 +4613,21 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       if (pi[0] === op.last[0] && pi[1] === op.last[1]) return;
       op.box = D.union(op.box, mirrored(D.line(op.mask, W(), H(), op.last[0], op.last[1], pi[0], pi[1], op.sz, op.rd))); op.last = pi;
       show(full(), null, t === 'eraser');
-    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, op.start, pi, e.shiftKey); show(); }
+    } else if (t === 'line' || t === 'rect' || t === 'ellipse') { shapeMask(t, op.start, pi, e.shiftKey || app.snap); show(); }
     else if (t === 'lasso') { var lp = op.pts[op.pts.length - 1]; if (lp[0] !== pi[0] || lp[1] !== pi[1]) { op.pts.push(pi); polyMask(op.pts); show(); } }
-    else if (t === 'polygon') { polyMask(op.pts.concat([e.shiftKey ? snap45(op.pts[op.pts.length - 1], pi) : pi])); show(); }
-    else if (t === 'gradient') { op.end = e.shiftKey ? snapVec(op.start, a) : a; show(full(), handleStyle(op.start, op.end)); }
+    else if (t === 'polygon') { polyMask(op.pts.concat([e.shiftKey || app.snap ? snap45(op.pts[op.pts.length - 1], pi) : pi])); show(); }
+    else if (t === 'gradient') { op.end = e.shiftKey || app.snap ? snapVec(op.start, a) : a; show(full(), handleStyle(op.start, op.end)); }
     else if (t === 'move') { D.shift(layer(op.li).data, op.before, W(), H(), pi[0] - op.start[0], pi[1] - op.start[1]); redraw(); }
   }
   function snapVec(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), len = Math.hypot(dx, dy); return [a[0] + Math.cos(ang) * len, a[1] + Math.sin(ang) * len]; }
   function onUp(e) {
-    delete pointers[e.pointerId];
-    if (pinch) { if (Object.keys(pointers).length === 0) pinch = null; return; }
+    delete pointers[e.pointerId]; endLongPress();
+    if (pinch) {
+      if (Object.keys(pointers).length) return;
+      // a quick tap with two fingers undoes, with three redoes (fingers that barely moved: not a pinch)
+      if (e.timeStamp - pinch.t0 < 350 && pinch.moved < 16) { app.zoom = pinch.z; app.panX = pinch.px; app.panY = pinch.py; applyView(); if (pinch.fingers === 3) redo(); else undo(); }
+      pinch = null; return;
+    }
     if (panning) { panning = null; work.classList.remove('panning'); return; }
     if (selDrag) { if (!selDrag.moved) app.sel = null; selDrag = null; drawOverlay(); status(app.sel ? 'Selected ' + (app.sel.x1 - app.sel.x0) + ' × ' + (app.sel.y1 - app.sel.y0) + ' pixels: drawing stays inside.' : null); return; }
     if (!op || op.kind === 'polygon') return;
@@ -4796,6 +4924,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   /* ---------------- side-panel and option events ---------------- */
   function onSideInput(e) {
     var t = e.target, k = t.getAttribute('data-k');
+    if (t.hasAttribute('data-opt')) return onOpt(e);   // the tool's options, in the phone's Tool sheet
     if (k) {
       var v = t.type === 'checkbox' ? t.checked : t.tagName === 'SELECT' ? t.value : parseFloat(t.value);
       if (t.type === 'number' && isNaN(v)) return;
@@ -4824,7 +4953,8 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     if (e.target.tagName === 'INPUT') return;   // checkboxes and fields act through onSideInput
     var t = e.target.closest('button, .ph, .layer'); if (!t) return;
     if (t.classList.contains('ph')) { var p = t.parentNode.getAttribute('data-panel'); app.shut[p] = !app.shut[p]; savePrefs(); renderSide(); return; }
-    if (t.hasAttribute('data-cmd')) return run(t.getAttribute('data-cmd'));
+    if (t.getAttribute('data-m') === 'close') { app.sheet = null; renderSide(); keepInView(); return; }
+    if (t.hasAttribute('data-cmd')) { if (app.sheet === 'menu') { app.sheet = null; renderSide(); keepInView(); } return run(t.getAttribute('data-cmd')); }
     if (t.hasAttribute('data-ramp')) { app.rampSel = +t.getAttribute('data-ramp'); renderSide(); return; }
     if (t.hasAttribute('data-pal')) {
       var r = app.style.ramp[Math.min(app.rampSel, app.style.ramp.length - 1)], c = t.getAttribute('data-pal');
@@ -4858,8 +4988,9 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     var t = e.target, k = t.getAttribute('data-opt'); if (!k) return;
     var v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? parseInt(t.value, 10) : t.value;
     if (t.type === 'number' && isNaN(v)) return;
-    if (k === 'size') v = clamp(v, 1, 64); if (k === 'tol') v = clamp(v, 0, 255);
-    app[k] = v; savePrefs(); if (k === 'shape' || k === 'mirror') renderOpts(); drawOverlay();
+    if (t.type === 'range') v = parseInt(t.value, 10);
+    if (k === 'size') { v = clamp(v, 1, 64); document.querySelectorAll('[data-optv="size"]').forEach(function (b) { b.textContent = v; }); } if (k === 'tol') v = clamp(v, 0, 255);
+    app[k] = v; savePrefs(); if ((k === 'shape' || k === 'mirror' || k === 'snap') && e.type === 'change') renderOpts(); drawOverlay();
   }
 
   /* ---------------- the example scene ---------------- */
@@ -4912,17 +5043,25 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     renderOpts(); renderSide(); renderTitle();
     ready.then(function () { renderOpts(); if (hooks.start) return hooks.start(); }).then(function () { window.dithryReady = true; });
 
-    document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { setTool(b.getAttribute('data-tool')); }); });
+    // on a phone, tapping the tool you already have opens its options
+    onTap($('.tools'), '[data-tool]', function (b) { var id = b.getAttribute('data-tool'); if (mobile() && app.tool === id) openSheet('tool'); else { setTool(id); if (mobile() && app.sheet === 'tool') renderSide(); } });
+    onTap($('.mtop'), '[data-m]', function (b) { var m = b.getAttribute('data-m');
+      if (m === 'menu') openSheet('menu'); else if (m === 'undo') undo(); else if (m === 'redo') redo(); else if (m === 'fit') fit(); });
+    onTap($('#mtabs'), '[data-sheet]', function (b) { openSheet(b.getAttribute('data-sheet')); });
+    onTap($('#polybar'), '[data-poly]', function (b) { if (!op || op.kind !== 'polygon') return; var a = b.getAttribute('data-poly');
+      if (a === 'done') finishPolygon(); else if (a === 'cancel') cancel(); else { op.pts.pop(); if (!op.pts.length) cancel(); else { polyMask(op.pts); show(); drawOverlay(); } } });
+    $('#polybar').addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    if (PHONE.addEventListener) PHONE.addEventListener('change', function () { app.sheet = null; renderSide(); renderOpts(); setTimeout(fit, 50); });
     $('.menubar').addEventListener('click', function (e) {
       var cmd = e.target.closest('[data-cmd]'); if (cmd) return run(cmd.getAttribute('data-cmd'));
       var mi = e.target.closest('.mi'); if (!mi) return; var was = mi.classList.contains('open'); closeMenus(); if (!was) mi.classList.add('open');
     });
     $('.menubar').addEventListener('mouseover', function (e) { var mi = e.target.closest('.mi'); if (mi && document.querySelector('.mi.open') && !mi.classList.contains('open')) { closeMenus(); mi.classList.add('open'); } });
     document.addEventListener('pointerdown', function (e) { if (!e.target.closest('.menubar')) closeMenus(); }, true);
-    var side = $('#side'); side.addEventListener('input', onSideInput); side.addEventListener('change', onSideInput); side.addEventListener('click', onSideClick); side.addEventListener('dblclick', onSideDbl);
+    var side = $('#side'); side.addEventListener('input', onSideInput); side.addEventListener('change', onSideInput); onTap(side, 'button, .ph, .layer', function (b, e) { onSideClick({ target: e.target.tagName === 'INPUT' ? e.target : b }); }); side.addEventListener('dblclick', onSideDbl);
     var opts = $('#opts'); opts.addEventListener('change', onOpt); opts.addEventListener('input', onOpt);
     work.addEventListener('pointerdown', onDown); window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp);
-    work.addEventListener('dblclick', function () { finishPolygon(); });
+    work.addEventListener('dblclick', function () { if (lastPointerType !== 'touch') finishPolygon(); });   // on touch, quick taps on nearby corners look like a double-click: the Finish bar ends a polygon there
     work.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     work.addEventListener('pointerleave', function () { if (!op) { app.hover = null; status(); drawOverlay(); } });
     work.addEventListener('wheel', function (e) { e.preventDefault(); var r = work.getBoundingClientRect(); if (e.ctrlKey || Math.abs(e.deltaY) >= Math.abs(e.deltaX)) { wheelAcc += e.deltaY; if (Math.abs(wheelAcc) >= (e.ctrlKey ? 8 : 40)) { zoomStep(wheelAcc < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); wheelAcc = 0; } } else { app.panX -= e.deltaX; applyView(); } }, { passive: false });
@@ -4932,6 +5071,19 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     window.addEventListener('beforeunload', function () { if (app.dirty) autosave(); });
   }
   var wheelAcc = 0;
+  // Buttons that act when a finger lifts off them, not on the click that follows: Chrome drops a tap that comes just
+  // after a stroke (it waits to see if it's a double-tap), and you often reach for Undo right after drawing.
+  // A click without a pointer before it (the keyboard) still works.
+  function onTap(root, sel, fn) {
+    var down = null, last = -1e9;
+    root.addEventListener('pointerdown', function (e) { var b = e.target.closest(sel); down = b && root.contains(b) ? { b: b, id: e.pointerId, x: e.clientX, y: e.clientY } : null; });
+    root.addEventListener('pointerup', function (e) {
+      var d = down; down = null; if (!d || e.pointerId !== d.id || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+      last = e.timeStamp; fn(d.b, e);
+    });
+    root.addEventListener('pointercancel', function () { down = null; });
+    root.addEventListener('click', function (e) { var b = e.target.closest(sel); if (b && root.contains(b) && e.timeStamp - last > 700) fn(b, e); });
+  }
   // For card mode (cards.js) and tests.
   window.DithryApp = { app: app, D: D, hooks: hooks, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject,
     setupCanvas: function () { setupCanvas(); }, PALETTES: PALETTES, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,
@@ -4972,7 +5124,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     A.confirmDiscard(function () {
       cm = { list: library(), i: 0, palette: app.palette };   // the palette to go back to when you leave
       var at = id || A.lsGet('dithry.cardmode.last'), k = cm.list.findIndex(function (c) { return c.id === at; }); cm.i = k < 0 ? 0 : k;
-      app.mode = 'cards'; buildBar(); buildHosts();
+      app.mode = 'cards'; buildBar(); buildHosts(); A.renderSide();
       A.hooks.view.push(placeHosts); A.hooks.overlay.push(shadeGap); A.hooks.change.push(updateBar);
       return load();
     });
@@ -4980,7 +5132,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   function leave() {
     if (!cm || cm.busy) return;
     var c = cm; cm = null; app.mode = null; app.allow = null; app.palette = c.palette; A.renderSide();
-    c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); });
+    c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); }); if (app.sheet === 'card') app.sheet = null;
     A.hooks.view.splice(A.hooks.view.indexOf(placeHosts), 1); A.hooks.overlay.splice(A.hooks.overlay.indexOf(shadeGap), 1); A.hooks.change.splice(A.hooks.change.indexOf(updateBar), 1);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   }
@@ -4999,27 +5151,41 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     bar.innerHTML = '<button class="btn" data-c="prev" title="Previous card (Page Up)">◀</button>' +
       '<select data-c="pick" aria-label="Card">' + Object.keys(groups).map(function (s) { return '<optgroup label="' + esc(s) + '">' + groups[s].join('') + '</optgroup>'; }).join('') + '</select>' +
       '<button class="btn" data-c="next" title="Next card (Page Down)">▶</button><span class="small muted" data-c="count"></span>' +
-      '<label class="row small"><input type="checkbox" data-c="text" checked> Card text</label>' +
-      '<span class="grow"></span><span class="small" data-c="state"></span>' +
-      '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)">Save to Kartenspiel</button>' +
-      '<button class="btn" data-c="reset" title="Go back to the plain suit texture">Reset…</button><button class="btn" data-c="pack" title="Export or import all painted cards">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button>';
+      '<label class="row small wide"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Card text</label>' +
+      '<span class="grow"></span><span class="small wide" data-c="state"></span>' +
+      '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)"><span class="wide">Save to Kartenspiel</span><span class="narrow">Save</span></button>' +
+      '<button class="btn wide" data-c="reset" title="Go back to the plain suit texture">Reset…</button><button class="btn wide" data-c="pack" title="Export or import all painted cards">Art pack…</button><button class="btn wide" data-c="leave">Leave card mode</button>';
     var mb = $('.menubar'); mb.parentNode.insertBefore(bar, mb.nextSibling); cm.bar = bar;
-    bar.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
-      ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]();
-    });
-    bar.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t.getAttribute('data-c') === 'pick') goTo(cm.list[+t.value].id);
-      if (t.getAttribute('data-c') === 'text') cm.hosts.forEach(function (h) { h.style.display = t.checked ? '' : 'none'; });
-    });
   }
+  // The bar's buttons, and the same ones in the phone's Card sheet.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-c]'); if (!cm || !b || b.tagName === 'SELECT' || b.tagName === 'INPUT' || b.tagName === 'LABEL' || b.tagName === 'SPAN') return;
+    var f = ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]; if (f) f();
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!cm || !t.getAttribute) return;
+    if (t.getAttribute('data-c') === 'pick') goTo(cm.list[+t.value].id);
+    if (t.getAttribute('data-c') === 'text') { cm.noText = !t.checked; cm.hosts.forEach(function (h) { h.style.display = cm.noText ? 'none' : ''; }); document.querySelectorAll('[data-c="text"]').forEach(function (x) { x.checked = !cm.noText; }); }
+  });
+  // The phone's Card sheet: where you are, whether it's saved, and the rest of the bar's buttons.
+  A.hooks.cardSheet = function () {
+    if (!cm) return '';
+    var c = cm.list[cm.i];
+    return '<div class="pb"><div><b>' + esc(c.name) + '</b> <span class="muted">' + esc(c.type + ' · ' + c.suit) + ' · card ' + (cm.i + 1) + ' of ' + cm.list.length + '</span></div>' +
+      '<div class="small" data-c="state"></div>' +
+      '<label class="row"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Show the card text over the painting</label>' +
+      '<div class="row"><button class="btn def" data-c="save">Save to Kartenspiel</button><button class="btn" data-c="reset">Reset…</button></div>' +
+      '<div class="row"><button class="btn" data-c="pack">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button></div>' +
+      '<div class="small muted">Tip: tap with two fingers to undo, three to redo; press and hold to pick a colour.</div></div>';
+  };
   function updateBar() {
     if (!cm || !cm.bar) return;
     var c = cm.list[cm.i], f = myFaces()[c.id], committed = typeof KCardArt !== 'undefined' && KCardArt[c.id];
     $('[data-c="pick"]', cm.bar).value = String(cm.i);
     $('[data-c="count"]', cm.bar).textContent = (cm.i + 1) + ' of ' + cm.list.length;
-    $('[data-c="state"]', cm.bar).textContent = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
+    var st = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
+    document.querySelectorAll('[data-c="state"]').forEach(function (x) { x.textContent = st; });
+    cm.bar.querySelector('[data-c="save"]').classList.toggle('dirty', app.dirty);
   }
 
   /* ----- the card text in front of the paint ----- */
@@ -5077,7 +5243,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       A.setupCanvas(); A.renderSide();
     });
     return done.then(function () {
-      cm.busy = false; app.name = c.name; app.dirty = false; A.renderTitle(); fillHosts(c); A.fit(); placeHosts(); updateBar();
+      cm.busy = false; app.name = c.name; app.dirty = false; A.renderTitle(); fillHosts(c); A.fit(); placeHosts(); if (app.sheet === 'card') A.renderSide(); updateBar();
       if (app.doc.layers.length > 1 && app.doc.active === 0) { app.doc.active = app.doc.layers.length - 1; A.renderSide(); }
     }, function () { cm.busy = false; A.toast('That card’s saved painting couldn’t be read.'); });
   }

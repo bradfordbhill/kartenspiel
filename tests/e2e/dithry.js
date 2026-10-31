@@ -127,7 +127,10 @@ const URL = 'file://' + path.join(REPO, 'dithry.html');
   ok(proj.app === 'Dithry' && proj.layers.length === 2 && proj.w === 40, 'Ctrl+S downloads a .dithry project with both layers');
   const before = await p.evaluate(() => Array.from(DithryApp.flatten()).join(','));
   await p.evaluate(() => { DithryApp.app.dirty = false; }); await p.click('[data-menu="file"] > button'); await p.click('[data-cmd="new"]'); await p.fill('#nW', '8'); await p.fill('#nH', '8'); await p.click('#nGo');
-  const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.keyboard.press('Control+o')]); await fc.setFiles(file); await p.waitForTimeout(500);
+  // Ctrl+O; if the browser is slow to show the picker, File → Open does the same
+  let fc = await Promise.all([p.waitForEvent('filechooser', { timeout: 8000 }), p.keyboard.press('Control+o')]).then(r => r[0], () => null);
+  if (!fc) fc = (await Promise.all([p.waitForEvent('filechooser'), (async () => { await p.click('[data-menu="file"] > button'); await p.click('[data-cmd="open"]'); })()]))[0];
+  await fc.setFiles(file); await p.waitForTimeout(500);
   s = await app(); ok(s.w === 40 && s.layers.length === 2, 'Ctrl+O opens it again');
   ok(await p.evaluate(() => Array.from(DithryApp.flatten()).join(',')) === before, 'and the picture is pixel-for-pixel the same');
   // export
@@ -212,21 +215,72 @@ const URL = 'file://' + path.join(REPO, 'dithry.html');
   ok((await cs()).mode !== 'cards' && !(await cp.$('.cardbar')), 'Leave card mode goes back to the picture you had');
   await cc.close();
 
-  // phone: everything reachable, no sideways scroll, a finger can draw
+  // phone: the canvas fills the screen; tools, undo and sheets are all a tap away; touch gestures
   const pc = await b.newContext({ ...devices['iPhone 13'] }), ph = await pc.newPage(); ph.on('pageerror', e => errs.push('phone: ' + e.message));
   await ph.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
   await ph.goto(URL); await ph.waitForFunction(() => window.dithryReady);
-  ok(await ph.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'phone: no sideways scrolling');
-  await ph.tap('[data-tool="rect"]');
-  const box = await ph.$eval('#art', e => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
   const cdp = await pc.newCDPSession(ph), t = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((q, i) => ({ x: q[0], y: q[1], id: i })) });
-  const u1 = await ph.evaluate(() => DithryApp.app.undo.length);
-  await t('touchStart', [[box[0] + 10, box[1] + 10]]); for (let i = 1; i <= 5; i++) await t('touchMove', [[box[0] + 10 + i * 12, box[1] + 10 + i * 8]]); await t('touchEnd', []);
-  ok(await ph.evaluate(() => DithryApp.app.undo.length) === u1 + 1, 'phone: dragging a finger draws a rectangle');
-  const z0 = await ph.evaluate(() => DithryApp.app.zoom);
-  await t('touchStart', [[box[0] + 60, box[1] + 40], [box[0] + 100, box[1] + 40]]); for (let i = 1; i <= 6; i++) await t('touchMove', [[box[0] + 60 - i * 8, box[1] + 40], [box[0] + 100 + i * 8, box[1] + 40]]); await t('touchEnd', []);
-  ok(await ph.evaluate(() => DithryApp.app.zoom) > z0 && await ph.evaluate(() => DithryApp.app.undo.length) === u1 + 1, 'phone: two fingers zoom instead of drawing');
-  await ph.screenshot({ path: SHOTS + '/phone.png', fullPage: true });
+  const pa = () => ph.evaluate(() => { const a = DithryApp.app; return { undo: a.undo.length, redo: a.redo.length, zoom: a.zoom, panY: a.panY, sheet: a.sheet, tool: a.tool, size: a.size }; });
+  const pp = (x, y) => ph.evaluate(([x, y]) => { const r = document.getElementById('art').getBoundingClientRect(), a = DithryApp.app; return [r.left + (x + .5) * a.zoom, r.top + (y + .5) * a.zoom]; }, [x, y]);
+  const pxl = (x, y) => ph.evaluate(([x, y]) => { const a = DithryApp.app, L = a.doc.layers[a.doc.active], i = (y * a.doc.w + x) * 4; return Array.from(L.data.slice(i, i + 4)); }, [x, y]);
+  const fdrag = async (x0, y0, x1, y1) => { const a = await pp(x0, y0), z = await pp(x1, y1); await t('touchStart', [a]); for (let i = 1; i <= 6; i++) await t('touchMove', [[a[0] + (z[0] - a[0]) * i / 6, a[1] + (z[1] - a[1]) * i / 6]]); await t('touchEnd', []); };
+  const ftap = async (x, y) => { const a = await pp(x, y); await t('touchStart', [a]); await t('touchEnd', []); };
+  const layout = await ph.evaluate(() => ({ w: document.documentElement.scrollWidth <= innerWidth, h: document.documentElement.scrollHeight <= innerHeight, vis: ['.mtop', '#mtabs', '.tools', '#work'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight + 1; }), menubar: getComputedStyle(document.querySelector('.menubar')).display, work: document.getElementById('work').getBoundingClientRect().height }));
+  ok(layout.w && layout.h, 'phone: the page fits the screen; nothing scrolls sideways or down');
+  ok(layout.vis.every(Boolean) && layout.menubar === 'none' && layout.work > 400, 'phone: top bar, tools, canvas (' + Math.round(layout.work) + 'px tall) and tab bar are all on screen; the desktop menus are tucked away');
+  await ph.tap('[data-tool="rect"]'); await ph.evaluate(() => { const st = DithryApp.app.style; st.mode = 'solid'; st.ramp = [{ c: '#ff0000', a: 1 }]; st.opacity = 1; });
+  let s0 = await pa(); await fdrag(10, 10, 30, 25); let s1 = await pa();
+  ok(s1.undo === s0.undo + 1 && (await pxl(20, 20))[0] === 255, 'phone: dragging a finger draws a rectangle');
+  await ph.tap('[data-m="undo"]'); ok((await pxl(20, 20))[0] !== 255 || (await pxl(20, 20))[3] < 255, 'the ↶ button undoes');
+  await ph.tap('[data-m="redo"]'); ok((await pxl(20, 20))[0] === 255, 'the ↷ button redoes');
+  // two-finger tap undoes, three-finger tap redoes; a pinch zooms and draws nothing
+  const f1 = await pp(40, 40), f2 = await pp(70, 40), f3 = await pp(55, 60);
+  await t('touchStart', [f1, f2]); await t('touchEnd', []); await ph.waitForTimeout(50);
+  ok((await pa()).undo === s1.undo - 1 && (await pxl(20, 20))[0] !== 255, 'a quick two-finger tap undoes');
+  await t('touchStart', [f1, f2]); await t('touchStart', [f1, f2, f3]); await t('touchEnd', []); await ph.waitForTimeout(50);
+  ok((await pxl(20, 20))[0] === 255, 'a quick three-finger tap redoes');
+  s0 = await pa();
+  await t('touchStart', [f1, f2]); for (let i = 1; i <= 8; i++) await t('touchMove', [[f1[0] - i * 8, f1[1]], [f2[0] + i * 8, f2[1]]]); await t('touchEnd', []);
+  s1 = await pa(); ok(s1.zoom > s0.zoom && s1.undo === s0.undo, 'a two-finger pinch zooms in, and doesn’t draw or undo');
+  await ph.tap('[data-m="fit"]'); ok((await pa()).zoom < s1.zoom, 'the ⤢ button fits the picture back on screen');
+  // press and hold to pick a colour, without painting
+  await ph.tap('[data-tool="brush"]'); await ph.evaluate(() => { DithryApp.app.rampSel = 0; DithryApp.app.style.ramp[0] = { c: '#00ff00', a: 1 }; });
+  s0 = await pa(); const hp = await pp(20, 20); await t('touchStart', [hp]); await ph.waitForTimeout(700); await t('touchEnd', []);
+  ok(await ph.evaluate(() => DithryApp.app.style.ramp[0].c) === '#ff0000' && (await pa()).undo === s0.undo, 'press and hold picks the colour under your finger (and paints nothing)');
+  // tapping the tool you have opens its options; the size slider; Done closes
+  await ph.tap('[data-tool="brush"]'); ok((await pa()).sheet === 'tool' && !!(await ph.$('#side.open [data-opt="size"]')), 'tapping the current tool opens its options');
+  await ph.$eval('#side [data-opt="size"]', e => { e.value = 5; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  ok((await pa()).size === 5 && (await ph.textContent('#side [data-optv="size"]')) === '5', 'the size slider sets the brush size');
+  await ph.tap('#side [data-m="close"]'); ok((await pa()).sheet === null && !(await ph.$('#side.open')), 'Done closes the sheet');
+  // Colour sheet: palette swatches, fields big enough that iPhones don't zoom; the picture slides up out of the way
+  const py0 = (await pa()).panY;
+  await ph.tap('[data-sheet="colours"]');
+  const sh = await ph.evaluate(() => { const art = document.getElementById('art').getBoundingClientRect(), side = document.getElementById('side').getBoundingClientRect();
+    return { open: document.getElementById('side').classList.contains('open'), artTop: art.top, sideTop: side.top, small: [...document.querySelectorAll('#side input[type=text], #side input[type=number], #side select')].filter(e => parseFloat(getComputedStyle(e).fontSize) < 16).length }; });
+  ok(sh.open && sh.small === 0, 'the Colour tab opens a sheet whose fields are 16px, so tapping one doesn’t zoom the page');
+  ok(sh.artTop < sh.sideTop && (await pa()).panY <= py0, 'the picture slides up so it isn’t hidden behind the sheet');
+  await ph.tap('#side [data-pal="#000000"]'); ok(await ph.evaluate(() => DithryApp.app.style.ramp[0].c) === '#000000', 'tapping a swatch sets the colour');
+  await ph.tap('[data-sheet="colours"]'); ok(!(await ph.$('#side.open')) && (await pa()).panY === py0, 'tapping the tab again closes it, and the picture slides back');
+  // polygon: tap the corners, then Finish on the bar that appears
+  await ph.tap('[data-tool="polygon"]'); await ph.evaluate(() => { const st = DithryApp.app.style; st.mode = 'solid'; st.ramp = [{ c: '#0000ff', a: 1 }]; });
+  s0 = await pa(); await ftap(60, 60); await ftap(90, 60); await ftap(60, 85);
+  ok(await ph.$eval('#polybar', e => getComputedStyle(e).display) === 'flex', 'while drawing a polygon, a Finish / Last point / Cancel bar appears');
+  await ph.tap('[data-poly="done"]');
+  ok((await pa()).undo === s0.undo + 1 && (await pxl(65, 65))[2] === 255 && await ph.$eval('#polybar', e => getComputedStyle(e).display) === 'none', 'Finish fills the polygon and the bar goes away');
+  // snap: Shift for fingers
+  await ph.tap('[data-tool="line"]'); await ph.tap('[data-tool="line"]'); await ph.check('#side [data-opt="snap"]'); await ph.tap('#side [data-m="close"]');
+  await fdrag(100, 10, 130, 14);
+  ok((await pxl(130, 10))[3] === 255, 'with Snap to 45° on, a slightly slanted line comes out level');
+  // the ☰ menu lists every command
+  await ph.tap('[data-m="menu"]'); ok((await ph.$$('#side [data-cmd]')).length >= 20, 'the ☰ menu lists the File, Edit, Image, Layer, View and Help commands');
+  await ph.tap('#side [data-cmd="addLayer"]'); ok(!(await ph.$('#side.open')) && (await ph.evaluate(() => DithryApp.app.doc.layers.length)) === 6, 'choosing one runs it and closes the menu');
+  await ph.screenshot({ path: SHOTS + '/phone.png' });
+  // card mode on a phone: a compact bar, and the rest in the Card tab
+  await ph.evaluate(() => { DithryApp.app.dirty = false; }); await ph.goto(URL + '#card=fairgrounds'); await ph.reload(); await ph.waitForFunction(() => window.dithryReady); await ph.waitForTimeout(200);
+  const cb = await ph.evaluate(() => ({ save: document.querySelector('.cardbar [data-c="save"]').getBoundingClientRect().right <= innerWidth, reset: getComputedStyle(document.querySelector('.cardbar [data-c="reset"]')).display, tab: !!document.querySelector('[data-sheet="card"]'), wide: document.documentElement.scrollWidth <= innerWidth }));
+  ok(cb.save && cb.reset === 'none' && cb.tab && cb.wide, 'card mode on a phone: one compact bar (◀ card ▶ Save), the rest under a Card tab');
+  await ph.tap('[data-sheet="card"]'); ok(!!(await ph.$('#side.open [data-c="leave"]')) && !!(await ph.$('#side.open [data-c="reset"]')), 'the Card tab has Reset, Art pack and Leave card mode');
+  await ph.screenshot({ path: SHOTS + '/phone-card.png' });
 
   ok(errs.length === 0, 'no page errors ' + errs.join(' | '));
   await b.close(); console.log(out.join('\n')); console.log('screenshots: ' + SHOTS); process.exit(0);

@@ -39,6 +39,8 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .cardbar { display: flex; align-items: center; gap: 6px; padding: 4px 6px; flex-wrap: wrap; flex: 0 0 auto; }
 .cardbar select { max-width: 260px; }
 .cardbar .grow { flex: 1; }
+.cardbar .narrow { display: none; }
+.cardbar .btn.dirty { font-weight: 700; }
 .main { flex: 1; min-height: 0; display: flex; gap: 4px; padding: 2px; }
 .toolbox { flex: 0 0 auto; width: 92px; padding: 4px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
@@ -97,17 +99,75 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .modal table { border-collapse: collapse; } .modal td { padding: 1px 10px 1px 0; vertical-align: top; }
 .presetlist { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .presetlist .btn { text-align: left; }
-.toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 6px 12px; z-index: 60; max-width: 90vw; }
+.toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); padding: 6px 12px; z-index: 60; max-width: 90vw; pointer-events: none; }   /* taps go through it */
 
-/* phones and narrow windows: tools across the top, panels below the canvas */
-@media (max-width: 820px) {
-  .win { inset: 0; }
-  .main { flex-direction: column; overflow: auto; }
-  .toolbox { width: auto; flex-direction: column; overflow: visible; }
-  .tools { display: flex; overflow-x: auto; gap: 2px; padding-bottom: 2px; }
-  .tool { flex: 0 0 auto; width: 40px; height: 36px; }
-  .opts { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-  .work { flex: 0 0 52vh; min-height: 260px; }
-  .side { flex: 0 0 auto; overflow: visible; }
-  .titlebar .tip { display: none; }
+/* Parts only phones use; hidden on wider screens. */
+.mtop, .mtabs, .sheethead { display: none; }
+.polybar { display: none; position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); gap: 6px; z-index: 6; padding: 4px; white-space: nowrap; }
+.sizer { display: flex; align-items: center; gap: 6px; } .sizer input { flex: 1; min-width: 70px; } .sizer b { min-width: 2ch; text-align: right; }
+.tabsw { display: inline-flex; border: 1px solid var(--dk); } .tabsw i { width: 9px; height: 16px; display: block; }
+
+/* Phones, either way up (and narrow windows): the canvas fills the screen, with a top bar (menu, undo, redo, fit), a strip of tools,
+   and a tab bar at the bottom whose tabs open the panels in a sheet over the lower part of the canvas. */
+@media (max-width: 820px), (max-height: 520px) {
+  html, body { touch-action: manipulation; overscroll-behavior: none; }
+  .win { inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); border: 0; box-shadow: none; }
+  .titlebar, .menubar, .statusbar { display: none; }
+  .mtop { display: flex; align-items: center; gap: 4px; padding: 4px; flex: 0 0 auto; }
+  .mtop .mb { min-width: 44px; min-height: 40px; font-size: 18px; line-height: 1; padding: 0 8px; }
+  .mtop .grow { flex: 1; }
+  .mname { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .main { flex-direction: column; overflow: hidden; padding: 0 2px; gap: 2px; }
+  .toolbox { width: auto; flex: 0 0 auto; padding: 3px; overflow: visible; }
+  .toolbox .opts { display: none; }
+  .tools { display: flex; overflow-x: auto; gap: 3px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tools::-webkit-scrollbar { display: none; }
+  .tool { flex: 0 0 auto; width: 46px; height: 42px; }
+  .work { flex: 1 1 auto; min-height: 0; }
+  .side { position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom)); max-height: 58vh; overflow: auto; display: none; z-index: 40; gap: 0;
+    background: var(--face); border-top: 2px solid var(--hi); box-shadow: 0 -2px 0 var(--dk), 0 -6px 12px rgba(0, 0, 0, .25); padding: 0 0 8px; -webkit-overflow-scrolling: touch; }
+  .side.open { display: flex; }
+  .sheethead { display: flex; align-items: center; gap: 6px; padding: 6px 10px; position: sticky; top: 0; z-index: 2; background: var(--face); border-bottom: 1px solid var(--lo); font-size: 15px; }
+  .sheethead .grow { flex: 1; }
+  .side .panel { border: 0; box-shadow: none; }
+  .side .panel > .ph { cursor: default; }
+  .side .panel > .ph > span:first-child { display: none; }
+  .side .pb { padding: 8px 12px 0; gap: 8px; }
+  .side .opts { display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+  .mtabs { display: flex; gap: 3px; padding: 3px 3px calc(3px + env(safe-area-inset-bottom)); flex: 0 0 auto; }
+  .mtabs .btn { flex: 1; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 12px; padding: 2px; }
+  .mtabs .btn svg { width: 18px; height: 18px; }
+  /* bigger targets, and 16px text in fields so iPhones don't zoom the page when you tap one */
+  input[type="number"], input[type="text"], select { font-size: 16px; min-height: 34px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  input[type="range"] { height: 30px; }
+  .btn { min-height: 36px; }
+  .slider { grid-template-columns: 96px 1fr 52px; }
+  .ctl { grid-template-columns: 96px 1fr; }
+  .sw { width: 42px; height: 42px; }
+  .palette { grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .layers { max-height: none; }
+  .layer { grid-template-columns: 28px 48px 1fr 36px; padding: 6px; min-height: 44px; }
+  .layer canvas { width: 48px; height: 32px; }
+  .menusheet { display: flex; flex-direction: column; gap: 10px; }
+  .menusheet .msec { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .menusheet .msec > div { grid-column: 1 / -1; }
+  .menusheet .btn { text-align: left; min-height: 42px; }
+  .toast { bottom: auto; top: calc(env(safe-area-inset-top) + 98px); }   /* clear of the polygon bar and the sheets at the bottom */
+  .polybar { bottom: 8px; }
+  .polybar .btn { min-height: 40px; }
+  .modal .body { font-size: 15px; }
+  .cardbar { flex-wrap: nowrap; padding: 3px 4px; gap: 4px; }
+  .cardbar .wide { display: none; } .cardbar .narrow { display: inline; }
+  .cardbar select { flex: 1; min-width: 0; max-width: none; }
+  .cardbar .btn { min-width: 40px; padding: 0 8px; }
+  .cardbar [data-c="count"] { display: none; }
+}
+/* a phone on its side: less height, so slimmer bars and a taller sheet */
+@media (max-height: 520px) {
+  .mtop { padding: 2px 4px; } .mtop .mb { min-height: 32px; }
+  .tool { height: 34px; width: 42px; }
+  .mtabs .btn { min-height: 36px; flex-direction: row; gap: 6px; }
+  .side { max-height: none; top: calc(env(safe-area-inset-top) + 40px); bottom: calc(44px + env(safe-area-inset-bottom)); left: auto; width: min(430px, 56vw); border-top: 0; border-left: 2px solid var(--hi); box-shadow: -2px 0 0 var(--dk), -6px 0 12px rgba(0, 0, 0, .25); }
+  .cardbar { padding: 2px 4px; }
 }

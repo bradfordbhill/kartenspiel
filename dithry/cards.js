@@ -31,7 +31,7 @@
     A.confirmDiscard(function () {
       cm = { list: library(), i: 0, palette: app.palette };   // the palette to go back to when you leave
       var at = id || A.lsGet('dithry.cardmode.last'), k = cm.list.findIndex(function (c) { return c.id === at; }); cm.i = k < 0 ? 0 : k;
-      app.mode = 'cards'; buildBar(); buildHosts();
+      app.mode = 'cards'; buildBar(); buildHosts(); A.renderSide();
       A.hooks.view.push(placeHosts); A.hooks.overlay.push(shadeGap); A.hooks.change.push(updateBar);
       return load();
     });
@@ -39,7 +39,7 @@
   function leave() {
     if (!cm || cm.busy) return;
     var c = cm; cm = null; app.mode = null; app.allow = null; app.palette = c.palette; A.renderSide();
-    c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); });
+    c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); }); if (app.sheet === 'card') app.sheet = null;
     A.hooks.view.splice(A.hooks.view.indexOf(placeHosts), 1); A.hooks.overlay.splice(A.hooks.overlay.indexOf(shadeGap), 1); A.hooks.change.splice(A.hooks.change.indexOf(updateBar), 1);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   }
@@ -58,27 +58,41 @@
     bar.innerHTML = '<button class="btn" data-c="prev" title="Previous card (Page Up)">◀</button>' +
       '<select data-c="pick" aria-label="Card">' + Object.keys(groups).map(function (s) { return '<optgroup label="' + esc(s) + '">' + groups[s].join('') + '</optgroup>'; }).join('') + '</select>' +
       '<button class="btn" data-c="next" title="Next card (Page Down)">▶</button><span class="small muted" data-c="count"></span>' +
-      '<label class="row small"><input type="checkbox" data-c="text" checked> Card text</label>' +
-      '<span class="grow"></span><span class="small" data-c="state"></span>' +
-      '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)">Save to Kartenspiel</button>' +
-      '<button class="btn" data-c="reset" title="Go back to the plain suit texture">Reset…</button><button class="btn" data-c="pack" title="Export or import all painted cards">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button>';
+      '<label class="row small wide"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Card text</label>' +
+      '<span class="grow"></span><span class="small wide" data-c="state"></span>' +
+      '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)"><span class="wide">Save to Kartenspiel</span><span class="narrow">Save</span></button>' +
+      '<button class="btn wide" data-c="reset" title="Go back to the plain suit texture">Reset…</button><button class="btn wide" data-c="pack" title="Export or import all painted cards">Art pack…</button><button class="btn wide" data-c="leave">Leave card mode</button>';
     var mb = $('.menubar'); mb.parentNode.insertBefore(bar, mb.nextSibling); cm.bar = bar;
-    bar.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-c]'); if (!b || b.tagName === 'SELECT' || b.tagName === 'INPUT') return;
-      ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]();
-    });
-    bar.addEventListener('change', function (e) {
-      var t = e.target;
-      if (t.getAttribute('data-c') === 'pick') goTo(cm.list[+t.value].id);
-      if (t.getAttribute('data-c') === 'text') cm.hosts.forEach(function (h) { h.style.display = t.checked ? '' : 'none'; });
-    });
   }
+  // The bar's buttons, and the same ones in the phone's Card sheet.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-c]'); if (!cm || !b || b.tagName === 'SELECT' || b.tagName === 'INPUT' || b.tagName === 'LABEL' || b.tagName === 'SPAN') return;
+    var f = ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]; if (f) f();
+  });
+  document.addEventListener('change', function (e) {
+    var t = e.target; if (!cm || !t.getAttribute) return;
+    if (t.getAttribute('data-c') === 'pick') goTo(cm.list[+t.value].id);
+    if (t.getAttribute('data-c') === 'text') { cm.noText = !t.checked; cm.hosts.forEach(function (h) { h.style.display = cm.noText ? 'none' : ''; }); document.querySelectorAll('[data-c="text"]').forEach(function (x) { x.checked = !cm.noText; }); }
+  });
+  // The phone's Card sheet: where you are, whether it's saved, and the rest of the bar's buttons.
+  A.hooks.cardSheet = function () {
+    if (!cm) return '';
+    var c = cm.list[cm.i];
+    return '<div class="pb"><div><b>' + esc(c.name) + '</b> <span class="muted">' + esc(c.type + ' · ' + c.suit) + ' · card ' + (cm.i + 1) + ' of ' + cm.list.length + '</span></div>' +
+      '<div class="small" data-c="state"></div>' +
+      '<label class="row"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Show the card text over the painting</label>' +
+      '<div class="row"><button class="btn def" data-c="save">Save to Kartenspiel</button><button class="btn" data-c="reset">Reset…</button></div>' +
+      '<div class="row"><button class="btn" data-c="pack">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button></div>' +
+      '<div class="small muted">Tip: tap with two fingers to undo, three to redo; press and hold to pick a colour.</div></div>';
+  };
   function updateBar() {
     if (!cm || !cm.bar) return;
     var c = cm.list[cm.i], f = myFaces()[c.id], committed = typeof KCardArt !== 'undefined' && KCardArt[c.id];
     $('[data-c="pick"]', cm.bar).value = String(cm.i);
     $('[data-c="count"]', cm.bar).textContent = (cm.i + 1) + ' of ' + cm.list.length;
-    $('[data-c="state"]', cm.bar).textContent = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
+    var st = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
+    document.querySelectorAll('[data-c="state"]').forEach(function (x) { x.textContent = st; });
+    cm.bar.querySelector('[data-c="save"]').classList.toggle('dirty', app.dirty);
   }
 
   /* ----- the card text in front of the paint ----- */
@@ -136,7 +150,7 @@
       A.setupCanvas(); A.renderSide();
     });
     return done.then(function () {
-      cm.busy = false; app.name = c.name; app.dirty = false; A.renderTitle(); fillHosts(c); A.fit(); placeHosts(); updateBar();
+      cm.busy = false; app.name = c.name; app.dirty = false; A.renderTitle(); fillHosts(c); A.fit(); placeHosts(); if (app.sheet === 'card') A.renderSide(); updateBar();
       if (app.doc.layers.length > 1 && app.doc.active === 0) { app.doc.active = app.doc.layers.length - 1; A.renderSide(); }
     }, function () { cm.busy = false; A.toast('That card’s saved painting couldn’t be read.'); });
   }
