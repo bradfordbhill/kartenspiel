@@ -351,15 +351,19 @@
   function sig(x) { return 1 / (1 + Math.exp(-x)); }
   // the frontier of each suit's gradient: darkness 0..1 at (u, v), u across and v down, both 0..1; a = width / height
   var TEX_FIELD = {
-    // a straight edge with one sharp kink, at a slant
-    Sword: function (R) { var k = .25 + R() * .5, sl = (R() - .5) * .6, A = .14 + R() * .08, c = .55 + R() * .1;
-      return function (u, v) { return sig((v - (c + sl * (u - .5) - A * (1 - Math.abs(u - k) / Math.max(k, 1 - k) * 2))) / .045); }; },
+    // flames: pointed tongues licking up from the bottom, swept to one side as they rise
+    Sword: function (R) { var lean = (R() < .5 ? -1 : 1) * (.25 + R() * .2), base = .92, T = [];
+      for (var i = 0; i < 4; i++) T.push([-.1 + i * .36 + R() * .12, .16 + R() * .08, .3 + R() * .32]);   // centre, half-width, height
+      return function (u, v) { var f = 0, up = base - v;
+        T.forEach(function (t) { var x = (u - t[0] - lean * up * up * 2.2) / t[1], top = t[2] * Math.max(0, 1 - Math.abs(x)) * (1 - .25 * x * x);
+          f = Math.max(f, sig((top - up) / .035) * (.42 + .4 * Math.max(0, 1 - up / .7))); });   // lighter towards the tips, so the streaks show
+        return Math.max(f, sig((v - base) / .03) * .85); }; },
     // a spearhead rising from the bottom
     Sceptre: function (R) { var m = .38 + R() * .24, w = .2 + R() * .1, c = .82 + R() * .06, H = .5 + R() * .12;
       return function (u, v) { return sig((v - (c - H * Math.max(0, 1 - Math.abs(u - m) / w))) / .04); }; },
-    // soft, uneven light falling through leaves
+    // soft, uneven light falling through leaves (drawn as vines by TEX_MAP)
     Leaf: function (R) { var spots = []; for (var i = 0; i < 7; i++) spots.push([R(), .15 + R() * .85, .08 + R() * .1, R() < .5 ? -1 : 1]);
-      return function (u, v, a) { var f = sig((v - .55) / .16); spots.forEach(function (s) { var d = Math.hypot((u - s[0]) * a, v - s[1]) / s[2]; if (d < 1) f += s[3] * .5 * (1 - d * d); }); return f; }; },
+      return function (u, v, a) { var f = sig((v - .55) / .16); spots.forEach(function (s) { var d = Math.hypot((u - s[0]) * a, v - s[1]) / s[2]; if (d < 1) f += s[3] * .3 * (1 - d * d); }); return f; }; },
     // a headstone, rounded on top, rising from the bottom
     Bone: function (R) { var m = .4 + R() * .2, hw = .2 + R() * .08, top = .22 + R() * .14;
       return function (u, v, a) { var x = (u - m) * a, r = hw * a, cy = top + r, d = v > cy ? Math.abs(x) - r : Math.hypot(x, v - cy) - r; return sig(-d / .035) * .9 + v * .1; }; },
@@ -372,20 +376,62 @@
     Goblet: function (R) { var c = .42 + R() * .1, bub = []; for (var i = 0; i < 5; i++) bub.push([.12 + R() * .76, c + .12 + R() * (.8 - c), .06 + R() * .06]);
       return function (u, v, a) { var f = sig((v - (c + .02 * Math.sin(u * 9 + c * 40))) / .05); bub.forEach(function (b) { var d = Math.hypot((u - b[0]) * a, v - b[1]) / b[2]; if (d < .8) f -= .9; else if (d < 1.1) f += .4; }); return f; }; }
   };
-  // how each suit dithers: ordered (Bayer) cross-hatch, the same turned 45°, scattered noise, a fine checker, a softened cross-hatch, halftone dots
+  // how each suit dithers: a fine checker, a softened cross-hatch, halftone dots.
+  // Sword, Sceptre and Leaf draw a map per card instead (TEX_MAP, below).
   var TEX_DITHER = {
-    Sword: function (x, y) { return (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16; },
-    Sceptre: function (x, y) { return (BAYER4[((x + y) & 3) * 4 + ((x - y) & 3)] + .5) / 16; },
-    Leaf: function (x, y, R) { return R(); },
     Bone: function (x, y) { return ([0, 2, 3, 1][(y & 1) * 2 + (x & 1)] + .5) / 4; },
     Tome: function (x, y) { return (BAYER4[(y & 3) * 4 + (x & 3)] * .6 + (x & 1) * 5 + .5) / 15; },
     Goblet: function (x, y) { return (HALFTONE[(y & 3) * 4 + (x & 3)] + .5) / 16; }
   };
+  // Per-card dither maps, (R, width, height) → threshold(x, y). A pixel turns dark where the gradient's darkness
+  // passes its threshold, so low thresholds show first: they draw the pattern, and the rest fills in as it darkens.
+  var TEX_MAP = {
+    // a swoosh: curved streaks that sweep up and over like the flames, with a fine cross-hatch between them
+    Sword: function (R, gw, gh) {
+      var dir = R() < .5 ? -1 : 1, P = 5 + Math.floor(R() * 2), ph = R() * P, k = (.8 + R() * .6) * dir;
+      return function (x, y) { var up = (gh - y) / gh, q = (x + k * up * up * gh * .9 + ph) / P, tri = Math.abs(2 * (q - Math.floor(q)) - 1);
+        return .08 + tri * .72 + (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16 * .18; };
+    },
+    // ashlar masonry: mortar joints darken first, then the stones fill in; each course is offset by half a stone
+    Sceptre: function (R, gw, gh) {
+      var bw = 7 + Math.floor(R() * 3), bh = 4, ox = Math.floor(R() * bw), oy = Math.floor(R() * bh);
+      return function (x, y) {
+        var row = Math.floor((y + oy) / bh), yy = (y + oy) % bh, xx = (x + ox + (row & 1 ? bw >> 1 : 0)) % bw;
+        if (yy === 0 || xx === 0) return .12;                                       // the joints
+        return .45 + (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16 * .55; };             // the stone face
+    },
+    // vines: sinuous diagonal stems (lower left to upper right), each with short side shoots and leaves
+    Leaf: function (R, gw, gh) {
+      var d = [], W = gw, H = gh, i, P = 11 + Math.floor(R() * 4), ph = R() * P;
+      for (i = 0; i < W * H; i++) d[i] = 9;
+      function dot(x, y, v) { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < W && y < H && v < d[y * W + x]) d[y * W + x] = v; }
+      for (var s = -H + ph; s < W + H; s += P) {                     // one stem per diagonal: x + y = s, wiggling
+        var wob = R() * 6.3, side = R() < .5 ? 1 : -1;
+        for (var t = -H; t < W + H; t += .5) {
+          var w = 1.1 * Math.sin(t * .22 + wob), x = (s + t) / 2 + w * .7, y = (s - t) / 2 + w * .7; dot(x, y, 0);
+          if (Math.abs(t % 9) < .25 && R() < .85) {                   // a shoot every few steps, on alternating sides,
+            side = -side;                                              // leaving the stem at 45°: right or up
+            var sx = side > 0 ? 1 : 0, sy = side > 0 ? 0 : -1, bx = x, by = y;
+            for (var b = 1; b <= 6; b++) { bx += sx * .9 + .1; by += sy * .9 - .1; dot(bx, by, 1); }
+            dot(bx + sx, by + sy, 0); dot(bx + sx + sy * -1, by + sy + sx, 0); dot(bx, by, 0);   // a leaf at the tip
+          }
+        }
+      }
+      for (var pass = 0; pass < 3; pass++) for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {   // grow outward: distance from the vine
+        var k = y * W + x, m = d[k];
+        if (x > 0) m = Math.min(m, d[k - 1] + 2); if (y > 0) m = Math.min(m, d[k - W] + 2); if (x < W - 1) m = Math.min(m, d[k + 1] + 2); if (y < H - 1) m = Math.min(m, d[k + W] + 2);
+        d[k] = m;
+      }
+      var T = [.06, .2, .5, .62, .74, .84, .9, .94, .97, .98];   // stem, shoot, then a thin halo, then the gaps fill last
+      return function (x, y) { return T[Math.min(9, d[y * W + x])]; };
+    }
+  };
   // background-image CSS for one card: suit, a seed (the card's id), and its size in CSS pixels
   function cardTex(suit, seed, w, h) {
     var key = suit + '|' + seed + '|' + w + 'x' + h; if (TEX[key] !== undefined) return TEX[key];
-    var F = TEX_FIELD[suit], Dth = TEX_DITHER[suit]; if (!F || typeof document === 'undefined') return (TEX[key] = '');
+    var F = TEX_FIELD[suit]; if (!F || typeof document === 'undefined') return (TEX[key] = '');
     var R = rng(seed + suit), field = F(R), N = rng('n' + seed), gw = w >> 1, gh = h >> 1, a = gw / gh;
+    var Dth = TEX_MAP[suit] ? TEX_MAP[suit](rng('m' + seed), gw, gh) : TEX_DITHER[suit];
     var cv = document.createElement('canvas'); cv.width = gw; cv.height = gh; var g = cv.getContext('2d'), img = g.createImageData(gw, gh), px = img.data;
     for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) {
       var u = (x + .5) / gw, v = (y + .5) / gh, f = Math.max(0, Math.min(1, field(u, v, a) * .85 + v * .15));
