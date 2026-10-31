@@ -195,6 +195,15 @@ const URL = 'file://' + path.join(REPO, 'dithry.html');
   const inGame = await ks.evaluate(() => { const f = JSON.parse(localStorage.getItem('ks.faces'))['tithing-hall'], hc = [...document.querySelectorAll('.bottom .hcard .card')].find(e => e.querySelector('.nm').textContent === 'Tithing Hall'), bc = document.querySelector('.cell:has([data-cell="1,0"]) .card');
     return [hc && hc.style.backgroundImage.indexOf(f.hand.slice(0, 80)) >= 0, bc && bc.style.backgroundImage.indexOf(f.board.slice(0, 80)) >= 0]; });
   ok(inGame[0] && inGame[1], 'in a game, the hand card shows the hand face and the board card the board face');
+  // light text for a dark painting: the toggle shows it at once, saves with the card, and Kartenspiel uses it
+  await cp.click('[data-c="ink"]');
+  ok(await cp.evaluate(() => [...document.querySelectorAll('.cardtext')].every(h => h.shadowRoot.querySelector('.card').classList.contains('lighttext'))) && (await cs()).dirty, 'the Aa button switches the card text to light (and needs saving)');
+  await cp.click('[data-c="save"]'); await cp.waitForTimeout(300);
+  ok(await cp.evaluate(() => JSON.parse(localStorage.getItem('ks.faces'))['tithing-hall'].text) === 'light', 'saving keeps the light text with the painting');
+  await ks.waitForTimeout(300);
+  ok(await ks.evaluate(() => [...document.querySelectorAll('.bottom .hcard .card')].some(e => e.querySelector('.nm').textContent === 'Tithing Hall' && e.classList.contains('lighttext')) && document.querySelector('.cell:has([data-cell="1,0"]) .card').classList.contains('lighttext')), 'Kartenspiel draws that card’s text light, in hand and on the board');
+  await cp.click('[data-c="ink"]'); await cp.click('[data-c="save"]'); await cp.waitForTimeout(300);
+  ok(!(await cp.evaluate(() => JSON.parse(localStorage.getItem('ks.faces'))['tithing-hall'].text)), 'and switching back to dark text saves that too');
   // the layers are kept for next time; moving on asks about unsaved work
   await cp.click('[data-c="next"]'); await cp.waitForTimeout(300); const c1 = await cs();
   await cp.click('[data-c="prev"]'); await cp.waitForTimeout(400); const c2 = await cs();

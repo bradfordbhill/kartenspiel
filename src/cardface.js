@@ -2,7 +2,7 @@
    card's text sits in exactly the same place in both. Also here: the suit icons, the faint dithered texture each
    suit gets, and the store of painted card faces.
    Painted faces: each card can have a picture for its hand (portrait, 75 × 103 pixels, shown at 2× on a desktop
-   hand card of 150 × 206 and stretched to fit elsewhere) and board (square, 52 × 52, on a 104 × 104 cell) versions. Committed ones live in src/cardart.js (KCardArt) and show for everyone; Dithry saves
+   hand card of 150 × 206 and stretched to fit elsewhere) and board (square, 52 × 52, on a 104 × 104 cell) versions, and .text: 'light' when its text should be light over a dark painting. Committed ones live in src/cardart.js (KCardArt) and show for everyone; Dithry saves
    new ones in this browser (localStorage 'ks.faces'), which take precedence, so you see your edits at once. */
 var KFace = (function () {
   'use strict';
@@ -56,11 +56,12 @@ var KFace = (function () {
   function artStyle(art) { return 'background-image:url(' + art + ')' + (art.indexOf('data:image/png') === 0 ? ';image-rendering:pixelated' : ''); }
 
   // Face for a card definition: in hand, the library, the builder. opts: { big, mid, value, cost, art (art-band
-  // picture), style (CSS for the card's background: its texture or painted face) }.
+  // picture), style (CSS for the card's background: its texture or painted face), ink ('light' for light text over a
+  // dark painting; a painted face's .text) }.
   function handFace(d, o) {
     o = o || {};
     var art = o.art, tx = o.style || '';
-    var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + '"' + (tx ? ' style="' + tx + '"' : '') + '>';
+    var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + (o.ink === 'light' ? ' lighttext' : '') + '"' + (tx ? ' style="' + tx + '"' : '') + '>';
     h += '<div class="top"><span>' + esc(o.cost != null ? o.cost : d.cost) + '●</span>' + icon(d.suit) + '</div>';
     if (art) h += '<div class="art" style="' + artStyle(art) + '"></div>';
     h += '<div class="nm">' + esc(d.name) + '</div><div class="ty">' + esc(d.type) + ' · ' + esc(d.suit) + '</div>';
@@ -87,7 +88,7 @@ var KFace = (function () {
   // painting. The game draws its live board faces in boardFace (ui.js), with the same structure.
   function boardBlank(d, o) {
     o = o || {};
-    var h = '<div class="card s-' + esc(d.suit) + (d.type === 'Foundation' ? ' found' : '') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>';
+    var h = '<div class="card s-' + esc(d.suit) + (d.type === 'Foundation' ? ' found' : '') + (o.ink === 'light' ? ' lighttext' : '') + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>';
     h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(d.suit) + '</div>';
     if (o.art) h += '<div class="art" style="' + artStyle(o.art) + '"></div>';
     h += '<div class="nm">' + esc(d.name) + '</div><div class="ty">' + esc(d.type) + '</div>';

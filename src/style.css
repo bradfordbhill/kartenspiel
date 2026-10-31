@@ -421,6 +421,12 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
   .bottom .card .txt.mid { font-size: 10.5px; }
 }
 
+/* light text, for a card painted dark in Dithry (its painted face says text: 'light'); suit icons in lighter inks */
+.card.lighttext { color: #f4efe2; text-shadow: 1px 1px 0 rgba(0, 0, 0, .55); }
+.card.lighttext .ty, .card.lighttext .txt.small { color: #d9d1bf !important; }
+.card.lighttext .suitico { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .55)); }
+.card.lighttext .suitico.si-Sceptre { color: #f2d878 !important; } .card.lighttext .suitico.si-Goblet { color: #eab0de !important; } .card.lighttext .suitico.si-Sword { color: #ffa293 !important; }
+.card.lighttext .suitico.si-Bone { color: #e4e4e4 !important; } .card.lighttext .suitico.si-Leaf { color: #b2e29c !important; } .card.lighttext .suitico.si-Tome { color: #b0c6ff !important; }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }

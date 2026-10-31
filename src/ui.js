@@ -376,13 +376,14 @@
   }
   function handStyle(d, seed, big) { var f = FACES[d.id]; return f && f.hand ? KF.picCSS(f.hand, big ? 'cover' : null) : seed ? cardTex(d.suit, seed, 150, 206) : ''; }   // the desktop hand card's size, so its pixels are square there
   // face for a card definition (hand, library, builder); opts: {big, mid, value, cost, tex (a seed for the texture)}
-  function defFace(d, o) { o = o || {}; return KF.handFace(d, Object.assign({}, o, { art: d.art || artOf(d.id), style: handStyle(d, o.tex, o.big) })); }
+  function inkOf(id) { var f = FACES[id]; return f && f.hand && f.text === 'light' ? 'light' : ''; }   // light text over a dark painting
+  function defFace(d, o) { o = o || {}; return KF.handFace(d, Object.assign({}, o, { art: d.art || artOf(d.id), style: handStyle(d, o.tex, o.big), ink: inkOf(d.id) })); }
   // face for a card on the board
   function boardFace(st, k, ctx) {
     var u = E.top(st, k), c = st.cards[u], d = E.def(st, u), suit = E.suitOf(st, u), stack = st.board[k];
     var ruined = c.ruined, covered = E.isCovered(st, k);
     var noOW = c.ascended || !!(E.rawDef(st, u).mods || {}).immune;
-    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '"' + (ruined || c.ascended ? '' : ' style="' + (FACES[c.def] && FACES[c.def].board ? KF.picCSS(FACES[c.def].board) : cardTex(suit, u, CW, CH)) + '"') + '>';
+    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + (!ruined && !c.ascended && inkOf(c.def) ? ' lighttext' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '"' + (ruined || c.ascended ? '' : ' style="' + (FACES[c.def] && FACES[c.def].board ? KF.picCSS(FACES[c.def].board) : cardTex(suit, u, CW, CH)) + '"') + '>';
     h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(suit) + '</div>';
     var art = artOf(c.def); if (art && !ruined) h += '<div class="art" style="' + artStyle(art) + '"></div>';
     h += '<div class="nm">' + esc(ruined ? E.rawDef(st, u).name : d.name) + '</div><div class="ty">' + esc(ruined ? (c.overwhelmed ? 'Overwhelmed' : 'Ruined') : d.type) + '</div>';

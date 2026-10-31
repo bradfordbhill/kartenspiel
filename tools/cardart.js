@@ -13,7 +13,7 @@ for (const id in pack.faces) {
   const f = pack.faces[id];
   if (f === null) { if (cur[id]) { delete cur[id]; removed++; } continue; }
   if (!f || !ok(f.hand) || !ok(f.board)) { console.warn('skipped ' + id + ': not two PNG pictures'); continue; }
-  cur[id] = { hand: f.hand, board: f.board }; added++;
+  cur[id] = { hand: f.hand, board: f.board }; if (f.text === 'light') cur[id].text = 'light'; added++;
 }
 const ids = Object.keys(cur).sort();
 fs.writeFileSync(out, '/* Painted card faces committed to the game, so every player sees them: { cardId: { hand, board } } as PNG data URLs.\n' +

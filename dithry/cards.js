@@ -58,6 +58,7 @@
     bar.innerHTML = '<button class="btn" data-c="prev" title="Previous card (Page Up)">◀</button>' +
       '<select data-c="pick" aria-label="Card">' + Object.keys(groups).map(function (s) { return '<optgroup label="' + esc(s) + '">' + groups[s].join('') + '</optgroup>'; }).join('') + '</select>' +
       '<button class="btn" data-c="next" title="Next card (Page Down)">▶</button><span class="small muted" data-c="count"></span>' +
+      '<button class="btn ink" data-c="ink" title="Dark or light card text: light reads better over a dark painting">Aa</button>' +
       '<label class="row small wide"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Card text</label>' +
       '<span class="grow"></span><span class="small wide" data-c="state"></span>' +
       '<button class="btn def" data-c="save" title="Save this card to Kartenspiel (Ctrl+S)"><span class="wide">Save to Kartenspiel</span><span class="narrow">Save</span></button>' +
@@ -67,7 +68,7 @@
   // The bar's buttons, and the same ones in the phone's Card sheet.
   document.addEventListener('click', function (e) {
     var b = e.target.closest('[data-c]'); if (!cm || !b || b.tagName === 'SELECT' || b.tagName === 'INPUT' || b.tagName === 'LABEL' || b.tagName === 'SPAN') return;
-    var f = ({ prev: function () { step(-1); }, next: function () { step(1); }, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]; if (f) f();
+    var f = ({ prev: function () { step(-1); }, next: function () { step(1); }, ink: toggleInk, save: save, reset: resetCard, pack: packDialog, leave: leaveToPicture })[b.getAttribute('data-c')]; if (f) f();
   });
   document.addEventListener('change', function (e) {
     var t = e.target; if (!cm || !t.getAttribute) return;
@@ -81,6 +82,7 @@
     return '<div class="pb"><div><b>' + esc(c.name) + '</b> <span class="muted">' + esc(c.type + ' · ' + c.suit) + ' · card ' + (cm.i + 1) + ' of ' + cm.list.length + '</span></div>' +
       '<div class="small" data-c="state"></div>' +
       '<label class="row"><input type="checkbox" data-c="text"' + (cm.noText ? '' : ' checked') + '> Show the card text over the painting</label>' +
+      '<div class="row">Text colour <button class="btn ink" data-c="ink">' + (cm.ink === 'light' ? 'Light' : 'Dark') + '</button><span class="small muted">Light reads better over a dark painting.</span></div>' +
       '<div class="row"><button class="btn def" data-c="save">Save to Kartenspiel</button><button class="btn" data-c="reset">Reset…</button></div>' +
       '<div class="row"><button class="btn" data-c="pack">Art pack…</button><button class="btn" data-c="leave">Leave card mode</button></div>' +
       '<div class="small muted">Tip: tap with two fingers to undo, three to redo; press and hold to pick a colour.</div></div>';
@@ -93,6 +95,7 @@
     var st = app.dirty ? 'Unsaved changes' : f ? 'Painted (this browser)' : committed ? 'Painted (in the game)' : 'Plain texture';
     document.querySelectorAll('[data-c="state"]').forEach(function (x) { x.textContent = st; });
     cm.bar.querySelector('[data-c="save"]').classList.toggle('dirty', app.dirty);
+    document.querySelectorAll('[data-c="ink"]').forEach(function (b) { b.classList.toggle('light', cm.ink === 'light'); b.setAttribute('aria-pressed', cm.ink === 'light'); });
   }
 
   /* ----- the card text in front of the paint ----- */
@@ -110,8 +113,13 @@
     });
   }
   function fillHosts(c) {
-    cm.hosts[0].shadowRoot.querySelector('.face').innerHTML = '<div class="bottom"><div class="hand"><div class="hcard">' + F.handFace(c, { mid: true, art: c.art }) + '</div></div></div>';
-    cm.hosts[1].shadowRoot.querySelector('.face').innerHTML = '<div class="boardinner"><div class="cell">' + F.boardBlank(c, { art: c.art }) + '</div></div>';
+    cm.hosts[0].shadowRoot.querySelector('.face').innerHTML = '<div class="bottom"><div class="hand"><div class="hcard">' + F.handFace(c, { mid: true, art: c.art, ink: cm.ink }) + '</div></div></div>';
+    cm.hosts[1].shadowRoot.querySelector('.face').innerHTML = '<div class="boardinner"><div class="cell">' + F.boardBlank(c, { art: c.art, ink: cm.ink }) + '</div></div>';
+  }
+  // Dark or light card text: light reads better over a dark painting. It's saved with the card's painting.
+  function toggleInk() {
+    cm.ink = cm.ink === 'light' ? '' : 'light'; fillHosts(cm.list[cm.i]);
+    app.dirty = true; A.renderTitle(); updateBar(); if (app.sheet === 'card') A.renderSide();
   }
   function placeHosts() {
     if (!cm) return;
@@ -136,6 +144,7 @@
   function load() {
     var c = cm.list[cm.i], draft = A.lsGet('dithry.card.' + c.id), face = F.faces()[c.id];
     if (A.PALETTES[c.suit]) app.palette = c.suit;   // each suit's own palette while you paint its cards
+    cm.ink = face && face.text === 'light' ? 'light' : '';
     A.lsSet('dithry.cardmode.last', c.id); history.replaceState(null, '', '#card=' + encodeURIComponent(c.id));
     app.allow = new Uint8Array(DW * DH);
     for (var y = 0; y < DH; y++) for (var x = 0; x < DW; x++) app.allow[y * DW + x] = (x < HW && y < HH) || (x >= BX && y < BH) ? 1 : 0;
@@ -169,7 +178,7 @@
   function save() {
     if (!cm) return;
     var c = cm.list[cm.i], flat = A.flatten(), mine = myFaces();
-    mine[c.id] = { hand: crop(flat, 0, HW, HH), board: crop(flat, BX, BW, BH) };
+    mine[c.id] = { hand: crop(flat, 0, HW, HH), board: crop(flat, BX, BW, BH) }; if (cm.ink === 'light') mine[c.id].text = 'light';
     if (!A.lsSet('ks.faces', mine)) return A.toast('This browser’s storage is full, so the card couldn’t be saved. Export an art pack to keep your work.');
     A.lsSet('dithry.card.' + c.id, A.projectJSON());   // the layers, so you can keep working on them later
     app.dirty = false; A.renderTitle(); updateBar();

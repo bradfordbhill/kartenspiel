@@ -41,6 +41,8 @@ input[type="range"] { width: 100%; accent-color: var(--sel); margin: 0; }
 .cardbar .grow { flex: 1; }
 .cardbar .narrow { display: none; }
 .cardbar .btn.dirty { font-weight: 700; }
+.btn.ink { font-weight: 700; min-width: 40px; }
+.btn.ink.light { background: #2a2420; color: #f4efe2; }   /* shows the text colour the card will use */
 .main { flex: 1; min-height: 0; display: flex; gap: 4px; padding: 2px; }
 .toolbox { flex: 0 0 auto; width: 92px; padding: 4px; display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
