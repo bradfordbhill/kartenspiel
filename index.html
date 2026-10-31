@@ -121,9 +121,7 @@ legend { padding: 0 3px; }
 
 /* board */
 .boardbar { padding: 2px 4px; }
-.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: #f4f4ee; background-image: radial-gradient(#d4d4c8 1px, transparent 1px); background-size: 12px 12px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); } }
-:root[data-theme="dark"] .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); }
+.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; }
 .boardsizer { position: relative; }
 .boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .cell { position: absolute; width: 104px; height: 104px; }
@@ -493,7 +491,11 @@ h2:not(.plain) { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 
 .prompt.winner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .prompt.winner b { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 400; font-size: 26px; }
 /* the board in light mode: a faded vellum war-table instead of grey paper */
-.boardwrap { background-color: #efe6cc; background-image: radial-gradient(#cdbb8e 1px, transparent 1px); }
+/* the board's backdrop is a dithered night landscape, painted by paintScene in ui.js; these are its tones before it's drawn */
+.boardwrap { background: #c9c9c9 no-repeat 0 0; image-rendering: pixelated; }
+.boardsizer { image-rendering: auto; }   /* the pixelated setting is for the backdrop only */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boardwrap { background-color: #262a2a; } }
+:root[data-theme="dark"] .boardwrap { background-color: #262a2a; }
 </style></head><body><div id="app"></div><script>
 /* Kartenspiel — starter data. Card definitions are plain JSON so they can live in a db later. */
 var KData = (function () {
@@ -5749,6 +5751,63 @@ if (typeof module !== 'undefined') module.exports = KBots;
       return function (x, y) { return T[Math.min(9, d[y * W + x])]; };
     }
   };
+  // The board's backdrop, in the same two-tone dither: a windswept prairie at night under a crescent moon, a walled
+  // city on the horizon, and a river winding toward you. Drawn at the board's size (one pixel = 2 CSS pixels),
+  // grey in light mode and dark grey in dark mode, and redrawn only when that size or the theme changes.
+  var SCENE = {}, SCENE_TONES = { light: ['#c9c9c9', '#b9b9b9'], dark: ['#262a2a', '#1c1f1f'] };
+  function isDark() { var t = document.documentElement.getAttribute('data-theme'); return t === 'dark' || (t !== 'light' && !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)); }
+  function sceneTex(W, H, dark) {
+    var key = W + 'x' + H + (dark ? 'd' : 'l'); if (SCENE[key]) return SCENE[key];
+    var R = rng('prairie'), hz = Math.round(H * .4), cx = W * (.38 + R() * .24), toneA = SCENE_TONES[dark ? 'dark' : 'light'];
+    var sky = new Float32Array(W * H), solid = new Uint8Array(W * H);   // darkness 0..1, and 1 = drawn solid (city), 2 = drawn light (stars, moon)
+    function rect(x0, y0, x1, y1) { for (var y = Math.max(0, y0); y < Math.min(H, y1); y++) for (var x = Math.max(0, x0); x < Math.min(W, x1); x++) solid[y * W + x] = 1; }
+    // the walled city: curtain walls between towers with pointed roofs, a gatehouse, a keep and a church spire
+    var wh = Math.max(5, Math.round(H * .022)), cw = Math.max(56, Math.round(W * .22)), cl = Math.round(cx - cw / 2);
+    function crenels(x0, x1, top) { for (var x = x0; x < x1; x += 3) rect(x, top - 1, x + 2, top); }
+    function roof(x0, w, top, h) { for (var r = 0; r < h; r++) { var inset = Math.round(r * (w / 2) / h); rect(x0 + inset, top - r - 1, x0 + w - inset, top - r); } }
+    rect(cl, hz - wh, cl + cw, hz + 1); crenels(cl, cl + cw, hz - wh);                                           // the curtain wall
+    var nT = 5; for (var i = 0; i < nT; i++) {                                                                      // towers along it
+      var tx = Math.round(cl + i * (cw - 6) / (nT - 1)), th = wh + 5 + Math.round(R() * 3);
+      rect(tx, hz - th, tx + 6, hz); if (R() < .6) roof(tx - 1, 8, hz - th, 5); else crenels(tx, tx + 6, hz - th); }
+    var gx = Math.round(cl + cw * .3), gh = wh + 4; rect(gx, hz - gh, gx + 10, hz); crenels(gx, gx + 10, hz - gh); // the gatehouse
+    var kx = Math.round(cl + cw * (.55 + R() * .1)), kh = wh * 3; rect(kx, hz - kh, kx + 12, hz); crenels(kx, kx + 12, hz - kh);   // the keep
+    rect(kx + 4, hz - kh - 4, kx + 8, hz - kh); roof(kx + 3, 6, hz - kh - 4, 4);                                    // its turret
+    var sx = Math.round(cl + cw * .82); rect(sx, hz - wh * 2, sx + 4, hz); roof(sx - 1, 6, hz - wh * 2, 9); rect(sx + 1, hz - wh * 2 - 11, sx + 3, hz - wh * 2 - 9);   // a church spire
+    var rx = Math.round(cl - 16 - R() * 10); rect(rx, hz - 7, rx + 3, hz); roof(rx - 1, 5, hz - 7, 3);              // a lone watchtower out on the plain
+    // the moon: a crescent, high up on the side away from the city
+    var mx = cx < W / 2 ? W * .78 : W * .22, my = H * .12, mr = Math.max(6, H * .035);
+    for (var y = 0; y < hz; y++) for (var x = 0; x < W; x++) {
+      var u = x / W, v = y / hz, k = y * W + x;
+      var f = .78 - .55 * v * v + .07 * Math.sin(x * .045 + y * .5 + Math.sin(x * .013) * 3) * (1 - v);        // night sky, glowing at the horizon, wisps of cloud
+      if (Math.hypot(x - mx, y - my) < mr && Math.hypot(x - mx - mr * .45, y - my + mr * .2) > mr * .85) solid[k] = 2;
+      sky[k] = f;
+      if (!solid[k] && v < .7 && R() < .004) solid[k] = 2;                                                       // stars
+    }
+    // the ground: darker toward you; the river narrows and winds into the distance toward the city gate
+    for (var y = hz; y < H; y++) { var t = (y - hz) / (H - hz), wobble = Math.sin(1.6 / (t + .06) + 1.3) * W * .2 * t + Math.sin(.5 / (t + .03)) * W * .02;
+      var rc = cx + wobble, rw = 1 + W * .11 * Math.pow(t, 1.4);
+      for (var x = 0; x < W; x++) { var k = y * W + x;
+        if (Math.abs(x - rc) < rw) { sky[k] = .12 + .2 * t + (Math.sin(y * 1.7 + x * .2) > .6 ? .35 : 0); continue; }   // water: lit by the sky, with ripples
+        sky[k] = .42 + .45 * t + .12 * Math.sin(x * .07 + Math.sin(y * .3) * 2) * t; } }
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var g = cv.getContext('2d'), img = g.createImageData(W, H), px = img.data;
+    var A = toneA.map(function (c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; });
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      var k = y * W + x, on;
+      if (solid[k]) on = solid[k] === 1;
+      else if (y < hz) on = sky[k] > (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16;
+      else { var q = (y - x * .28 + 2.5 * Math.sin(x * .06 + y * .02)) / 4, tri = Math.abs(2 * (q - Math.floor(q)) - 1);   // grass bent by the wind
+        on = sky[k] > tri * .6 + (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16 * .4; }
+      var c = A[on ? 1 : 0], i = k * 4; px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    return (SCENE[key] = 'url(' + cv.toDataURL() + ')');
+  }
+  function paintScene(wrap) {
+    var W = Math.ceil(wrap.clientWidth / 2), H = Math.ceil(wrap.clientHeight / 2); if (W < 8 || H < 8) return;
+    var key = W + 'x' + H + (isDark() ? 'd' : 'l'); if (wrap.getAttribute('data-scene') === key) return;
+    wrap.setAttribute('data-scene', key); wrap.style.backgroundImage = sceneTex(W, H, isDark()); wrap.style.backgroundSize = W * 2 + 'px ' + H * 2 + 'px';
+  }
+
   // background-image CSS for one card: suit, a seed (the card's id), and its size in CSS pixels
   function cardTex(suit, seed, w, h) {
     var key = suit + '|' + seed + '|' + w + 'x' + h; if (TEX[key] !== undefined) return TEX[key];
@@ -6021,6 +6080,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
     if (ctx.ui.fit) { var z = Math.min((wrap.clientWidth - 4) / W, (wrap.clientHeight - 4) / Hh, 1.15); ctx.ui.zoom = Math.max(0.25, z); }
     var zz = ctx.ui.zoom; inner.style.transform = 'scale(' + zz + ')'; sizer.style.width = W * zz + 'px'; sizer.style.height = Hh * zz + 'px';
     var zl = $('#zoomlbl'); if (zl) zl.textContent = Math.round(zz * 100) + '%';
+    paintScene(wrap);
   }
   // Toolbar above the board: zoom, highlight toggles, overlays, debug report.
   function boardBar(ctx) {

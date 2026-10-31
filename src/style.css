@@ -107,9 +107,7 @@ legend { padding: 0 3px; }
 
 /* board */
 .boardbar { padding: 2px 4px; }
-.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; background: #f4f4ee; background-image: radial-gradient(#d4d4c8 1px, transparent 1px); background-size: 12px 12px; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); } }
-:root[data-theme="dark"] .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); }
+.boardwrap { flex: 1; min-height: 0; overflow: auto; position: relative; }
 .boardsizer { position: relative; }
 .boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .cell { position: absolute; width: 104px; height: 104px; }
@@ -479,4 +477,8 @@ h2:not(.plain) { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 
 .prompt.winner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .prompt.winner b { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 400; font-size: 26px; }
 /* the board in light mode: a faded vellum war-table instead of grey paper */
-.boardwrap { background-color: #efe6cc; background-image: radial-gradient(#cdbb8e 1px, transparent 1px); }
+/* the board's backdrop is a dithered night landscape, painted by paintScene in ui.js; these are its tones before it's drawn */
+.boardwrap { background: #c9c9c9 no-repeat 0 0; image-rendering: pixelated; }
+.boardsizer { image-rendering: auto; }   /* the pixelated setting is for the backdrop only */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .boardwrap { background-color: #262a2a; } }
+:root[data-theme="dark"] .boardwrap { background-color: #262a2a; }
