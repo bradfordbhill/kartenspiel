@@ -312,6 +312,8 @@
 
   /* ---------------- card faces ---------------- */
   function artOf(defId) { var c = libById(defId); return c && c.art ? c.art : ''; }
+  // Card art as CSS. Pixel art (stored as PNG, see downscale) is scaled with hard edges so it stays crisp.
+  function artStyle(art) { return 'background-image:url(' + art + ')' + (art.indexOf('data:image/png') === 0 ? ';image-rendering:pixelated' : ''); }
   // Placement arrows shown in a card's footer.
   function placeIcon(pl) {
     if (pl === 'diag') return '✕';
@@ -504,8 +506,7 @@
     var tx = o.tex ? cardTex(d.suit, o.tex, 88, 118) : '';   // hand cards: textured, seeded by the card's id
     var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + '"' + (tx ? ' style="' + tx + '"' : '') + '>';
     h += '<div class="top"><span>' + esc(o.cost != null ? o.cost : d.cost) + '●</span>' + icon(d.suit) + '</div>';
-    if (art && o.big) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
-    else if (art) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
+    if (art) h += '<div class="art" style="' + artStyle(art) + '"></div>';
     h += '<div class="nm">' + esc(d.name) + '</div><div class="ty">' + esc(d.type) + ' · ' + esc(d.suit) + '</div>';
     if (o.big) {
       h += '<div class="txt">' + esc(d.text || '') + '</div>';
@@ -532,7 +533,7 @@
     var noOW = c.ascended || !!(E.rawDef(st, u).mods || {}).immune;
     var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '"' + (ruined || c.ascended ? '' : ' style="' + cardTex(suit, u, CW, CH) + '"') + '>';
     h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(suit) + '</div>';
-    var art = artOf(c.def); if (art && !ruined) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
+    var art = artOf(c.def); if (art && !ruined) h += '<div class="art" style="' + artStyle(art) + '"></div>';
     h += '<div class="nm">' + esc(ruined ? E.rawDef(st, u).name : d.name) + '</div><div class="ty">' + esc(ruined ? (c.overwhelmed ? 'Overwhelmed' : 'Ruined') : d.type) + '</div>';
     if (stack.length > 1) h += '<span class="stackn" title="' + (stack.length - 1) + ' card(s) underneath">+' + (stack.length - 1) + '</span>';
     if (c.dtok > 0 && !ruined) h += '<span class="defb" title="' + c.dtok + ' Defense token' + (c.dtok > 1 ? 's' : '') + ': each one stops a Ruin or Curse">' + shieldStack(c.dtok) + (c.dtok > 4 ? '<b>' + c.dtok + '</b>' : '') + '</span>';
@@ -1249,7 +1250,7 @@
     h += '<label>Cost ●</label><span>' + inp('cost', c.cost, 'number') + ' Copies in deck ' + inp('copies', c.copies, 'number') + '</span>';
     h += '<label>Income ● per turn</label><span>' + inp('income', c.income, 'number') + ' plus ' + inp('incomePerToken', c.incomePerToken, 'number') + '● per token on the card</span>';
     h += '<label>Rules text</label><textarea data-focus-key="b-text" data-b="text" rows="3">' + esc(c.text) + '</textarea>';
-    h += '<label>Artwork</label><span class="row"><input type="file" accept="image/*" data-art="1">' + (c.art ? '<button class="btn sm" data-act="clearArt">Remove art</button>' : '') + '<span class="small muted">Scaled down to fit in the library.</span></span>';
+    h += '<label>Artwork</label><span class="row"><input type="file" accept="image/*" data-art="1">' + (c.art ? '<button class="btn sm" data-act="clearArt">Remove art</button>' : '') + '<span class="small muted">Scaled down to fit in the library. Pixel art stays crisp: <a href="dithry.html" target="_blank" rel="noopener">draw some in Dithry</a>.</span></span>';
     h += '</div><fieldset style="margin-top:8px"><legend>Value (◇)</legend><div class="form"><label>How it scores</label>' + sel('score.kind', sk.kind, Object.keys(SCORE_KINDS).map(function (k) { return [k, SCORE_KINDS[k]]; }));
     if (sk.kind !== 'none') h += '<label>Amount</label><span>' + inp('score.n', sk.n, 'number') + (/Split|Minus/.test(sk.kind) ? ' second amount ' + inp('score.m', sk.m, 'number') : '') + (/Suit(?!s)|perSuit/.test(sk.kind) && sk.kind !== 'perDistinctSuitInKingdom' ? ' suit ' + sel('score.suit', sk.suit, suitOpts) : '') + '</span>';
     h += '</div></fieldset><fieldset><legend>Placement and sight</legend><div class="form"><label>Sides that may touch</label><span class="row">' +
@@ -1309,14 +1310,28 @@
     var p = saveCard(c); B.orig = c.id; B.card = normalizeCard(clone(c)); app.libUI.sel = c.id;
     p.then(function () { toast('Saved ' + c.name + '.'); });
   }
-  // Shrink an uploaded image to a 320px JPEG so the library stays small.
+  // Shrink an uploaded image so the library stays small. Pixel art (256 colours or fewer, like Dithry's exports) is
+  // kept as a PNG, scaled down by whole steps without smoothing so its pixels stay sharp; photos become a 320px JPEG.
+  function isPixelArt(cx, w, h) {
+    if (w * h > 1024 * 1024) return false;
+    var d = cx.getImageData(0, 0, w, h).data, seen = {}, n = 0;
+    for (var i = 0; i < d.length; i += 4) { var k = d[i] << 24 ^ d[i + 1] << 16 ^ d[i + 2] << 8 ^ d[i + 3]; if (!seen[k]) { seen[k] = 1; if (++n > 256) return false; } }
+    return true;
+  }
   function downscale(file, cb) {
     var fr = new FileReader();
     fr.onload = function () {
       var img = new Image(); img.onload = function () {
-        var max = 320, s = Math.min(1, max / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+        var max = 320, cv = document.createElement('canvas'), cx = cv.getContext('2d');
+        cv.width = img.width; cv.height = img.height; cx.drawImage(img, 0, 0);
+        if (isPixelArt(cx, cv.width, cv.height)) {
+          var step = Math.ceil(Math.max(img.width, img.height) / max);
+          if (step > 1) { var sm = document.createElement('canvas'), sx = sm.getContext('2d'); sm.width = Math.ceil(img.width / step); sm.height = Math.ceil(img.height / step); sx.imageSmoothingEnabled = false; sx.drawImage(img, 0, 0, sm.width, sm.height); cv = sm; }
+          return cb(cv.toDataURL('image/png'));
+        }
+        var s = Math.min(1, max / Math.max(img.width, img.height));
         cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
-        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
         cb(cv.toDataURL('image/jpeg', 0.72));
       }; img.onerror = function () { toast('That file could not be read as an image.'); }; img.src = fr.result;
     };
@@ -1352,6 +1367,7 @@
       '<li>Watchtower’s extra cost applies to the 4 spaces orthogonally next to it.</li><li>Living Death takes the card directly under the top card.</li></ul>' +
       '<h2>When something isn’t automated</h2><p>Every card on the board has <b>Referee tools</b>: Ruin or flip back, change suit, move, remove, bury a card under it, adjust tokens, and claim for any player. <b>Undo</b> steps back one action at a time. An effect can be cancelled from the prompt bar.</p>' +
       '<h2>Card builder</h2><p>Pick how a card scores, what it sees (for highlighting), which sides may touch, its Overwhelm number, what happens when it is played (a list of presets, or JSON steps), and any ongoing ability or modifier. Saved cards go to the shared library when it is available, otherwise to this browser. Games in progress keep the card set they started with.</p>' +
+      '<h2>Card art</h2><p>Any image works as a card’s <b>Artwork</b>. To match the game’s look, draw it in <a href="' + (ONLINE ? 'dithry/' : 'dithry.html') + '" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool: start a <i>Kartenspiel card art</i> picture (64 × 24), export it at 1×, and choose the PNG here. Pixel art stays crisp on the cards.</p>' +
       '<h2>Saving</h2><p><b>Copy debug report</b> (above the board) copies the log, a text map of the board, every card\u2019s state and the full saved state, so a bug can be pasted into a message and reproduced.</p><p>The current game and sandbox are kept in this browser and survive a reload. <b>Copy current game as text</b> on the New game page gives you a save you can paste back later, which is also the format a future online version would send between players.</p>' +
       '</div></div>');
   }
@@ -1504,7 +1520,7 @@
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
       appBox() +
-      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>.</p></div></div>';
+      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>. Want to draw in this style? Try <a href="dithry/" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool.</p></div></div>';
   }
 
   /* ----- online: sign in, server list, lobby, game ----- */

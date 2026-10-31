@@ -16,9 +16,9 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || (url.origin === location.origin && url.pathname.includes('/api/'))) return;
-  if (req.mode === 'navigate') {          // the page: network first
-    e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./', copy)); return res; })
-      .catch(() => caches.match('./')));
+  if (req.mode === 'navigate') {          // a page: network first, each stored under its own address (the game, Dithry)
+    e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res; })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || caches.match('./'))));
     return;
   }
   const font = /^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname);

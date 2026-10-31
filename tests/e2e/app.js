@@ -11,7 +11,8 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   // a static server that serves site/ at /kartenspiel/, like https://<user>.github.io/kartenspiel/
   const pages = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'); if (!u.pathname.startsWith('/kartenspiel/')) { res.writeHead(404); return res.end(); }
-    const f = path.join(SITE, u.pathname.slice('/kartenspiel/'.length) || 'index.html');
+    let rel = u.pathname.slice('/kartenspiel/'.length); if (rel === '' || rel.endsWith('/')) rel += 'index.html';   // a folder serves its index.html
+    const f = path.join(SITE, rel);
     if (!f.startsWith(SITE) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' }); res.end(fs.readFileSync(f));
   });
@@ -38,6 +39,13 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   ok(/Kartenspiel/.test(await p.textContent('.home h1')), 'with no connection, the app still opens');
   await p.evaluate(() => { window.ksBotDelay = 0; }); await p.click('[data-act="soloSetup"]'); await p.click('[data-act="start"]'); await p.click('[data-act="startTurn"]');
   ok(!!(await p.$('.bottom .hcard')), 'and a single-player game starts offline');
+  await c.setOffline(false);
+  // Dithry lives at dithry/; visiting it must not replace the game's offline copy (leaving a game asks first: say yes)
+  p.on('dialog', d => d.accept());
+  await p.goto(url + 'dithry/'); await p.waitForFunction(() => window.dithryReady);
+  ok(/Dithry/.test(await p.title()), 'Dithry, the paint tool, is served at dithry/');
+  await c.setOffline(true); await p.goto(url).catch(() => {});
+  ok(/Kartenspiel/.test(await p.textContent('.home h1').catch(() => '')), 'after visiting Dithry, the game still opens offline');
   await c.setOffline(false);
 
 

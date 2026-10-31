@@ -24,8 +24,9 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
+| `dithry/` | **Dithry**, the pixel-art and dithered-gradient paint app: `engine.js` (the pixel work, no DOM), `app.js` (the interface), `dithry.css`. `build.sh` makes `dithry.html` and `site/dithry/index.html` |
 | `cards.json` | The same 87 cards as plain JSON, for spreadsheets or other tools. Nothing in the build reads it |
-| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure chevrons, `e2e/app.js` installing as an app and playing offline, `e2e/suits.js` the suit wheel and placement chevrons |
+| `tests/` | Rules checks, one file per batch of cards and rules. `qc8` covers redact/resign, `qc9-server` the server, `qc10-bots` the single-player bots, `e2e/online.js` two browsers playing online, `e2e/solo.js` a game against bots, `e2e/keys.js` the keyboard shortcuts, `e2e/mobile.js` the phone layout and drag and drop (real touch events), `e2e/pressure.js` the Overwhelm pressure chevrons, `e2e/app.js` installing as an app and playing offline, `e2e/suits.js` the suit wheel and placement chevrons, `e2e/dithry.js` the Dithry paint app (every tool, layers, files, and art going into the Card Builder) |
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
@@ -143,6 +144,27 @@ The server is `server/server.js`, built on Node's `http` module plus the `ws` pa
 - **Stats.** These are recorded when a game ends, for everyone who played: wins and losses, games per archetype, how many times each card was played, and the last 30 games. Passwords are stored as salted scrypt hashes.
 - **Guests.** **Log in as guest** (`POST /api/guest`) gives a one-tap session under a made-up name like Guest-K7QX. Guests play fully but have no profile or saved stats; their opponents' records still count the game. Guest sessions live in the server's memory for a day, and names starting with "Guest" can't be registered.
 - **Limits.** Sign-up and sign-in allow 10 attempts a minute per address; an account keeps its 20 newest sessions; each connection may send about 20 messages a second. Games live in the server's memory, so restarting the server ends any games in progress (accounts and stats are on disk).
+
+## Dithry: drawing art in the game's style
+
+Dithry (`dithry/`, live at `<site>/dithry/`, linked from the Home page, Help and the Card Builder) is a Paint-style app for making card art that matches Kartenspiel's dithered look. Every tool builds a **mask** (which pixels it touches); `engine.js`'s `paint()` then fills the mask with the current **style**:
+
+- **Ramp:** 1–4 colours, each with its own alpha, so a style can tint what's underneath (the card wash is brown at 7%).
+- **Gradient field:** a value from 0 to 1 for each pixel. It can be linear, radial, diamond, around a point, following the shape's edge, or flat. It spans each shape, or the two handles the Gradient tool sets, with start, end, midpoint and softness controls.
+- **Ripples:** they bend that field into waves, and turbulence roughens it.
+- **Dither pattern:** it turns the field into the ramp's colours. There are 16 patterns: the Bayer matrices, halftone, ruled and slanted lines, masonry, wind-bent grass, swoosh streaks, waves, vines, scales and scatter.
+
+The tools are:
+- **Drawing:** select, pencil, brush, eraser and line.
+- **Shapes:** rectangle, ellipse, polygon and freehand shape.
+- **Filling:** fill and gradient.
+- **Other:** picker, move, hand and zoom.
+
+Layers have visibility, lock and opacity. Undo and redo cover pixel changes and layer-structure changes. Mirror drawing, selections (with copy, cut and paste), and **Dither layer by brightness** (which turns an imported picture into pixel art) round it out.
+
+Projects save as `.dithry` files (JSON with a PNG per layer) and autosave in the browser. **Export PNG** scales by whole steps so pixels stay square. The Card Builder keeps PNGs with 256 colours or fewer as crisp, unsmoothed pixel art (`isPixelArt` in `ui.js`), and draws them with `image-rendering: pixelated`.
+
+To add a dither pattern, add an entry to `PATTERNS` in `dithry/engine.js`: it returns a threshold from 0 to 1 for each pixel, where lower thresholds show first. To add a style preset, add it to `PRESETS`.
 
 ## Deploying
 

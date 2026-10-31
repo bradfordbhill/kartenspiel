@@ -55,3 +55,27 @@ cp assets/manifest.webmanifest site/
 # a new page means a new cache: the service worker's version is a hash of the page
 version=$(node -e 'process.stdout.write(require("crypto").createHash("sha1").update(require("fs").readFileSync("site/index.html")).digest("hex").slice(0, 12))')
 sed "s/__VERSION__/$version/" src/sw.js > site/sw.js
+
+# Dithry, the pixel-art and dithered-gradient paint app (dithry/): one file for the repo root and one for the site
+dithry_page() {
+cat <<'H'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dithry · Pixel Art and Dithered Gradient Tool</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Crect width='8' height='8' fill='%23fff'/%3E%3Cpath d='M0 0h8v3H0zM0 3h1v1H0zM2 3h1v1H2zM4 3h1v1H4zM6 3h1v1H6zM1 4h1v1H1zM5 4h1v1H5zM3 5h1v1H3zM7 5h1v1H7z' fill='%231c1f3a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+H
+  cat dithry/dithry.css
+  echo '</style></head><body><div id="app"></div><script>'
+  cat dithry/engine.js dithry/app.js
+  echo '</script></body></html>'
+}
+dithry_page > dithry.html
+mkdir -p site/dithry
+cp dithry.html site/dithry/index.html
