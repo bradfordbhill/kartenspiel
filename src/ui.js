@@ -6,7 +6,7 @@
   var ONLINE = typeof KConfig !== 'undefined' && KConfig.edition === 'online';
   // Player colors by seat, and the board cell size in pixels.
   var COLORS = ['#d42020', '#1f4fd1', '#138a36', '#d39a00', '#8a2be2'];
-  var CW = 88, CH = 118, GAP = 10;
+  var CW = 104, CH = 104, GAP = 10;   // board cells are square; hand cards stay 88 × 118
   // Small helpers: querySelector, HTML escaping, and localStorage calls that never throw.
   var $ = function (s, r) { return (r || document).querySelector(s); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }

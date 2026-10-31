@@ -124,7 +124,7 @@ legend { padding: 0 3px; }
 :root[data-theme="dark"] .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); }
 .boardsizer { position: relative; }
 .boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-.cell { position: absolute; width: 88px; height: 118px; }
+.cell { position: absolute; width: 104px; height: 104px; }
 .cell.empty { border: 1px dashed rgba(128, 128, 128, .35); }
 .cell .coord { position: absolute; left: 3px; bottom: 2px; font-size: 9px; color: #888; }
 .cellbtn { position: absolute; inset: 0; background: transparent; border: 0; padding: 0; cursor: pointer; }
@@ -5319,7 +5319,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
   var ONLINE = typeof KConfig !== 'undefined' && KConfig.edition === 'online';
   // Player colors by seat, and the board cell size in pixels.
   var COLORS = ['#d42020', '#1f4fd1', '#138a36', '#d39a00', '#8a2be2'];
-  var CW = 88, CH = 118, GAP = 10;
+  var CW = 104, CH = 104, GAP = 10;   // board cells are square; hand cards stay 88 × 118
   // Small helpers: querySelector, HTML escaping, and localStorage calls that never throw.
   var $ = function (s, r) { return (r || document).querySelector(s); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }

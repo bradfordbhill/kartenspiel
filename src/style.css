@@ -112,7 +112,7 @@ legend { padding: 0 3px; }
 :root[data-theme="dark"] .boardwrap { background-color: #1f2424; background-image: radial-gradient(#334 1px, transparent 1px); }
 .boardsizer { position: relative; }
 .boardinner { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-.cell { position: absolute; width: 88px; height: 118px; }
+.cell { position: absolute; width: 104px; height: 104px; }
 .cell.empty { border: 1px dashed rgba(128, 128, 128, .35); }
 .cell .coord { position: absolute; left: 3px; bottom: 2px; font-size: 9px; color: #888; }
 .cellbtn { position: absolute; inset: 0; background: transparent; border: 0; padding: 0; cursor: pointer; }
