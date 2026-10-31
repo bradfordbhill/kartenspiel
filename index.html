@@ -5664,10 +5664,65 @@ if (typeof module !== 'undefined') module.exports = KBots;
     }
   }
   // face for a card definition (hand, library, builder); opts: {big, value, cost}
+  /* ----- card texture: a faint two-tone dithered gradient, dark at the bottom, different for every card ----- */
+  // Each suit shapes the gradient's frontier and dithers it its own way; each card's id seeds small changes
+  // (phase, slope, where the bubbles go), so no two cards repeat. One pixel is 2 CSS pixels; the dark tone is
+  // a light brown wash over the card's own colour, so it suits every suit and Foundations alike.
+  var TEX = {}, TEX_TONE = [70, 45, 10, 18];   // r, g, b, alpha (of 255) for the dark pixels
+  function rng(seed) { var a = 0; for (var i = 0; i < seed.length; i++) a = Math.imul(a ^ seed.charCodeAt(i), 2654435761) >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  var BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], HALFTONE = [12, 5, 6, 13, 4, 0, 1, 7, 11, 3, 2, 8, 15, 10, 9, 14];
+  function sig(x) { return 1 / (1 + Math.exp(-x)); }
+  // the frontier of each suit's gradient: darkness 0..1 at (u, v), u across and v down, both 0..1; a = width / height
+  var TEX_FIELD = {
+    // a straight edge with one sharp kink, at a slant
+    Sword: function (R) { var k = .25 + R() * .5, sl = (R() - .5) * .6, A = .14 + R() * .08, c = .55 + R() * .1;
+      return function (u, v) { return sig((v - (c + sl * (u - .5) - A * (1 - Math.abs(u - k) / Math.max(k, 1 - k) * 2))) / .045); }; },
+    // a spearhead rising from the bottom
+    Sceptre: function (R) { var m = .38 + R() * .24, w = .2 + R() * .1, c = .82 + R() * .06, H = .5 + R() * .12;
+      return function (u, v) { return sig((v - (c - H * Math.max(0, 1 - Math.abs(u - m) / w))) / .04); }; },
+    // soft, uneven light falling through leaves
+    Leaf: function (R) { var spots = []; for (var i = 0; i < 7; i++) spots.push([R(), .15 + R() * .85, .08 + R() * .1, R() < .5 ? -1 : 1]);
+      return function (u, v, a) { var f = sig((v - .55) / .16); spots.forEach(function (s) { var d = Math.hypot((u - s[0]) * a, v - s[1]) / s[2]; if (d < 1) f += s[3] * .5 * (1 - d * d); }); return f; }; },
+    // a headstone, rounded on top, rising from the bottom
+    Bone: function (R) { var m = .4 + R() * .2, hw = .2 + R() * .08, top = .22 + R() * .14;
+      return function (u, v, a) { var x = (u - m) * a, r = hw * a, cy = top + r, d = v > cy ? Math.abs(x) - r : Math.hypot(x, v - cy) - r; return sig(-d / .035) * .9 + v * .1; }; },
+    // rolling waves: wavy lines, thicker and closer to solid as they go down
+    Tome: function (R) { var k = .9 + R() * 1.1, ph = R() * 6.3, c = .34 + R() * .06, gap = .14 + R() * .03, drift = .8 + R() * 1.2;
+      return function (u, v) { var f = v * v * .5; for (var i = 0; i < 5; i++) {   // wavy lines, each a little thicker than the one above
+        var g = c + i * gap + .045 * Math.sin(6.283 * k * u + ph + i * drift), w = .014 + i * .007; f += sig((w - Math.abs(v - g)) / .012) * .8; }
+        return f; }; },
+    // a liquid line, with light, rimmed bubbles rising through the dark below it
+    Goblet: function (R) { var c = .42 + R() * .1, bub = []; for (var i = 0; i < 5; i++) bub.push([.12 + R() * .76, c + .12 + R() * (.8 - c), .06 + R() * .06]);
+      return function (u, v, a) { var f = sig((v - (c + .02 * Math.sin(u * 9 + c * 40))) / .05); bub.forEach(function (b) { var d = Math.hypot((u - b[0]) * a, v - b[1]) / b[2]; if (d < .8) f -= .9; else if (d < 1.1) f += .4; }); return f; }; }
+  };
+  // how each suit dithers: ordered (Bayer) cross-hatch, the same turned 45°, scattered noise, a fine checker, a softened cross-hatch, halftone dots
+  var TEX_DITHER = {
+    Sword: function (x, y) { return (BAYER4[(y & 3) * 4 + (x & 3)] + .5) / 16; },
+    Sceptre: function (x, y) { return (BAYER4[((x + y) & 3) * 4 + ((x - y) & 3)] + .5) / 16; },
+    Leaf: function (x, y, R) { return R(); },
+    Bone: function (x, y) { return ([0, 2, 3, 1][(y & 1) * 2 + (x & 1)] + .5) / 4; },
+    Tome: function (x, y) { return (BAYER4[(y & 3) * 4 + (x & 3)] * .6 + (x & 1) * 5 + .5) / 15; },
+    Goblet: function (x, y) { return (HALFTONE[(y & 3) * 4 + (x & 3)] + .5) / 16; }
+  };
+  // background-image CSS for one card: suit, a seed (the card's id), and its size in CSS pixels
+  function cardTex(suit, seed, w, h) {
+    var key = suit + '|' + seed + '|' + w + 'x' + h; if (TEX[key] !== undefined) return TEX[key];
+    var F = TEX_FIELD[suit], Dth = TEX_DITHER[suit]; if (!F || typeof document === 'undefined') return (TEX[key] = '');
+    var R = rng(seed + suit), field = F(R), N = rng('n' + seed), gw = w >> 1, gh = h >> 1, a = gw / gh;
+    var cv = document.createElement('canvas'); cv.width = gw; cv.height = gh; var g = cv.getContext('2d'), img = g.createImageData(gw, gh), px = img.data;
+    for (var y = 0; y < gh; y++) for (var x = 0; x < gw; x++) {
+      var u = (x + .5) / gw, v = (y + .5) / gh, f = Math.max(0, Math.min(1, field(u, v, a) * .85 + v * .15));
+      if (f > Dth(x, y, N)) { var i = (y * gw + x) * 4; px[i] = TEX_TONE[0]; px[i + 1] = TEX_TONE[1]; px[i + 2] = TEX_TONE[2]; px[i + 3] = TEX_TONE[3]; }
+    }
+    g.putImageData(img, 0, 0);
+    return (TEX[key] = 'background-image:url(' + cv.toDataURL() + ');background-size:100% 100%;image-rendering:pixelated');
+  }
+
   function defFace(d, o) {
     o = o || {};
     var art = d.art || artOf(d.id);
-    var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + '">';
+    var tx = o.tex ? cardTex(d.suit, o.tex, 88, 118) : '';   // hand cards: textured, seeded by the card's id
+    var h = '<div class="card s-' + esc(d.suit) + (o.big ? ' big' : '') + (d.type === 'Foundation' ? ' found' : '') + '"' + (tx ? ' style="' + tx + '"' : '') + '>';
     h += '<div class="top"><span>' + esc(o.cost != null ? o.cost : d.cost) + '●</span>' + icon(d.suit) + '</div>';
     if (art && o.big) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
     else if (art) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
@@ -5695,7 +5750,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
     var u = E.top(st, k), c = st.cards[u], d = E.def(st, u), suit = E.suitOf(st, u), stack = st.board[k];
     var ruined = c.ruined, covered = E.isCovered(st, k);
     var noOW = c.ascended || !!(E.rawDef(st, u).mods || {}).immune;
-    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '">';
+    var h = '<div class="card s-' + esc(suit) + (ruined ? ' ruined' : '') + '' + (E.rawDef(st, u).type === 'Foundation' ? ' found' : '') + (c.ascended && !ruined ? ' ascended' : '') + (E.isCursed(st, k) && !ruined ? ' cursed' : '') + '"' + (ruined || c.ascended ? '' : ' style="' + cardTex(suit, u, CW, CH) + '"') + '>';
     h += '<div class="top"><span>' + esc(d.cost) + '●</span>' + icon(suit) + '</div>';
     var art = artOf(c.def); if (art && !ruined) h += '<div class="art" style="background-image:url(' + art + ')"></div>';
     h += '<div class="nm">' + esc(ruined ? E.rawDef(st, u).name : d.name) + '</div><div class="ty">' + esc(ruined ? (c.overwhelmed ? 'Overwhelmed' : 'Ruined') : d.type) + '</div>';
@@ -6246,7 +6301,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       if (ui.hand === u) cls += ' sel'; if (blocked) cls += ' blocked'; if (ui.swap && ui.swap.indexOf(u) >= 0) cls += ' pick';
       if (!blocked && myTurn(ctx) && !st.pending && !st.res && canAfford(st, u)) cls += ' afford';
       var free = E.isFree(st, u); if (free) cls += ' free';
-      h += '<div class="' + cls + '"' + (blocked ? ' title="' + esc(blocked) + '"' : '') + '>' + defFace(Object.assign({}, d, { art: artOf(d.id) }), free ? { mid: true, cost: 0 } : { mid: true }) + (free ? '<span class="freetag">Free this turn</span>' : '') + '<button class="cellbtn" data-hand="' + u + '" aria-label="' + esc(d.name) + '"></button></div>';
+      h += '<div class="' + cls + '"' + (blocked ? ' title="' + esc(blocked) + '"' : '') + '>' + defFace(Object.assign({}, d, { art: artOf(d.id) }), free ? { mid: true, cost: 0, tex: u } : { mid: true, tex: u }) + (free ? '<span class="freetag">Free this turn</span>' : '') + '<button class="cellbtn" data-hand="' + u + '" aria-label="' + esc(d.name) + '"></button></div>';
     });
     if (pl.aside && pl.aside.length) h += '<span class="muted small" style="align-self:center">Set aside for next turn: ' + pl.aside.length + ' card' + (pl.aside.length > 1 ? 's' : '') + '</span>';
     if (!pl.hand.length) h += '<span class="muted">No cards in hand.</span>';
@@ -6263,7 +6318,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
     var st = ctx.state, ui = ctx.ui, pd = st.pending;
     if (st.reveal && (ctx.online ? st.reveal.to === ctx.me : !isBot(st, st.reveal.to))) {
       var rv = st.reveal;
-      return modal(st.players[rv.of].name + '’s hand', '<p>Shown to ' + esc(st.players[rv.to].name) + ' only.</p><div class="hand">' + rv.cards.map(function (u) { return '<div class="hcard">' + defFace(E.rawDef(st, u), { mid: true }) + '</div>'; }).join('') + (rv.cards.length ? '' : '<span class="muted">Their hand is empty.</span>') + '</div>', '<button class="btn def" data-act="closeReveal">Close</button>');
+      return modal(st.players[rv.of].name + '’s hand', '<p>Shown to ' + esc(st.players[rv.to].name) + ' only.</p><div class="hand">' + rv.cards.map(function (u) { return '<div class="hcard">' + defFace(E.rawDef(st, u), { mid: true, tex: u }) + '</div>'; }).join('') + (rv.cards.length ? '' : '<span class="muted">Their hand is empty.</span>') + '</div>', '<button class="btn def" data-act="closeReveal">Close</button>');
     }
     if (ctx.kind !== 'game') { if (pd && pd.kind !== 'cell') return pendingModal(ctx); return ''; }
     var me = fixedSeat(ctx);
@@ -6295,7 +6350,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       var hand = pd.options || who.hand, picked = ui.picked;
       return modal(who.name + ': choose cards', '<p>' + esc(pd.prompt) + ' (' + picked.length + ' of ' + pd.count + ' chosen)</p><div class="hand" style="flex-wrap:wrap">' + hand.map(function (u) {
         var weak = (E.archInfo(st)[who.arch] || {}).weakTo, isWeak = weak && E.rawDef(st, u).suit === weak;
-        return '<div class="hcard' + (picked.indexOf(u) >= 0 ? ' pick' : '') + (isWeak ? ' weak' : '') + '"' + (isWeak ? ' title="Your weak suit: you can’t play this card"' : '') + '>' + defFace(E.rawDef(st, u), { mid: true }) + (isWeak ? '<span class="weaktag">Weak suit</span>' : '') + '<button class="cellbtn" data-pick="' + u + '" aria-label="' + esc(E.rawDef(st, u).name) + '"></button></div>';
+        return '<div class="hcard' + (picked.indexOf(u) >= 0 ? ' pick' : '') + (isWeak ? ' weak' : '') + '"' + (isWeak ? ' title="Your weak suit: you can’t play this card"' : '') + '>' + defFace(E.rawDef(st, u), { mid: true, tex: u }) + (isWeak ? '<span class="weaktag">Weak suit</span>' : '') + '<button class="cellbtn" data-pick="' + u + '" aria-label="' + esc(E.rawDef(st, u).name) + '"></button></div>';
       }).join('') + '</div>', (st.res && !ctx.online ? '<button class="btn" data-act="cancelEffect">Cancel effect</button>' : '') + '<button class="btn def" data-act="answerHand"' + (picked.length === pd.count ? '' : ' disabled') + '>Confirm</button>');
     }
     if (pd.kind === 'suit') return modal(who.name + ': choose a suit', '<p>' + esc(pd.prompt) + '</p><div class="row">' + pd.options.map(function (s) { return '<button class="btn" data-answer="' + s + '">' + icon(s) + ' ' + s + '</button>'; }).join('') + (pd.allowKeep ? '<button class="btn" data-answer="keep">Keep its suit</button>' : '') + '</div>', '');
@@ -6903,7 +6958,7 @@ if (typeof module !== 'undefined') module.exports = KBots;
       drag.def = E.rawDef(st, drag.uid); drag.cast = !E.needsPlacement(drag.def); drag.prevHand = ctx.ui.hand;
       drag.blocked = E.playBlock(st, st.cur, drag.uid);     // a card you can't play can still go to the discard pile
       if (!drag.blocked) ctx.ui.hand = drag.uid; ctx.ui.sel = null;
-      drag.ghost = el('dragghost', defFace(Object.assign({}, drag.def, { art: artOf(drag.def.id) }), {}));
+      drag.ghost = el('dragghost', defFace(Object.assign({}, drag.def, { art: artOf(drag.def.id) }), { tex: drag.uid }));
       var others = st.players[st.cur].hand.filter(function (u) { return u !== drag.uid && E.rawDef(st, u).type !== 'Foundation'; });
       if (drag.def.type !== 'Foundation' && others.length) {
         var first = (ctx.ui.swap || []).filter(function (u) { return u !== drag.uid; }).length;
