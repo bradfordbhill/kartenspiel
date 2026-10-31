@@ -458,3 +458,25 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .suitwheel .wh-head.arch { fill: currentColor; } .suitwheel .wh-head.sword { fill: #b01010; }
 .suitwheel .wh-node circle { fill: #fff; stroke: currentColor; stroke-width: 2; }
 .suitwheel .wh-name { font-size: 13px; font-weight: 700; fill: currentColor; } .suitwheel .wh-arch { font-size: 11px; fill: var(--muted); }
+
+/* ---------- a light medieval touch: Fraktur logo, crest, blackletter headings, pixel ornaments ---------- */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pix { display: block; flex: 0 0 auto; }
+/* the logo is a 140 x 30 bitmap, shown at whole multiples (3x, 2x on phones) so its pixels stay square */
+h1.logo { width: 420px; max-width: 100%; aspect-ratio: 140 / 30; margin: 6px auto 0; background: var(--logo) no-repeat center / contain; image-rendering: pixelated; }
+h1.logo.small { width: 280px; }
+@media (max-width: 460px) { h1.logo { width: 280px; } }
+.fleuron { display: flex; justify-content: center; margin: 2px 0 12px; }
+.titlebar .crest { margin-right: 2px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .45)); }
+/* section headings in a pixel blackletter; user-chosen names stay in the plain font */
+h2:not(.plain) { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 400; font-size: 26px; letter-spacing: .3px; line-height: 1.05; }
+.help h2:not(.plain) { font-size: 24px; margin: 16px 0 4px; }
+.online h2:not(.plain) { font-size: 26px; }
+/* Win95 message-box layout: an icon on the left, the text beside it */
+.msgbox { display: flex; gap: 14px; align-items: flex-start; }
+.msgbox .pix { margin-top: 2px; }
+.msgbox p:first-child { margin-top: 0; }
+.prompt.winner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.prompt.winner b { font-family: "Jacquard 24", "DotGothic16", serif; font-weight: 400; font-size: 26px; }
+/* the board in light mode: a faded vellum war-table instead of grey paper */
+.boardwrap { background-color: #efe6cc; background-image: radial-gradient(#cdbb8e 1px, transparent 1px); }

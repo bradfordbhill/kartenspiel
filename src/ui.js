@@ -54,6 +54,31 @@
   function shieldPixels() { return '<rect x="1" y="0" width="8" height="1" fill="#000"/><rect x="0" y="1" width="1" height="6" fill="#000"/><rect x="9" y="1" width="1" height="6" fill="#000"/><rect x="1" y="1" width="8" height="6" fill="#4a7bd6"/><rect x="1" y="7" width="1" height="2" fill="#000"/><rect x="8" y="7" width="1" height="2" fill="#000"/><rect x="2" y="7" width="6" height="2" fill="#4a7bd6"/><rect x="2" y="9" width="2" height="1" fill="#000"/><rect x="6" y="9" width="2" height="1" fill="#000"/><rect x="4" y="10" width="2" height="1" fill="#000"/><rect x="4" y="9" width="2" height="1" fill="#4a7bd6"/><rect x="2" y="2" width="2" height="2" fill="#bcd2ff"/><rect x="4" y="3" width="2" height="4" fill="#f2c94c"/><rect x="3" y="4" width="4" height="1" fill="#f2c94c"/>'; }
   function shieldIcon() { return '<svg viewBox="0 0 10 12" width="9" height="11" shape-rendering="crispEdges" aria-hidden="true"><rect x="1" y="0" width="8" height="1" fill="#000"/><rect x="0" y="1" width="1" height="6" fill="#000"/><rect x="9" y="1" width="1" height="6" fill="#000"/><rect x="1" y="1" width="8" height="6" fill="#4a7bd6"/><rect x="1" y="7" width="1" height="2" fill="#000"/><rect x="8" y="7" width="1" height="2" fill="#000"/><rect x="2" y="7" width="6" height="2" fill="#4a7bd6"/><rect x="2" y="9" width="2" height="1" fill="#000"/><rect x="6" y="9" width="2" height="1" fill="#000"/><rect x="4" y="10" width="2" height="1" fill="#000"/><rect x="4" y="9" width="2" height="1" fill="#4a7bd6"/><rect x="2" y="2" width="2" height="2" fill="#bcd2ff"/></svg>'; }
   // Inline suit icon.
+  /* ----- pixel art for the light medieval touches: drawn from text, one character per pixel ----- */
+  // rows: equal-length strings; pal: character → colour ('.' is transparent); px: CSS pixels per pixel.
+  function pix(rows, pal, px, cls, label) {
+    var w = rows[0].length, h = rows.length, r = '';
+    rows.forEach(function (row, y) { for (var x = 0; x < w; x++) { var c = pal[row[x]]; if (c) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + c + '"/>'; } });
+    return '<svg class="pix ' + (cls || '') + '" width="' + w * px + '" height="' + h * px + '" viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges"' + (label ? ' role="img" aria-label="' + label + '"' : ' aria-hidden="true"') + '>' + r + '</svg>';
+  }
+  var ART_PAL = { k: '#2a1600', y: '#f2c230', Y: '#fff2a8', o: '#b07a10', r: '#b01818', b: '#1c3fa0', w: '#8a5a20', g: '#cfe6ee', s: '#e8b838', W: '#ffffff' };
+  // the title-bar crest: a shield, per pale gules and azure, edged in gold
+  var CREST = ['kkkkkkkkkkk', 'kyyyyyyyyyk', 'kyrrrrbbbyk', 'kyrrrrbbbyk', 'kyrrrrbbbyk', 'kyrrrrbbbyk', 'kyrrrrbbbyk', 'kyrrrrbbbyk', '.kyrrrbbyk.', '..kyrrbyk..', '...kyyyk...', '....kkk....'];
+  // the "Next turn" message-box icon: an hourglass, sand running down
+  var HOURGLASS = ['kkkkkkkkkk', 'kwwwwwwwwk', 'kkkkkkkkkk', '.kgggggggk', '.kgssssgk.', '..kgssgk..', '...kgsk...', '....ks....', '...kgsk...', '..kggsgk..', '.kggsssgk.', '.ksssssssk', 'kkkkkkkkkk', 'kwwwwwwwwk', 'kkkkkkkkkk'];
+  // the winner's crown
+  var CROWN = ['.k....k....k.', 'kYk..kYk..kYk', 'kyyk.kyk.kyyk', 'kyyykyyykyyyk', 'kyyyyyyyyyyyk', 'kyryyybyyyryk', 'kyyyyyyyyyyyk', 'kkkkkkkkkkkkk'];
+  // a divider: a gold lozenge between two fine rules
+  var FLEURON = (function () {
+    var w = 61, m = 30, rows = [];
+    for (var y = 0; y < 7; y++) { var row = ''; for (var x = 0; x < w; x++) { var d = Math.abs(x - m) + Math.abs(y - 3);
+      row += d <= 3 ? (d === 3 ? 'k' : d === 0 ? 'Y' : 'y') : (y === 3 && Math.abs(x - m) > 5 && Math.abs(x - m) < 29 ? 'o' : (y === 3 && (Math.abs(x - m) === 5) ? 'y' : '.')); } rows.push(row); }
+    return rows;
+  })();
+  function crest() { return pix(CREST, ART_PAL, 1, 'crest'); }
+  function fleuron() { return '<div class="fleuron">' + pix(FLEURON, ART_PAL, 2) + '</div>'; }
+  // the Fraktur logo (assets/logo.png, drawn by tools/art.js and inlined by build.sh as --logo)
+  function logoHTML(cls) { return '<h1 class="logo ' + (cls || '') + '"><span class="sr">Kartenspiel</span></h1>'; }
   function icon(s) { return '<svg class="suitico si-' + esc(s) + '" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="' + esc(s) + '"><title>' + esc(s) + '</title>' + (ICON[s] || '') + '</svg>'; }
 
   /* ---------------- app state ---------------- */
@@ -753,7 +778,7 @@
     var hs = $('.bottom .hand, .mhand .hand'), hsl = hs ? hs.scrollLeft : 0;
     var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['game', 'Local game'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
       : [['new', 'New game'], ['game', 'Game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
-    var h = '<div class="win raised' + (isMobile() && inGame() ? ' mwin' : '') + '"><div class="titlebar"><span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? (N.guest ? 'Playing as ' + N.user + ' (guest)' : 'Signed in as ' + N.user) : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
+    var h = '<div class="win raised' + (isMobile() && inGame() ? ' mwin' : '') + '"><div class="titlebar">' + crest() + '<span>' + (ONLINE ? 'Kartenspiel' : 'Kartenspiel — playtest table') + '</span><span class="grow"></span><span class="small" style="font-weight:400">' + esc(ONLINE ? (N.user ? (N.guest ? 'Playing as ' + N.user + ' (guest)' : 'Signed in as ' + N.user) : '') : 'Library: ' + app.libSource + ', ' + app.lib.length + ' cards') + '</span></div>';
     h += '<div class="menubar" role="tablist">' + tabs.map(function (t) { var dis = t[0] === 'game' && !app.game; return '<button class="tab' + (app.page === t[0] ? ' on' : '') + '" role="tab" data-page="' + t[0] + '"' + (dis ? ' disabled style="opacity:.5"' : '') + '>' + t[1] + '</button>'; }).join('') + '</div>';
     h += '<div class="content">' + pageHTML() + '</div>';
     var st = cur() && cur().state;
@@ -809,7 +834,7 @@
   function newGamePage() {
     ensureSetup();
     var A = archetypes(), saved = lsGet('ks.game');
-    var h = '<div class="page scroll"><div class="pane" style="max-width:720px">';
+    var h = '<div class="page scroll"><div class="pane" style="max-width:720px">' + (ONLINE ? '' : logoHTML('small') + fleuron());
     if (saved && saved.players && saved.winner == null && !app.game) h += '<div class="banner row" style="margin-bottom:8px">A game in progress was saved in this browser (round ' + saved.round + ', ' + esc(saved.players.map(function (p) { return p.name; }).join(', ')) + '). <button class="btn" data-act="resume">Resume it</button></div>';
     if (app.game) h += '<div class="banner row" style="margin-bottom:8px">A game is running. Starting a new one replaces it. <button class="btn" data-page="game">Back to the game</button></div>';
     h += '<fieldset><legend>Players</legend><div class="row" style="margin-bottom:6px">Number of players <select data-set="n">' + [2, 3, 4, 5].map(function (n) { return '<option' + (n === setup.n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><span class="muted small">Each archetype can be taken by only one player. Turn order goes top to bottom.</span></div>' +
@@ -872,7 +897,7 @@
       if (ui.mode === 'move') return '<div class="prompt">Click an empty space to move the card from ' + esc(ui.moveFrom) + '. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
       return '';
     }
-    if (st.winner != null) return '<div class="prompt"><b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm" data-page="new">New game</button>') + '</div>';
+    if (st.winner != null) return '<div class="prompt winner">' + pix(CROWN, ART_PAL, 2, '', 'Crown') + '<b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm" data-page="new">New game</button>') + '</div>';
     if (ctx.online || hasBots(st)) { var ow = waitingPrompt(ctx); if (ow) return ow; }
     if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' Click an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res && !ctx.online ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
     if (ui.autoEnding) return '<div class="prompt"><b>Out of ●.</b> Nothing left to play, claim or use, so your turn ends in a moment. <button class="btn sm" data-act="holdTurn">Wait, I’m not done</button></div>';
@@ -906,7 +931,7 @@
   }
 
   /* ----- modals ----- */
-  function modal(title, body, btns) { return '<div class="modalbg"><div class="modal raised" role="dialog" aria-label="' + esc(title) + '"><div class="titlebar"><span>' + esc(title) + '</span></div><div class="body">' + body + '</div><div class="btns">' + (btns || '') + '</div></div></div>'; }
+  function modal(title, body, btns) { return '<div class="modalbg"><div class="modal raised" role="dialog" aria-label="' + esc(title) + '"><div class="titlebar">' + crest() + '<span>' + esc(title) + '</span></div><div class="body">' + body + '</div><div class="btns">' + (btns || '') + '</div></div></div>'; }
   // Dialogs: app.modal for one-off ones; otherwise revealed hands, "pass the device" between turns,
   // and engine prompts that aren't answered by clicking the board.
   function modalHTML() {
@@ -922,7 +947,7 @@
     if (me != null) {
       if (st.winner == null && myTurn(ctx) && !st.turn.started && ui.mode !== 'reclaim' && !st.players[me].out) {
         var mine = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(me) >= 0; });
-        return modal('Your turn', '<p style="font-size:15px">It’s your turn, ' + esc(st.players[me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
+        return modal('Your turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px">It’s your turn, ' + esc(st.players[me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>',
           (!ctx.online && ctx.hist.length ? '<button class="btn" data-act="undo">Undo my last action</button>' : '') + '<button class="btn" data-act="reclaimMode"' + (mine ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start my turn</button>');
       }
       return pd && pd.kind !== 'cell' && st.winner == null ? pendingModal(ctx) : '';
@@ -931,7 +956,7 @@
     if (!st.turn.started && ui.mode !== 'reclaim' && !isBot(st, st.cur)) {
       var pl = st.players[st.cur];
       var hasClaims = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(st.cur) >= 0; });
-      return modal('Next turn', '<p style="font-size:15px"><span class="swatch" style="background:' + pl.color + ';width:14px;height:14px"></span> Pass the device to <b>' + esc(pl.name) + '</b> (' + esc(pl.arch) + ').</p><p class="small muted">Starting the turn gains ● and draws ' + (st.opts.drawPerTurn != null ? st.opts.drawPerTurn : 1) + ' card' + ((st.opts.drawPerTurn != null ? +st.opts.drawPerTurn : 1) === 1 ? '' : 's') + '. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p>',
+      return modal('Next turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px"><span class="swatch" style="background:' + pl.color + ';width:14px;height:14px"></span> Pass the device to <b>' + esc(pl.name) + '</b> (' + esc(pl.arch) + ').</p><p class="small muted">Starting the turn gains ● and draws ' + (st.opts.drawPerTurn != null ? st.opts.drawPerTurn : 1) + ' card' + ((st.opts.drawPerTurn != null ? +st.opts.drawPerTurn : 1) === 1 ? '' : 's') + '. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>',
         (ctx.hist.length ? '<button class="btn" data-act="undo">Undo last action</button>' : '') + '<button class="btn" data-act="reclaimMode"' + (hasClaims ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start ' + esc(pl.name) + '’s turn</button>');
     }
     if (pd && pd.kind !== 'cell') return pendingModal(ctx);
@@ -1314,7 +1339,7 @@
   /* ----- home ----- */
   function homePage() {
     var saved = !app.game && lsGet('ks.game'), resume = app.game ? '<button class="btn big" data-page="game">Back to your game</button>' : saved && saved.players && saved.winner == null ? '<button class="btn big" data-act="resume">Resume saved game</button>' : '';
-    return '<div class="page scroll"><div class="home"><h1>Kartenspiel</h1>' +
+    return '<div class="page scroll"><div class="home">' + logoHTML() + fleuron() +
       '<p>An asymmetric tableau-building card game for 2–5 players. Six archetypes share one board: build your Kingdom, claim cards with your meeples, and Overwhelm your rivals. First to the victory target wins.</p>' +
       '<div class="choices"><div class="choice raised"><h2>Single player</h2><p>Play against the computer. Choose each opponent: greedy, tactician or warlord bot.</p><div class="row"><button class="btn def big" data-act="soloSetup">Play vs bots</button>' + resume + '</div></div>' +
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
@@ -1368,7 +1393,7 @@
   }
   function roomHTML() {
     var r = N.room, me = N.user, host = r.host === me, h = '', o = r.opts, dis = host ? '' : ' disabled';
-    h += '<div class="row spread"><h2>' + esc(r.name) + '</h2><button class="btn" data-act="netLeave">Leave table</button></div>';
+    h += '<div class="row spread"><h2 class="plain">' + esc(r.name) + '</h2><button class="btn" data-act="netLeave">Leave table</button></div>';
     h += '<p class="small">' + (r.private ? 'Private table. Share the code <b class="code">' + esc(r.code) + '</b> or <button class="linkbtn" data-act="copyInvite">copy an invite link</button>.' : 'Public table: anyone can join from the server list.') + '</p>';
     h += '<fieldset><legend>Players ' + r.players.length + '/' + r.max + ' (turn order, top to bottom)</legend>' + r.players.map(function (p, i) {
       return '<div class="row" style="margin:2px 0"><span class="swatch" style="background:' + COLORS[i] + '"></span><button class="linkbtn" data-act="viewProfile" data-name="' + esc(p.name) + '">' + esc(p.name) + '</button>' +
@@ -1431,7 +1456,7 @@
     if (!p) return h + '<p>Loading ' + esc(who) + '’s profile…</p>' + end;
     if (p.error) return h + '<p class="err">' + esc(p.error) + '</p>' + end;
     var pct = function (w, n) { return n ? Math.round(100 * w / n) + '%' : '—'; }, same = function (a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); };
-    h += '<div class="row spread"><h2>' + esc(p.name) + '</h2>' + (N.user && same(p.name, N.user) ? '<button class="btn" data-act="netLogout">Sign out</button>' : N.user ? '<button class="btn" data-act="myProfile">My profile</button>' : '') + '</div>';
+    h += '<div class="row spread"><h2 class="plain">' + esc(p.name) + '</h2>' + (N.user && same(p.name, N.user) ? '<button class="btn" data-act="netLogout">Sign out</button>' : N.user ? '<button class="btn" data-act="myProfile">My profile</button>' : '') + '</div>';
     h += '<p class="small muted">Playing since ' + esc(new Date(p.created).toLocaleDateString()) + '</p>';
     h += '<div class="stats"><div class="stat raised"><div class="bignum">' + p.wins + '–' + p.losses + '</div><div class="small">Wins – losses</div></div>' +
       '<div class="stat raised"><div class="bignum">' + pct(p.wins, p.games) + '</div><div class="small">Win rate</div></div>' +

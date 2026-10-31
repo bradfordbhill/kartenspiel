@@ -1,6 +1,6 @@
 // End-to-end browser test of the phone layout and drag and drop, with real touch events (iPhone size),
 // then mouse drags on the desktop layout. Needs Playwright with Chromium.
-// Run: ./build.sh && node tests/e2e/mobile.js [screenshot folder]
+// Run: ./build.sh && node tests/e2e/mobile.js [screenshot folder]   (deals with seed 1; KS_SEED=n tries another deal)
 const { chromium, devices } = require('playwright');
 const path = require('path'), fs = require('fs'), os = require('os');
 const REPO = path.join(__dirname, '..', '..'), SHOTS = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'ks-mobile-'));
@@ -33,7 +33,7 @@ let lastPage = null;   // for a screenshot if the test fails
   const handCard = async uid => { await p.$eval('.mhand [data-hand="' + uid + '"]', e => e.closest('.hcard').scrollIntoView({ inline: 'center', block: 'nearest' })); await wait(100); return center(await rect('.mhand [data-hand="' + uid + '"]')); };
 
   await p.goto('file://' + REPO + '/site/index.html');
-  await p.evaluate(seed => { window.ksBotDelay = 0; if (seed) window.ksSeed = seed; }, +process.env.KS_SEED || 0);
+  await p.evaluate(seed => { window.ksBotDelay = 0; if (seed) window.ksSeed = seed; }, +process.env.KS_SEED || 1);
   await p.tap('[data-act="soloSetup"]'); await p.tap('[data-act="start"]'); await p.tap('[data-act="startTurn"]'); await wait(200);
   ok(await p.evaluate(() => document.documentElement.scrollWidth) <= 390, 'no sideways scrolling at phone width');
   const vis = async sel => { const r = await rect(sel); return r.y >= 0 && r.y + r.height <= 844 && r.width > 0; };
@@ -48,9 +48,9 @@ let lastPage = null;   // for a screenshot if the test fails
   s = await st();
   ok(s.players[0].foundationPlaced && s.board['0,0'], 'dragging the Foundation onto the board plays it');
 
-  // drag an affordable Structure next to it, then drag the meeple onto it to claim
+  // drag an affordable Structure next to it (a Structure stays where it's played; some placed cards don't), then drag the meeple onto it to claim
   const pick = await p.evaluate(() => { const st = JSON.parse(localStorage.getItem('ks.game')), E = KEngine, pl = st.players[0];
-    for (const u of pl.hand) { const d = E.rawDef(st, u); if (!E.needsPlacement(d) || E.playBlock(st, 0, u)) continue; const L = E.legalCells(st, u), k = Object.keys(L).find(k => L[k] <= E.funds(pl)); if (k) return { u, k }; } return null; });
+    for (const u of pl.hand) { const d = E.rawDef(st, u); if (d.type !== 'Structure' || E.playBlock(st, 0, u)) continue; const L = E.legalCells(st, u), k = Object.keys(L).find(k => L[k] <= E.funds(pl)); if (k) return { u, k }; } return null; });
   if (pick) {
     const [sx, sy] = await handCard(pick.u);
     await touchDragTo(sx, sy, '.cell.legal:not(.poor) [data-cell="' + pick.k + '"]');
@@ -140,7 +140,7 @@ let lastPage = null;   // for a screenshot if the test fails
   d.on('pageerror', e => errs.push('desktop: ' + e.message));
   await d.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
   await d.goto('file://' + REPO + '/index.html');
-  await d.evaluate(seed => { if (seed) window.ksSeed = seed; }, +process.env.KS_SEED || 0);
+  await d.evaluate(seed => { if (seed) window.ksSeed = seed; }, +process.env.KS_SEED || 1);
   await d.click('[data-act="start"]'); await d.click('[data-act="startTurn"]');
   const dst = () => d.evaluate(() => JSON.parse(localStorage.getItem('ks.game')));
   async function mouseDrag(fromSel, targetSel, dx, dy) {

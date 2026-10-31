@@ -20,7 +20,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `src/ui.js` | The interface for both apps. `KConfig.edition === 'online'` switches on the public site's pages |
 | `src/bots.js` | The bots (greedy, tactician, raider, warlord): single player in both apps, and the simulator |
 | `src/net.js` | Public site only: the connection to the game server |
-| `src/sw.js`, `assets/` | Public site only: the service worker (offline play) and the app manifest and icons, which `build.sh` copies into `site/` |
+| `src/sw.js`, `assets/` | The service worker (offline play), app manifest and icons, which `build.sh` copies into `site/`; and `assets/logo.png`, the Fraktur logo, which `build.sh` inlines into both apps |
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |
 | `server/store.js` | Accounts and stats, saved to one JSON file |
 | `src/style.css` | Windows 95–style look, light and dark modes |
@@ -29,6 +29,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `.github/workflows/pages.yml`, `render.yaml`, `Dockerfile` | Deployment: the site to GitHub Pages, the server to Render or any Docker host |
 | `tools/sim2.js` | Bot self-play for balance analysis, using the bots in `src/bots.js` |
 | `tools/analyze2.js` | Summarizes simulation output |
+| `tools/art.js` | Redraws the Fraktur logo and the app icons as pixel art (`node tools/art.js`, then `./build.sh`) |
 
 ## Build, test, simulate
 

@@ -21,8 +21,12 @@ $head
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Tiny5&text=%E2%97%8F&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jacquard+24&display=swap" rel="stylesheet">
 <style>
 H
+  # the Fraktur logo bitmap (assets/logo.png, drawn by tools/art.js), inlined so both apps stay single files
+  echo ":root { --logo: url(data:image/png;base64,$(base64 -w0 assets/logo.png)); }"
+
   cat src/style.css
   echo '</style></head><body><div id="app"></div><script>'
   cat "$@"
