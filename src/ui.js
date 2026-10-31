@@ -1511,6 +1511,10 @@
 
   document.addEventListener('pointerdown', function (e) {
     lastPointer = e.pointerType;
+    if (e.pointerType === 'touch' && e.isPrimary) {   // a fresh touch: forget any finger iOS left looking stuck (see boardTouchStart)
+      bt.pts = {}; bt.pinch = null; bt.moved = false;
+      if (drag) { var sd = drag; drag = null; if (sd.active) { endDragVisuals(sd); sd.ctx.ui.hand = sd.prevHand || null; render(); } }
+    }
     if (e.button > 0 || drag) return;
     var ctx = cur(), t = e.target, c = function (sel) { return t.closest ? t.closest(sel) : null; };
     var hand = c('.bottom [data-hand], .mhand [data-hand]'), meep = c('[data-meeple]'), cell = c('[data-cell]'), wrap = c('.boardwrap');
@@ -1629,24 +1633,38 @@
   function cancelLongPress() { if (!lp) return; clearTimeout(lp.t); if (lp.shown) hov.style.display = 'none'; lp = null; }
 
   // One finger drags the board around; two fingers pinch to zoom around the point between them.
+  // iOS drops the pointerup of a finger whose element was redrawn away mid-touch (the event goes to the
+  // detached element and never reaches us), so a finger can look stuck down. A fresh touch (isPrimary: no other
+  // finger is down) clears the board gesture (in the pointerdown handler), and a pinch uses the two newest fingers.
   function boardTouchStart(e, ctx) {
-    bt.pts[e.pointerId] = { x: e.clientX, y: e.clientY, travel: 0 }; bt.ctx = ctx;
-    var ids = Object.keys(bt.pts);
-    if (ids.length === 2) { var a = bt.pts[ids[0]], b = bt.pts[ids[1]]; bt.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: ctx.ui.zoom }; cancelLongPress(); if (drag && !drag.active) drag = null; }
+    bt.pts[e.pointerId] = { x: e.clientX, y: e.clientY, travel: 0, at: e.timeStamp }; bt.ctx = ctx;
+    var ids = Object.keys(bt.pts).sort(function (i, j) { return bt.pts[i].at - bt.pts[j].at; });
+    ids.slice(0, Math.max(0, ids.length - 2)).forEach(function (i) { delete bt.pts[i]; });
+    if (ids.length >= 2) startPinch(ctx);
+  }
+  // A pinch remembers the board point under the fingers' midpoint and the zoom it started at; each frame puts
+  // that point back under the current midpoint at start zoom × spread change, so it never drifts.
+  function startPinch(ctx) {
+    var ids = Object.keys(bt.pts), a = bt.pts[ids[0]], b = bt.pts[ids[1]], wrap = $('.boardwrap'); if (!wrap) return;
+    var r = wrap.getBoundingClientRect(), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top, z = ctx.ui.zoom;
+    bt.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: z, bx: (wrap.scrollLeft + mx) / z, by: (wrap.scrollTop + my) / z };
+    cancelLongPress(); if (drag && !drag.active) drag = null;
+  }
+  var pinchFrame = null;
+  function pinchStep() {
+    pinchFrame = null;
+    var wrap = $('.boardwrap'), ids = Object.keys(bt.pts), ctx = bt.ctx; if (!wrap || !bt.pinch || ids.length < 2 || !ctx) return;
+    var a = bt.pts[ids[0]], b = bt.pts[ids[1]], r = wrap.getBoundingClientRect(), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    var z = Math.max(0.25, Math.min(2.5, bt.pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / bt.pinch.d));
+    ctx.ui.fit = false; ctx.ui.zoom = z; applyZoom(ctx); wrap.scrollLeft = bt.pinch.bx * z - mx; wrap.scrollTop = bt.pinch.by * z - my;
   }
   function boardTouchMove(e) {
     var q = bt.pts[e.pointerId], wrap = $('.boardwrap'); if (!q || !wrap || !bt.ctx || (drag && drag.active)) return;
     var dx = e.clientX - q.x, dy = e.clientY - q.y; q.x = e.clientX; q.y = e.clientY; q.travel += Math.abs(dx) + Math.abs(dy);
-    var ids = Object.keys(bt.pts), ctx = bt.ctx;
-    if (ids.length >= 2 && bt.pinch) {
-      var a = bt.pts[ids[0]], b = bt.pts[ids[1]], r = wrap.getBoundingClientRect(), mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
-      var z0 = ctx.ui.zoom, z = Math.max(0.25, Math.min(2.5, bt.pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / bt.pinch.d));
-      var bx = (wrap.scrollLeft + mx) / z0, by = (wrap.scrollTop + my) / z0;
-      ctx.ui.fit = false; ctx.ui.zoom = z; applyZoom(ctx); wrap.scrollLeft = bx * z - mx; wrap.scrollTop = by * z - my;
-      bt.moved = true; e.preventDefault(); return;
-    }
+    e.preventDefault();
+    if (bt.pinch && Object.keys(bt.pts).length >= 2) { bt.moved = true; if (!pinchFrame) pinchFrame = requestAnimationFrame(pinchStep); return; }
     if (!bt.moved && q.travel < 8) return;
-    bt.moved = true; cancelLongPress(); wrap.scrollLeft -= dx; wrap.scrollTop -= dy; e.preventDefault();
+    bt.moved = true; cancelLongPress(); wrap.scrollLeft -= dx; wrap.scrollTop -= dy;
   }
   function boardTouchEnd(e) {
     if (!bt.pts[e.pointerId]) return;
@@ -1654,6 +1672,11 @@
     if (bt.moved) swallow(e);
     if (!Object.keys(bt.pts).length) bt.moved = false;
   }
+  // iOS also runs its own scroll and page zoom unless the touch events themselves are cancelled.
+  document.addEventListener('touchmove', function (e) {
+    if (Object.keys(bt.pts).length || (drag && drag.active) || (e.target.closest && e.target.closest('.mgame .boardwrap'))) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('gesturestart', function (e) { if (inGame()) e.preventDefault(); });
 
 
   /* ---------------- installable app (public site) ---------------- */

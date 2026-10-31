@@ -87,6 +87,21 @@ let lastPage = null;   // for a screenshot if the test fails
   const sl0 = await p.$eval('.boardwrap', e => e.scrollLeft);
   await touch('touchStart', [[bx, by]]); for (let i = 1; i <= 8; i++) { await touch('touchMove', [[bx - i * 12, by]]); await wait(16); } await touch('touchEnd', []); await wait(100);
   ok(await p.$eval('.boardwrap', e => e.scrollLeft) > sl0, 'dragging the board with one finger moves it');
+  ok(Math.abs(await scale() - z1) < 1e-6, 'and leaves the zoom alone');
+  // a pinch zooms around the point between the fingers: the board spot under them stays under them
+  const spot = () => p.$eval('.boardwrap', (w, [x, y]) => { const r = w.getBoundingClientRect(), z = parseFloat(w.querySelector('.boardinner').style.transform.slice(6)); return [(w.scrollLeft + x - r.left) / z, (w.scrollTop + y - r.top) / z]; }, [bx, by]);
+  await p.$eval('.boardwrap', w => { w.scrollLeft = (w.scrollWidth - w.clientWidth) / 2; w.scrollTop = (w.scrollHeight - w.clientHeight) / 2; });   // away from the edges, where the view can't follow
+  const sp0 = await spot();
+  await touch('touchStart', [[bx - 40, by], [bx + 40, by]]);
+  for (let i = 1; i <= 8; i++) { await touch('touchMove', [[bx - 40 + i * 1.5, by], [bx + 40 - i * 1.5, by]]); await wait(16); }
+  await touch('touchEnd', []); await wait(100);
+  const sp1 = await spot();
+  ok(await scale() < z1 && Math.hypot(sp1[0] - sp0[0], sp1[1] - sp0[1]) < 3, 'pinching in zooms around the fingers (spot moved ' + Math.hypot(sp1[0] - sp0[0], sp1[1] - sp0[1]).toFixed(1) + 'px)');
+  // iOS can lose a finger's lift when the board redraws under it; that stuck finger must not turn the next pan into a zoom
+  await p.$eval('.mgame .boardwrap', w => { const r = w.getBoundingClientRect(); w.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 999, pointerType: 'touch', isPrimary: true, clientX: r.left + 20, clientY: r.top + 20, bubbles: true })); });
+  const z2 = await scale(), sl2 = await p.$eval('.boardwrap', e => e.scrollLeft);
+  await touch('touchStart', [[bx, by]]); for (let i = 1; i <= 8; i++) { await touch('touchMove', [[bx + i * 6, by]]); await wait(16); } await touch('touchEnd', []); await wait(100);
+  ok(Math.abs(await scale() - z2) < 1e-6 && await p.$eval('.boardwrap', e => e.scrollLeft) < sl2, 'after a lost finger lift, one finger still pans without zooming');
 
   // discard 2, draw 1 by dragging two cards onto the discard pile
   s = await st(); const before = s.players[0].hand.length;
