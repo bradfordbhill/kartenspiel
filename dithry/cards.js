@@ -29,7 +29,7 @@
     if (cm) { if (id) goTo(id); return; }
     A.cancel();
     A.confirmDiscard(function () {
-      cm = { list: library(), i: 0 };
+      cm = { list: library(), i: 0, palette: app.palette };   // the palette to go back to when you leave
       var at = id || A.lsGet('dithry.cardmode.last'), k = cm.list.findIndex(function (c) { return c.id === at; }); cm.i = k < 0 ? 0 : k;
       app.mode = 'cards'; buildBar(); buildHosts();
       A.hooks.view.push(placeHosts); A.hooks.overlay.push(shadeGap); A.hooks.change.push(updateBar);
@@ -38,7 +38,7 @@
   }
   function leave() {
     if (!cm || cm.busy) return;
-    var c = cm; cm = null; app.mode = null; app.allow = null;
+    var c = cm; cm = null; app.mode = null; app.allow = null; app.palette = c.palette; A.renderSide();
     c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); });
     A.hooks.view.splice(A.hooks.view.indexOf(placeHosts), 1); A.hooks.overlay.splice(A.hooks.overlay.indexOf(shadeGap), 1); A.hooks.change.splice(A.hooks.change.indexOf(updateBar), 1);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
@@ -121,6 +121,7 @@
   // A card's canvas: its layers saved in Dithry, else its painted face, else its plain suit colour and texture.
   function load() {
     var c = cm.list[cm.i], draft = A.lsGet('dithry.card.' + c.id), face = F.faces()[c.id];
+    if (A.PALETTES[c.suit]) app.palette = c.suit;   // each suit's own palette while you paint its cards
     A.lsSet('dithry.cardmode.last', c.id); history.replaceState(null, '', '#card=' + encodeURIComponent(c.id));
     app.allow = new Uint8Array(DW * DH);
     for (var y = 0; y < DH; y++) for (var x = 0; x < DW; x++) app.allow[y * DW + x] = (x < HW && y < HH) || (x >= BX && y < BH) ? 1 : 0;

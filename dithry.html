@@ -4137,6 +4137,20 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     win16: { name: 'Windows 16', c: ['#000000', '#800000', '#008000', '#808000', '#000080', '#800080', '#008080', '#c0c0c0', '#808080', '#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff', '#ffffff'] },
     greys: { name: 'Greys', c: ['#000000', '#141414', '#262626', '#3a3a3a', '#4f4f4f', '#666666', '#7d7d7d', '#959595', '#adadad', '#c6c6c6', '#dedede', '#f0f0f0', '#ffffff', '#1c1f1f', '#262a2a', '#2f3434', '#b9b9b9', '#c9c9c9', '#d6d6d6', '#e4e4e4'] },
     night: { name: 'Night', c: ['#0b0d18', '#141829', '#1c2238', '#262d49', '#333c5c', '#434d70', '#566286', '#6b789c', '#8590b2', '#a3acc8', '#c5cbe0', '#e8ecff', '#fff7d6', '#ffe9a8', '#1a1c26', '#2a2d3a', '#3a3f52', '#4a5068', '#8a90a8', '#ffffff'] },
+    // One palette per Kartenspiel suit: muted, ancient and brooding, dark to light, ending near the suit's card colour.
+    // Card mode shows the one for the card being painted.
+    Sceptre: { name: 'Sceptre: old gold and umber', suit: 1, c: ['#1f1a12', '#3a2f1c', '#54432a', '#6e5a36', '#8a7444', '#a68f58', '#bfa86f', '#d4c08c', '#e6d6a8', '#f2e8c6', '#fff6c2', '#f0d45c',
+      '#4a3b26', '#5c4a3a', '#7d6a4a', '#8c6f3e', '#9e8a62', '#b39a5e', '#c9b48a', '#d9c79e'] },
+    Goblet: { name: 'Goblet: wine and dusk rose', suit: 1, c: ['#1d1219', '#2a1e2e', '#33202c', '#4a2c3d', '#613a4f', '#784a61', '#8f5d74', '#a57487', '#b98d9c', '#cca7b2', '#ddc1c8', '#f6dcf2',
+      '#dea0d4', '#3d2a3a', '#5e4458', '#7f6377', '#a08498', '#6b3a46', '#9a6a70', '#c8a0a8'] },
+    Sword: { name: 'Sword: rust, iron and ember', suit: 1, c: ['#1a1414', '#2e2020', '#45292a', '#5e3331', '#763f3a', '#8e5046', '#a56556', '#b98070', '#cc9d8e', '#ddbcb1', '#ecd8d1', '#ffdad5',
+      '#f19a8e', '#2a2a2e', '#4a4a50', '#6e6e74', '#94918e', '#7a4a2a', '#a0683c', '#c48a5a'] },
+    Bone: { name: 'Bone: ash, chalk and lichen', suit: 1, c: ['#141414', '#232322', '#343432', '#474643', '#5b5a56', '#706e69', '#86847e', '#9c9a93', '#b3b0a8', '#c9c6bd', '#dedbd2', '#ececec',
+      '#c4c4c4', '#2b2d2a', '#4a4f45', '#6d7365', '#3a3530', '#5e554a', '#887d6e', '#b0a592'] },
+    Leaf: { name: 'Leaf: moss, bark and mist', suit: 1, c: ['#121812', '#1e2a1c', '#2b3c27', '#384e32', '#46603d', '#567149', '#688257', '#7d9468', '#94a77e', '#adbb97', '#c7d0b3', '#dcf2d4',
+      '#a9db97', '#2a2318', '#4a3d2a', '#6e5c40', '#8f7c5a', '#3e4a3a', '#5f6e5a', '#8a9a86'] },
+    Tome: { name: 'Tome: ink, slate and vellum', suit: 1, c: ['#10131c', '#1b2030', '#262e45', '#323c59', '#3f4b6c', '#4e5b7e', '#606d8f', '#75819f', '#8c97b1', '#a6aec4', '#c1c7d6', '#d9e4ff',
+      '#a1bbf0', '#2a2622', '#4a4238', '#706452', '#9a8c72', '#c4b896', '#e6dcc0', '#3a4a52'] },
     earth: { name: 'Earth & fire', c: ['#1b120a', '#3a2412', '#5a3a1c', '#7a5428', '#9c7240', '#c09a62', '#dcc49a', '#f2e6c8', '#1e2a14', '#2f4524', '#4d6b3a', '#6e8f4f', '#9cb878', '#cddcb0', '#3a0a0a', '#7a1414', '#b01818', '#e04020', '#f08a24', '#ffe08a'] }
   };
   function paletteColours() { return app.palette === 'custom' ? app.custom : (PALETTES[app.palette] || PALETTES.kartenspiel).c; }
@@ -4204,7 +4218,8 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       '<span class="grow" style="flex:1"></span><button class="btn" data-act="rampAdd" title="Add a colour to the ramp (up to 4)"' + (st.ramp.length >= 4 ? ' disabled' : '') + '>+</button><button class="btn" data-act="rampDel" title="Remove the selected colour"' + (st.ramp.length <= 1 ? ' disabled' : '') + '>−</button><button class="btn" data-act="rampRev" title="Reverse the ramp (X)">⇄</button></div>' +
       '<div class="row"><input type="color" data-act="colour" value="' + esc(sel.c) + '" aria-label="Selected colour"><input type="text" data-act="hex" value="' + esc(sel.c) + '" style="width:80px" aria-label="Hex colour"><span class="small muted">' + (st.mode === 'solid' && app.rampSel > 0 ? 'Solid uses colour 1' : '') + '</span></div>' +
       '<div class="slider"><span>Alpha</span><input type="range" data-act="alpha" min="0" max="1" step="0.01" value="' + sel.a + '"><span class="v" id="alphaV">' + Math.round(sel.a * 100) + '%</span></div>' +
-      '<div class="row"><select data-act="palette" style="flex:1">' + Object.keys(PALETTES).map(function (k) { return '<option value="' + k + '"' + (k === app.palette ? ' selected' : '') + '>' + PALETTES[k].name + '</option>'; }).join('') + '<option value="custom"' + (app.palette === 'custom' ? ' selected' : '') + '>My colours</option></select><button class="btn" data-act="keepColour" title="Add the selected colour to My colours">Keep</button></div>' +
+      '<div class="row"><select data-act="palette" style="flex:1">' + [false, true].map(function (suit) { var ks = Object.keys(PALETTES).filter(function (k) { return !!PALETTES[k].suit === suit; });
+        return '<optgroup label="' + (suit ? 'Kartenspiel suits' : 'Palettes') + '">' + ks.map(function (k) { return '<option value="' + k + '"' + (k === app.palette ? ' selected' : '') + '>' + PALETTES[k].name + '</option>'; }).join('') + (suit ? '' : '<option value="custom"' + (app.palette === 'custom' ? ' selected' : '') + '>My colours</option>') + '</optgroup>'; }).join('') + '</select><button class="btn" data-act="keepColour" title="Add the selected colour to My colours">Keep</button></div>' +
       '<div class="palette"><button data-pal="transparent" title="Transparent"><i></i></button>' + paletteColours().map(function (c) { return '<button data-pal="' + c + '" title="' + c + '"><i style="background:' + c + '"></i></button>'; }).join('') + '</div>' +
       '<div class="small muted">Click a swatch in the ramp, then pick its colour. The gradient runs from colour 1 to the last.</div>');
     // gradient
@@ -4919,7 +4934,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   var wheelAcc = 0;
   // For card mode (cards.js) and tests.
   window.DithryApp = { app: app, D: D, hooks: hooks, run: run, setTool: setTool, flatten: function () { return flatten(); }, projectJSON: projectJSON, loadProject: loadProject,
-    setupCanvas: function () { setupCanvas(); }, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,
+    setupCanvas: function () { setupCanvas(); }, PALETTES: PALETTES, redraw: redraw, renderSide: function () { renderSide(); }, renderTitle: renderTitle, renderOpts: renderOpts, toast: toast, modal: modal, closeModal: closeModal,
     confirmDiscard: confirmDiscard, decode: decode, toCanvas: toCanvas, layerPNG: layerPNG, autosaved: function () { return lsGet('dithry.autosave'); }, fit: fit, applyView: applyView, drawOverlay: drawOverlay,
     cancel: function () { if (op) cancel(); }, lsGet: lsGet, lsSet: lsSet, esc: esc, work: function () { return work; } };
   start();
@@ -4955,7 +4970,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     if (cm) { if (id) goTo(id); return; }
     A.cancel();
     A.confirmDiscard(function () {
-      cm = { list: library(), i: 0 };
+      cm = { list: library(), i: 0, palette: app.palette };   // the palette to go back to when you leave
       var at = id || A.lsGet('dithry.cardmode.last'), k = cm.list.findIndex(function (c) { return c.id === at; }); cm.i = k < 0 ? 0 : k;
       app.mode = 'cards'; buildBar(); buildHosts();
       A.hooks.view.push(placeHosts); A.hooks.overlay.push(shadeGap); A.hooks.change.push(updateBar);
@@ -4964,7 +4979,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   }
   function leave() {
     if (!cm || cm.busy) return;
-    var c = cm; cm = null; app.mode = null; app.allow = null;
+    var c = cm; cm = null; app.mode = null; app.allow = null; app.palette = c.palette; A.renderSide();
     c.bar.remove(); c.hosts.forEach(function (h) { h.remove(); });
     A.hooks.view.splice(A.hooks.view.indexOf(placeHosts), 1); A.hooks.overlay.splice(A.hooks.overlay.indexOf(shadeGap), 1); A.hooks.change.splice(A.hooks.change.indexOf(updateBar), 1);
     if (location.hash) history.replaceState(null, '', location.pathname + location.search);
@@ -5047,6 +5062,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   // A card's canvas: its layers saved in Dithry, else its painted face, else its plain suit colour and texture.
   function load() {
     var c = cm.list[cm.i], draft = A.lsGet('dithry.card.' + c.id), face = F.faces()[c.id];
+    if (A.PALETTES[c.suit]) app.palette = c.suit;   // each suit's own palette while you paint its cards
     A.lsSet('dithry.cardmode.last', c.id); history.replaceState(null, '', '#card=' + encodeURIComponent(c.id));
     app.allow = new Uint8Array(DW * DH);
     for (var y = 0; y < DH; y++) for (var x = 0; x < DW; x++) app.allow[y * DW + x] = (x < HW && y < HH) || (x >= BX && y < BH) ? 1 : 0;

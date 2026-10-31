@@ -175,7 +175,7 @@ Projects save as `.dithry` files (JSON with a PNG per layer) and autosave in the
 
 **The text stays in front.** The card's own text is drawn on top of the paint with the game's face markup (`KFace.handFace` / `KFace.boardBlank`) and its stylesheet, inside a shadow root.
 
-**What you start from.** A card begins as its suit colour plus its usual dithered texture, on a `Card` layer, with an empty `Paint` layer above it.
+**What you start from.** A card begins as its suit colour plus its usual dithered texture, on a `Card` layer, with an empty `Paint` layer above it. The colour palette switches to that suit's own (muted, ancient tones, dark to light, ending at the suit's card colours: `PALETTES` in `dithry/app.js`).
 
 **Saving.** **Save to Kartenspiel** writes the two pictures to this browser's `ks.faces`. The game reads it through `KFace.faces()` and redraws on the `storage` event, so an open Kartenspiel tab updates right away. Dithry keeps the card's layers in `dithry.card.<id>`, so you can reopen it and carry on. **Reset** removes a card's painting.
 
