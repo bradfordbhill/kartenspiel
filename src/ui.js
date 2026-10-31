@@ -367,10 +367,9 @@
   }
 
   /* ---------------- Overwhelm pressure ---------------- */
-  // Shows where the pressure on a card comes from: a bar on each side held by an enemy-suit card (the cards
-  // Overwhelm counts), in that card's owner's colour (grey if unclaimed), with a notch pointing in. Foundations
-  // also count diagonals, shown as corner wedges. One away from Overwhelm, the bars glow red and the open
-  // sides are marked with red dashes: that's where the last enemy would go.
+  // Shows where the pressure on a card comes from: a light dithered fade in from each side held by an enemy-suit
+  // card (the cards Overwhelm counts), in that card's owner's colour (grey if unclaimed). Foundations also count
+  // diagonals, shown as corner fades. One away from Overwhelm, the fades show at full strength.
   var DIRS8 = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0], NE: [1, -1], SE: [1, 1], SW: [-1, 1], NW: [-1, -1] };
   function pressure(st, k) {
     var u = E.top(st, k), xy = E.XY(k), en = E.enemies(st, E.suitOf(st, u)), found = E.rawDef(st, u).type === 'Foundation';
@@ -386,7 +385,6 @@
     var pr = pressure(st, k); if (!pr.sides.length) return '';
     var hot = pr.oc.n >= pr.oc.th - 1, h = '<div class="press' + (hot ? ' hot' : '') + '" aria-hidden="true">';
     pr.sides.forEach(function (sd) { h += '<i class="pe pe-' + sd.d + '" style="--pc:' + sd.color + '"></i>'; });
-    if (hot) pr.open.forEach(function (d) { h += '<i class="po pe-' + d + '"></i>'; });
     return h + '</div>';
   }
 
@@ -1124,7 +1122,7 @@
   function helpPage() {
     return helpEdition('<div class="page scroll"><div class="pane help">' +
       '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
-      '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm. A coloured bar on a card’s edge shows where an enemy-suit neighbour is pressing, in that neighbour’s owner’s colour (grey if unclaimed; corners for a Foundation’s diagonals). One away from Overwhelm, the bars glow red and the open sides are dashed red: that’s where the last enemy would go.</p>' +
+      '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm. A faint dithered fade on a card’s edge shows where an enemy-suit neighbour is pressing, in that neighbour’s owner’s colour (grey if unclaimed; corners for a Foundation’s diagonals). One away from Overwhelm, the fades turn solid and bright.</p>' +
       '<p><b>Hover</b> over any card to see a magnified copy with its rules text. A card with a <b>bright green border</b> has a once-per-turn ability you can use right now (and afford); select it and use the button in the right panel. The <b>Overlay</b> menu covers every card with one kind of information. <b>Quickview</b> shows each card’s ● production and ◇ value in its owner’s colour (unclaimed cards’ ● in grey), with each player’s totals above the board. <b>War</b> splits each card into one strip per enemy neighbour it takes to Overwhelm it, filled in its owner’s colour as enemies gather; a red outline means one more will do it. Log lines are color-coded: blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, gray card movement, italic gray referee edits.</p>' +
       (ONLINE ? '<h2>Install as an app</h2><p>Add Kartenspiel to your home screen to play full screen with no browser bars: <b>Install app</b> on the Home page (Android, or Chrome and Edge on a computer), or on iPhone and iPad tap Share, then <b>Add to Home Screen</b>. Single player and pass-and-play then work offline too.</p>' : '') +
       '<h2>Drag and drop, and phones</h2><p>Drag a card from your hand onto a green space to play it, or anywhere on the board for cards played straight from hand. Drag your meeple (shown while a claim is available) onto an orange-outlined card to claim it, and drop two cards on the discard pile to discard 2 and draw 1. Clicking still works for all of it.</p><p>On a phone the game screen rearranges: your numbers and <b>End turn</b> along the top, the board in the middle, your hand along the bottom, and <b>Players</b>, <b>Log</b>, <b>Card</b> and <b>Menu</b> as tabs. Pinch to zoom, drag the board to move around, tap a card for its details, and press and hold any card to read it.</p>' +

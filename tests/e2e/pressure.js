@@ -1,4 +1,4 @@
-// Browser test of the Overwhelm pressure bars: right sides, right colours, one-away glow and open-side marks.
+// Browser test of the Overwhelm pressure bars: right sides, right colours, one-away emphasis, no open-side marks.
 // Needs Playwright with Chromium. Run: ./build.sh && node tests/e2e/pressure.js [screenshot folder]
 const { chromium, devices } = require('playwright');
 const path = require('path'), fs = require('fs'), os = require('os');
@@ -28,7 +28,7 @@ put('acorn', '8,0', 2);                                                         
   const hot = k => p.$eval('.cell:has([data-cell="' + k + '"])', e => !!e.querySelector('.press.hot'));
   const open = k => p.$$eval('.cell:has([data-cell="' + k + '"]) .press .po', els => els.map(e => e.className.replace('po pe-', '')).sort().join(' '));
   ok(await bars('2,0') === 'N:' + GREEN + ' W:' + RED, 'pressure from the north (green Tome) and west (red Sword): ' + await bars('2,0'));
-  ok(await hot('2,0') && await open('2,0') === 'E S', 'one away: the bars glow and the open east and south sides are marked');
+  ok(await hot('2,0') && await open('2,0') === '' && await p.$eval('.cell:has([data-cell="2,0"]) .press .pe', e => getComputedStyle(e).opacity) === '1', 'one away: the fades show at full strength, and open sides are not marked');
   ok(await bars('5,0') === 'E:' + RED && !(await hot('5,0')), 'light pressure from the east, no glow');
   ok(await bars('2,3') === 'NW:' + RED + ' S:' + BLUE + ' SE:#7a7a7a', 'a Foundation shows its diagonals as corners, unclaimed in grey: ' + await bars('2,3'));
   ok(await bars('8,0') === '', 'a card with no enemy neighbours has no bars');
