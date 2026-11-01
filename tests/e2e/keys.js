@@ -7,6 +7,7 @@ const out = []; const ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m);
 
 (async () => {
   const b = await chromium.launch(), p = await b.newPage({ viewport: { width: 1400, height: 900 } }), errs = [];
+  await p.addInitScript(() => { if (!localStorage.getItem('ks.prefs')) localStorage.setItem('ks.prefs', '{"confirmEnd":false}'); });   // these tests end turns directly; solo.js tests the end-turn check
   p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
   await p.goto('file://' + REPO + '/index.html');

@@ -11,6 +11,7 @@ const out = []; const ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m);
   const errs = [];
   async function page(name) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 900 } }), p = await ctx.newPage();
+    await ctx.addInitScript(() => { if (!localStorage.getItem('ks.prefs')) localStorage.setItem('ks.prefs', '{"confirmEnd":false}'); });   // these tests end turns directly; solo.js tests the end-turn check
     p.on('pageerror', e => errs.push(name + ': ' + e.message));
     await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
     return p;

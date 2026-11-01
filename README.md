@@ -118,6 +118,18 @@ The game page and the sandbox are each a *context*: `{ state, hist (undo history
 
 **Phones** get their own game layout (`gamePageMobile`): top bar, board, hand strip and Players / Log / Card / Menu sheets, switched by screen width (`MOBILE_Q`), so the desktop page is unchanged. **Drag and drop** and the touch gestures (pinch, pan, press-and-hold) live in the "touch and drag" section and use pointer events, so mouse, touch and pen share one path. A drop sends the same engine action a click would. Tests can fix the shuffle with `window.ksSeed` and the bots' pace with `window.ksBotDelay`; `KS_SEED=n node tests/e2e/mobile.js` replays one deal.
 
+**Comforts** (all in `ui.js`):
+- **Hints:** `hintBar` suggests a next step on your turn.
+- **End-turn check:** `leftToDo` asks once before you end a turn while you could still play or claim a card.
+- **Recap:** `recapHTML` shows, in the turn dialogs, what everyone else did since your last turn.
+- **Unplayable cards:** each one carries a short reason (`blockShort`).
+- **Hand order:** `handOrder` sorts the hand as drawn, by suit or by cost. Only the display changes.
+- **Bot speed:** set with `BOT_SPEED`.
+- **Rematch:** the `rematch` action starts a new game with the same players and rules.
+- **Remembered setup:** the last game's setup is kept in `ks.setup`.
+
+Player preferences live in `ks.prefs` (`hints`, `confirmEnd`, `botSpeed`, `handSort`). Help can turn the hints and the end-turn check back on.
+
 Keyboard shortcuts (`onKey` in `ui.js`) mostly press the same on-screen button a click would, so they follow its rules; press **?** in the app for the list.
 
 The file runs top to bottom like this: helpers and icons → app state and library loading → dispatch and undo → animations (`FX`) → card faces → board → inspector panel → players and log → one function per page → event handlers → hover magnifier.

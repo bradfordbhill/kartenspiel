@@ -14,6 +14,12 @@
   function lsGet(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
+  // Player preferences, kept in this browser: hints (on), confirmEnd (ask before ending a turn with moves left; on),
+  // botSpeed ('normal'), handSort ('drawn').
+  var prefs = lsGet('ks.prefs') || {};
+  function setPref(k, v) { prefs[k] = v; lsSet('ks.prefs', prefs); }
+  // "Tap" on touch screens, "Click" with a mouse, in the prompts that say what to do.
+  function verb() { return (typeof lastPointer !== 'undefined' && lastPointer === 'touch') || (window.matchMedia && matchMedia('(pointer: coarse)').matches && lastPointer !== 'mouse') ? 'Tap' : 'Click'; }
 
   // Shared with Dithry (src/cardface.js): suit icons, placement and score text, card faces, textures.
   var KF = KFace, ICON = KF.ICON, icon = KF.icon, placeIcon = KF.placeIcon, scoreText = KF.scoreText, artStyle = KF.artStyle, rng = KF.rng, BAYER4 = KF.BAYER4;
@@ -142,6 +148,7 @@
   // Send an action to the engine. On success: keep the old state for undo, autosave, animate, re-render.
   // On error: show the message and keep the old state.
   function dispatch(ctx, a) {
+    if (ctx.ui) ctx.ui.endAsked = false;
     if (ctx.online) { ctx.err = null; KNet.send({ t: 'act', a: a }); uiAfter(ctx, a); render(); return true; }   // the server answers with a new state
     var r = E.apply(ctx.state, a);
     if (r.error) { ctx.err = r.error; render(); return false; }
@@ -160,6 +167,7 @@
   }
   // Bots: a player whose state carries `bot` (a KBots style) is played by the computer (see "bots" below).
   function isBot(st, p) { return !!(st.players[p] && st.players[p].bot); }
+  var BOT_SPEED = { slow: 1300, normal: 650, fast: 220, instant: 0 };   // pause between a bot's moves, ms
   function hasBots(st) { return st.players.some(function (q) { return q.bot; }); }
   // A seat the screen always shows: yours online, or the only human's in a game against bots. null = pass the device.
   function fixedSeat(ctx) {
@@ -620,6 +628,7 @@
       '<label><input type="checkbox" data-tog="showSeenBy"' + (u.showSeenBy ? ' checked' : '') + '> What sees it</label>' +
       '<label><input type="checkbox" data-tog="showOW"' + (u.showOW ? ' checked' : '') + '> Overwhelm pressure</label>' +
       '<label><input type="checkbox" data-tog="coords"' + (u.coords ? ' checked' : '') + '> Grid</label>' +
+      (ctx.kind === 'game' && hasBots(ctx.state) ? '<label title="How fast the bots play">Bots <select data-pref="botSpeed">' + [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast'], ['instant', 'Instant']].map(function (o) { return '<option value="' + o[0] + '"' + ((prefs.botSpeed || 'normal') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' : '') +
       '<button class="btn sm" data-act="debug" title="Copy the log and board state to the clipboard">Copy debug report</button>' +
       '<button class="btn sm" data-act="keys" title="Keyboard shortcuts">Keys</button>' +
       '<button class="btn sm" data-act="suits" title="Which suits pressure which">Suits</button>' +
@@ -838,6 +847,7 @@
   /* ----- new game ----- */
   // New game page options, kept for the next game.
   var setup = { n: 2, players: [], handSize: 4, drawPerTurn: 2, meeples: 8, target: 48, enforceWeak: true, foundationBy: 3, autoEnd: true, seatStart: true, burySuitOW: true, defense: true, adjDiscount: true, noWander: true, ascension: true };
+  (function () { var s = lsGet('ks.setup'); if (s && s.players && s.players.length) for (var k in s) setup[k] = s[k]; })();   // the last game's setup
   function archetypes() { return sortLib(app.lib.filter(function (c) { return c.type === 'Foundation' && c.archetype; })); }
   function ensureSetup() {
     var A = archetypes().map(function (c) { return c.archetype; });
@@ -909,39 +919,90 @@
       if (ui.mode === 'move') return '<div class="prompt">Click an empty space to move the card from ' + esc(ui.moveFrom) + '. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
       return '';
     }
-    if (st.winner != null) return '<div class="prompt winner">' + pix(CROWN, ART_PAL, 2, '', 'Crown') + '<b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm" data-page="new">New game</button>') + '</div>';
+    if (st.winner != null) return '<div class="prompt winner">' + pix(CROWN, ART_PAL, 2, '', 'Crown') + '<b>' + esc(st.players[st.winner].name) + ' wins!</b> ' + (ctx.online ? onlineAfterGame() : '<button class="btn sm def" data-act="rematch" title="Same players and rules, new shuffle">Rematch</button><button class="btn sm" data-page="new">New game</button>') + '</div>';
     if (ctx.online || hasBots(st)) { var ow = waitingPrompt(ctx); if (ow) return ow; }
-    if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' Click an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res && !ctx.online ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
+    if (pd && pd.kind === 'cell') return '<div class="prompt"><b>' + esc(st.players[pd.player].name) + ':</b> ' + esc(pd.prompt) + ' ' + verb() + ' an orange-outlined ' + (pd.empty ? 'space' : 'card') + '.' + (pd.optional ? ' <button class="btn sm" data-act="skip">Skip</button>' : '') + (st.res && !ctx.online ? ' <button class="btn sm" data-act="cancelEffect" title="Referee: stop resolving this effect">Cancel effect</button>' : '') + '</div>';
     if (ui.autoEnding) return '<div class="prompt"><b>Out of ●.</b> Nothing left to play, claim or use, so your turn ends in a moment. <button class="btn sm" data-act="holdTurn">Wait, I’m not done</button></div>';
-    if (ui.mode === 'reclaim') return '<div class="prompt">Click one of your claimed cards to take its meeple back. This ends your turn. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
+    if (ui.endAsked) { var lt = leftToDo(ctx); if (lt) return '<div class="prompt">You can still ' + lt.text + ' (' + E.funds(st.players[st.cur]) + '● left). End your turn anyway? <button class="btn sm def" data-act="endTurn">End turn</button><button class="btn sm" data-act="keepPlaying">Keep playing</button><button class="linkbtn small" data-act="noEndAsk">Don’t ask again</button></div>'; }
+    if (ui.mode === 'reclaim') return '<div class="prompt">' + verb() + ' one of your claimed cards to take its meeple back. This ends your turn. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
     if (ui.mode === 'move') return '<div class="prompt">Referee move: click an empty space for the card from ' + esc(ui.moveFrom) + '. <button class="btn sm" data-act="cancelMode">Cancel</button></div>';
     if (ui.swap) return '<div class="prompt">Choose 2 cards to discard, then draw 1. <button class="btn sm def" data-act="doSwap"' + (ui.swap.length === 2 ? '' : ' disabled') + '>Discard 2, draw 1</button><button class="btn sm" data-act="cancelSwap">Cancel</button></div>';
     if (ui.hand && !E.needsPlacement(E.rawDef(st, ui.hand))) { var ic = +E.rawDef(st, ui.hand).cost || 0, iok = ic <= E.funds(st.players[st.cur]), iwhy = E.playBlock(st, st.cur, ui.hand); return '<div class="prompt">' + esc(E.rawDef(st, ui.hand).name) + ' is played straight from your hand. <button class="btn sm def" data-act="cast"' + (iok && !iwhy ? '' : ' disabled') + '>' + (iwhy ? esc(iwhy) : iok ? 'Play it (' + ic + '●)' : 'Not enough AP (' + ic + '●)') + '</button> <button class="btn sm" data-act="deselect">Cancel</button></div>'; }
-    if (ui.hand) { var LC = E.legalCells(st, ui.hand), canPay = Object.keys(LC).some(function (x) { return LC[x] <= E.funds(st.players[st.cur]); }); return '<div class="prompt">' + (canPay ? 'Click a green space to play ' + esc(E.rawDef(st, ui.hand).name) + '.' : 'Not enough AP to play ' + esc(E.rawDef(st, ui.hand).name) + ' anywhere (you have ' + st.players[st.cur].ap + '●).') + ' <button class="btn sm" data-act="deselect">Cancel</button></div>'; }
+    if (ui.hand) { var LC = E.legalCells(st, ui.hand), canPay = Object.keys(LC).some(function (x) { return LC[x] <= E.funds(st.players[st.cur]); }); return '<div class="prompt">' + (canPay ? verb() + ' a green space to play ' + esc(E.rawDef(st, ui.hand).name) + '.' : 'Not enough AP to play ' + esc(E.rawDef(st, ui.hand).name) + ' anywhere (you have ' + st.players[st.cur].ap + '●).') + ' <button class="btn sm" data-act="deselect">Cancel</button></div>'; }
     var co = st.turn.started && !pd && !st.res ? E.claimOptions(st, st.cur) : [];
-    if (co.length) return '<div class="prompt">Claim available: your cursor is a meeple. Click an orange-outlined card to claim it (' + st.players[st.cur].meeples + ' meeples left), or keep playing.</div>';
-    return '';
+    if (co.length) return '<div class="prompt">Claim available: ' + (verb() === 'Tap' ? 'drag your meeple onto an orange-outlined card, or tap the card' : 'your cursor is a meeple. Click an orange-outlined card') + ' to claim it (' + st.players[st.cur].meeples + ' meeples left), or keep playing.</div>';
+    return hintBar(ctx);
   }
+  // What a player can still do this turn: { n (cards they can afford to play), claim (a claim is available), text }, or null.
+  function leftToDo(ctx) {
+    var st = ctx.state; if (!myTurn(ctx) || !st.turn || !st.turn.started || st.pending || st.res || st.winner != null) return null;
+    var n = st.players[st.cur].hand.filter(function (u) { return canAfford(st, u); }).length, claim = E.claimOptions(st, st.cur).length > 0 && st.players[st.cur].meeples > 0;
+    if (!n && !claim) return null;
+    return { n: n, claim: claim, text: (n ? 'play ' + n + ' card' + (n > 1 ? 's' : '') : '') + (n && claim ? ' and ' : '') + (claim ? 'claim a card' : '') };
+  }
+  // A gentle next step for a player whose turn it is and who has nothing selected. Off with "Hide hints".
+  function hintBar(ctx) {
+    var st = ctx.state, pl = st.players[st.cur];
+    if (prefs.hints === false || ctx.kind !== 'game' || !myTurn(ctx) || !st.turn || !st.turn.started || st.pending || st.res || st.winner != null || ctx.ui.hand || ctx.ui.mode || ctx.ui.swap) return '';
+    var touch = verb() === 'Tap', h = '', small = isMobile();
+    var fu = pl.hand.filter(function (u) { return E.rawDef(st, u).type === 'Foundation' && !E.playBlock(st, st.cur, u); })[0];
+    if (small) {   // a phone: the same hints, shorter, so the board keeps its room
+      if (fu && !pl.foundationPlaced) h = 'First, drag your Foundation (<b>' + esc(E.rawDef(st, fu).name) + '</b>) onto the board.';
+      else if (!leftToDo(ctx)) h = E.funds(pl) > 0 ? 'Nothing affordable: end turn, or discard 2 to draw 1.' : 'Out of ●: end your turn when ready.';
+      else if (pl.turns <= 2) h = 'Green-bordered cards are affordable: drag one onto the board.';
+      return h ? '<div class="prompt hint"><span>💡 ' + h + '</span><button class="linkbtn small" data-act="hideHints">Hide</button></div>' : '';
+    }
+    if (fu && !pl.foundationPlaced) h = 'Start by playing your Foundation, <b>' + esc(E.rawDef(st, fu).name) + '</b>: drag it onto the board, or ' + (touch ? 'tap' : 'click') + ' it and then the green space.' + (st.opts.foundationBy ? ' It must be down by turn ' + st.opts.foundationBy + '.' : '');
+    else if (!leftToDo(ctx)) h = E.funds(pl) > 0 ? 'Nothing in your hand fits your ● right now. End your turn, or discard 2 cards to draw 1.' : 'You’re out of ●. End your turn when you’re ready' + (touch ? '.' : ' (E).');
+    else if (pl.turns <= 2) h = 'Cards with a green border are ones you can afford. Drag one onto the board, or ' + (touch ? 'tap' : 'click') + ' it to see where it can go.';
+    if (!h) return '';
+    return '<div class="prompt hint"><span>💡 ' + h + '</span><button class="linkbtn small" data-act="hideHints">Hide hints</button></div>';
+  }
+  // The hand in the player's chosen order (only the display changes, never the game).
+  function handOrder(st, hand) {
+    var by = prefs.handSort || 'drawn'; if (by === 'drawn') return hand;
+    var S = KData.SUITS, T = ['Foundation', 'Structure', 'Grounds', 'Action', 'Blessing', 'Curse'];
+    return hand.slice().sort(function (a, b) { var x = E.rawDef(st, a), y = E.rawDef(st, b);
+      return by === 'suit' ? S.indexOf(x.suit) - S.indexOf(y.suit) || T.indexOf(x.type) - T.indexOf(y.type) || (+x.cost || 0) - (+y.cost || 0) : (+x.cost || 0) - (+y.cost || 0) || S.indexOf(x.suit) - S.indexOf(y.suit); });
+  }
+  // A short label for why a card can't be played (the full reason is its tooltip).
+  function blockShort(why) { return /not your Foundation/.test(why) ? 'Not your Foundation' : /cannot play/.test(why) ? 'Your weak suit' : /reaction/.test(why) ? 'Reaction only' : /own more/.test(why) ? 'You own too many' : 'Can’t play now'; }
   // The current player's hand. A green border means it can be afforded right now.
   function handHTML(ctx) {
     var st = ctx.state, ui = ctx.ui, pl = st.players[viewer(ctx)];
     var fixed = fixedSeat(ctx) != null;
     if ((!fixed && (!st.turn.started || isBot(st, st.cur))) || st.winner != null) return '<div class="hand"><span class="muted">' + (st.winner != null ? 'Game over.' : isBot(st, st.cur) ? esc(st.players[st.cur].name) + ' is playing.' : 'Hand hidden until ' + esc(pl.name) + ' starts their turn.') + '</span></div>';
-    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + (fixed ? 'Your hand' : esc(pl.name) + '’s hand') + '</b> <span class="muted">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
+    var h = '<div class="row small" style="padding:4px 6px 0"><b>' + (fixed ? 'Your hand' : esc(pl.name) + '’s hand') + '</b> <span class="muted handinfo">(' + esc(pl.arch) + ', weak to ' + esc((E.archInfo(st)[pl.arch] || {}).weakTo || '—') + ')</span>' +
+      '<button class="btn sm" data-act="handSort" title="Order your hand: as drawn, by suit or by cost">⇅ ' + ({ drawn: 'As drawn', suit: 'By suit', cost: 'By cost' }[prefs.handSort || 'drawn']) + '</button>' +
       '<button class="btn sm" data-act="startSwap"' + (pl.hand.filter(function (x) { return E.rawDef(st, x).type !== 'Foundation'; }).length >= 2 && !st.pending && !ui.swap && myTurn(ctx) ? '' : ' disabled') + '>Discard 2, draw 1…</button>' +
       (st.turn.played === 0 && !st.turn.claimed ? '' : '') + '</div><div class="hand">';
-    pl.hand.forEach(function (u) {
+    handOrder(st, pl.hand).forEach(function (u) {
       var d = E.rawDef(st, u), cls = 'hcard', blocked = E.playBlock(st, viewer(ctx), u);
       if (ui.hand === u) cls += ' sel'; if (blocked) cls += ' blocked'; if (ui.swap && ui.swap.indexOf(u) >= 0) cls += ' pick';
       if (!blocked && myTurn(ctx) && !st.pending && !st.res && canAfford(st, u)) cls += ' afford';
       var free = E.isFree(st, u); if (free) cls += ' free';
-      h += '<div class="' + cls + '"' + (blocked ? ' title="' + esc(blocked) + '"' : '') + '>' + defFace(Object.assign({}, d, { art: artOf(d.id) }), free ? { mid: true, cost: 0, tex: u } : { mid: true, tex: u }) + (free ? '<span class="freetag">Free this turn</span>' : '') + '<button class="cellbtn" data-hand="' + u + '" aria-label="' + esc(d.name) + '"></button></div>';
+      h += '<div class="' + cls + '"' + (blocked ? ' title="' + esc(blocked) + '"' : '') + '>' + defFace(Object.assign({}, d, { art: artOf(d.id) }), free ? { mid: true, cost: 0, tex: u } : { mid: true, tex: u }) + (blocked ? '<span class="blocktag">' + esc(blockShort(blocked)) + '</span>' : '') + (free ? '<span class="freetag">Free this turn</span>' : '') + '<button class="cellbtn" data-hand="' + u + '" aria-label="' + esc(d.name) + '"></button></div>';
     });
     if (pl.aside && pl.aside.length) h += '<span class="muted small" style="align-self:center">Set aside for next turn: ' + pl.aside.length + ' card' + (pl.aside.length > 1 ? 's' : '') + '</span>';
     if (!pl.hand.length) h += '<span class="muted">No cards in hand.</span>';
     return h + '</div>';
   }
 
+  /* ----- modals ----- */
+  // What everyone else did since this player's last turn, from the log: shown when their next turn comes round,
+  // so nobody has to dig through the log (which a phone keeps in a sheet).
+  function recapHTML(st, p) {
+    var L = st.log, mine = '— ' + st.players[p].name + '’s turn', end = L.length, last = -1, from = -1, i;
+    if (end && L[end - 1].indexOf(mine) === 0) end--;   // the header for the turn that's about to start
+    for (i = end - 1; i >= 0; i--) if (L[i].indexOf(mine) === 0) { last = i; break; }
+    for (i = last + 1; i < end; i++) if (L[i].indexOf('— ') === 0) { from = i; break; }
+    if (from < 0) return '';
+    var lines = L.slice(from, end).filter(function (l) { return logClass(l) !== 'lg-ref' && !/^New game/.test(l); });
+    if (!lines.some(function (l) { return l.indexOf('— ') !== 0; })) return '';
+    var more = Math.max(0, lines.length - 12); lines = lines.slice(-12);
+    return '<div class="recap"><div class="small muted">Since your last turn' + (more ? ' (the last 12 things; ' + more + ' more in the log)' : '') + ':</div><div class="log sunken">' +
+      lines.map(function (l) { return '<div class="' + logClass(l) + '">' + esc(l.replace(/^— (.*) —$/, '$1')) + '</div>'; }).join('') + '</div></div>';
+  }
   /* ----- modals ----- */
   function modal(title, body, btns) { return '<div class="modalbg"><div class="modal raised" role="dialog" aria-label="' + esc(title) + '"><div class="titlebar">' + crest() + '<span>' + esc(title) + '</span></div><div class="body">' + body + '</div><div class="btns">' + (btns || '') + '</div></div></div>'; }
   // Dialogs: app.modal for one-off ones; otherwise revealed hands, "pass the device" between turns,
@@ -959,7 +1020,7 @@
     if (me != null) {
       if (st.winner == null && myTurn(ctx) && !st.turn.started && ui.mode !== 'reclaim' && !st.players[me].out) {
         var mine = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(me) >= 0; });
-        return modal('Your turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px">It’s your turn, ' + esc(st.players[me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>',
+        return modal('Your turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px">It’s your turn, ' + esc(st.players[me].name) + '.</p><p class="small muted">Starting the turn gains ● and draws cards. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>' + recapHTML(st, me),
           (!ctx.online && ctx.hist.length ? '<button class="btn" data-act="undo">Undo my last action</button>' : '') + '<button class="btn" data-act="reclaimMode"' + (mine ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start my turn</button>');
       }
       return pd && pd.kind !== 'cell' && st.winner == null ? pendingModal(ctx) : '';
@@ -968,7 +1029,7 @@
     if (!st.turn.started && ui.mode !== 'reclaim' && !isBot(st, st.cur)) {
       var pl = st.players[st.cur];
       var hasClaims = E.keys(st).some(function (k) { var c = st.cards[E.top(st, k)]; return !c.fixed && c.claimants.indexOf(st.cur) >= 0; });
-      return modal('Next turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px"><span class="swatch" style="background:' + pl.color + ';width:14px;height:14px"></span> Pass the device to <b>' + esc(pl.name) + '</b> (' + esc(pl.arch) + ').</p><p class="small muted">Starting the turn gains ● and draws ' + (st.opts.drawPerTurn != null ? st.opts.drawPerTurn : 1) + ' card' + ((st.opts.drawPerTurn != null ? +st.opts.drawPerTurn : 1) === 1 ? '' : 's') + '. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>',
+      return modal('Next turn', '<div class="msgbox">' + pix(HOURGLASS, ART_PAL, 3) + '<div><p style="font-size:15px"><span class="swatch" style="background:' + pl.color + ';width:14px;height:14px"></span> Pass the device to <b>' + esc(pl.name) + '</b> (' + esc(pl.arch) + ').</p><p class="small muted">Starting the turn gains ● and draws ' + (st.opts.drawPerTurn != null ? st.opts.drawPerTurn : 1) + ' card' + ((st.opts.drawPerTurn != null ? +st.opts.drawPerTurn : 1) === 1 ? '' : 's') + '. Taking back a meeple replaces the whole turn: no ●, no draw, no plays.</p></div></div>' + recapHTML(st, st.cur),
         (ctx.hist.length ? '<button class="btn" data-act="undo">Undo last action</button>' : '') + '<button class="btn" data-act="reclaimMode"' + (hasClaims ? '' : ' disabled') + '>Take back a meeple instead</button><button class="btn def big" data-act="startTurn">Start ' + esc(pl.name) + '’s turn</button>');
     }
     if (pd && pd.kind !== 'cell') return pendingModal(ctx);
@@ -1226,7 +1287,9 @@
   }
   // The public site has no sandbox or card builder: swap the first paragraph and drop the builder section.
   function helpEdition(h) {
-    h = h.replace(/<\/div><\/div>$/, '<h2>Keyboard shortcuts</h2>' + keysTable() + '</div></div>');
+    h = h.replace(/<\/div><\/div>$/, '<h2>Comforts</h2><p>While it’s your turn, a <b>hint</b> line suggests a next step (play your Foundation first; claim with a meeple; out of ●). Ending a turn while you could still play a card or claim one asks once first. When your turn comes round, the dialog shows <b>what everyone else did</b> since your last turn. Cards you can’t play say why. <b>Sort</b> orders your hand by suit or cost; against bots, <b>Bots</b> sets how fast they play; a finished game offers a <b>Rematch</b>.</p>' +
+      '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' +
+      '<h2>Keyboard shortcuts</h2>' + keysTable() + '</div></div>');
     if (!ONLINE) return h;
     return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Single player</b> puts you against bots: on the Play locally page, set any seat to a greedy, tactician or warlord bot. <b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
         'Pick an archetype in the table’s lobby (first come, first served); the host starts the game. Your <b>Profile</b> keeps your win/loss record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</p>' +
@@ -1249,7 +1312,7 @@
   // window.ksBotDelay (ms) overrides the pause, e.g. 0 in tests.
   function botDriver(ctx) {
     if (!ctx || ctx.online || ctx.kind !== 'game' || ctx !== app.game || ctx.botTimer || botToAct(ctx.state) == null) return;
-    ctx.botTimer = setTimeout(function () { botStep(ctx); }, typeof window.ksBotDelay === 'number' ? window.ksBotDelay : 650);
+    ctx.botTimer = setTimeout(function () { botStep(ctx); }, typeof window.ksBotDelay === 'number' ? window.ksBotDelay : BOT_SPEED[prefs.botSpeed] != null ? BOT_SPEED[prefs.botSpeed] : 650);
   }
   // A bot plans its whole turn once (KBots.plan), then plays it out an action at a time. The plan is dropped when
   // anything else changed the game in between (a human answered a prompt), and the bot plans again from there.
@@ -1862,7 +1925,13 @@
         var players = []; for (var i = 0; i < setup.n; i++) players.push({ name: setup.players[i].name.trim() || ('Player ' + (i + 1)), arch: setup.players[i].arch, color: COLORS[i] });
         var st = E.newGame(app.lib, { seed: window.ksSeed, players: players, handSize: +setup.handSize || 4, meeples: +setup.meeples || 8, target: +setup.target || 48, enforceWeak: setup.enforceWeak, foundationBy: +setup.foundationBy, drawPerTurn: setup.drawPerTurn === '' || setup.drawPerTurn == null ? 2 : +setup.drawPerTurn, autoEnd: setup.autoEnd, seatStart: setup.seatStart, burySuitOW: setup.burySuitOW, defense: setup.defense, adjDiscount: setup.adjDiscount, noWander: setup.noWander, ascension: setup.ascension });
         st.players.forEach(function (pl, i) { var kind = setup.players[i].kind; if (kind && kind !== 'human') pl.bot = kind; });
-        app.game = newCtx(st, 'game'); lsSet('ks.game', st); app.page = 'game'; render(); return;
+        app.game = newCtx(st, 'game'); lsSet('ks.game', st); lsSet('ks.setup', setup); app.page = 'game'; render(); return;
+      }
+      case 'rematch': {   // the same players, archetypes, seats and rules, with a fresh shuffle
+        var old = ctx.state, rp = old.players.map(function (q) { return { name: q.name, arch: q.arch, color: q.color }; }), ro = {};
+        for (var ok in old.opts) ro[ok] = old.opts[ok]; ro.players = rp; ro.seed = window.ksSeed;
+        var rs = E.newGame(app.lib, ro); rs.players.forEach(function (q, i) { if (old.players[i].bot) q.bot = old.players[i].bot; });
+        app.game = newCtx(rs, 'game'); lsSet('ks.game', rs); render(); toast('Rematch: same players and rules, new shuffle.'); return;
       }
       case 'soloSetup': case 'hotseatSetup': {   // home page shortcuts: preset the seats, then the New game page
         ensureSetup(); var solo = a === 'soloSetup';
@@ -1875,7 +1944,15 @@
       case 'startTurn': dispatch(ctx, { t: 'startTurn' }); return;
       case 'reclaimMode': ctx.ui.mode = 'reclaim'; render(); return;
       case 'cancelMode': ctx.ui.mode = null; render(); return;
-      case 'endTurn': dispatch(ctx, { t: 'endTurn' }); return;
+      case 'endTurn':   // with cards you could still play or a card you could claim, ask once first
+        if (prefs.confirmEnd !== false && !ctx.ui.endAsked && ctx.kind === 'game' && leftToDo(ctx)) { ctx.ui.endAsked = true; render(); return; }
+        ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
+      case 'keepPlaying': ctx.ui.endAsked = false; render(); return;
+      case 'noEndAsk': setPref('confirmEnd', false); ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
+      case 'hideHints': setPref('hints', false); render(); toast('Hints are off. Turn them back on from Help.'); return;
+      case 'showHints': setPref('hints', true); setPref('confirmEnd', true); render(); toast('Hints and the end-turn check are on.'); return;
+      case 'hideHintsAll': setPref('hints', false); setPref('confirmEnd', false); render(); toast('Hints and the end-turn check are off.'); return;
+      case 'handSort': { var so = ['drawn', 'suit', 'cost']; setPref('handSort', so[(so.indexOf(prefs.handSort || 'drawn') + 1) % so.length]); render(); return; }
       case 'undo': undo(ctx); return;
       case 'claim': dispatch(ctx, { t: 'claim', k: k }); return;
       case 'ability': dispatch(ctx, { t: 'ability', k: k }); return;
@@ -2032,6 +2109,7 @@
     if (t.hasAttribute('data-sbmode')) { ctx.ui.sbMode = t.getAttribute('data-sbmode'); render(); return; }
     if (t.hasAttribute('data-sbn')) { sbSetup.n = +t.value; render(); return; }
     if (t.hasAttribute('data-sbarch')) { sbSetup.arch[+t.getAttribute('data-sbarch')] = t.value; return; }
+    if (t.hasAttribute('data-pref')) { setPref(t.getAttribute('data-pref'), t.value); render(); return; }
     if (t.hasAttribute('data-set')) { var f = t.getAttribute('data-set'); setup[f] = t.type === 'checkbox' ? t.checked : (f === 'n' ? +t.value : t.value); render(); return; }
     if (t.hasAttribute('data-pkind')) {   // picking a bot renames a default-named seat after it
       var pk = setup.players[+t.getAttribute('data-pkind')], was = pk.kind || 'human', named = /^Player \d$/.test(pk.name) || pk.name === BOT_NAMES[was];

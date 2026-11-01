@@ -269,7 +269,7 @@ body { font-size: 13px; }
 .hcard.afford.sel .card { box-shadow: 0 0 0 3px #19e619, 0 0 0 6px var(--focus); outline: none; }
 .boardsizer.aiming, .boardsizer.aiming .cellbtn { cursor: var(--sword), crosshair; }
 /* animation layer (FX in ui.js) */
-.fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
+.fxlayer { position: fixed; inset: 0; pointer-events: none; z-index: 45; overflow: hidden; }   /* under dialogs (50), so a bot's last effects don't cover the Your turn dialog */
 .fx { position: fixed; left: 0; top: 0; }
 .fx.shard { border: 1px solid rgba(0, 0, 0, .35); }
 .fx.dust { width: 8px; height: 8px; background: rgba(140, 130, 115, .55); border-radius: 50%; }
@@ -427,6 +427,11 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .card.lighttext .suitico { filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .55)); }
 .card.lighttext .suitico.si-Sceptre { color: #f2d878 !important; } .card.lighttext .suitico.si-Goblet { color: #eab0de !important; } .card.lighttext .suitico.si-Sword { color: #ffa293 !important; }
 .card.lighttext .suitico.si-Bone { color: #e4e4e4 !important; } .card.lighttext .suitico.si-Leaf { color: #b2e29c !important; } .card.lighttext .suitico.si-Tome { color: #b0c6ff !important; }
+/* hints, unplayable cards, and the recap of other players' turns */
+.prompt.hint { background: var(--field); font-size: 13px; justify-content: space-between; }
+@media (max-width: 900px), (max-height: 520px) { .mhand .handinfo { display: none; } .prompt.hint { font-size: 11.5px; line-height: 1.25; padding: 2px 6px; gap: 4px; flex-wrap: nowrap; } .prompt.hint .linkbtn { white-space: nowrap; } }
+.hcard .blocktag { position: absolute; left: 4px; right: 4px; bottom: 22px; z-index: 2; background: #5a5a5a; color: #fff; border: 1px solid #000; text-align: center; font-size: 10.5px; font-weight: 700; padding: 1px 2px; pointer-events: none; }
+.recap { margin-top: 8px; } .recap .log { max-height: 180px; overflow: auto; margin-top: 3px; font-size: 12px; }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }

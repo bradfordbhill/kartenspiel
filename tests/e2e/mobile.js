@@ -14,6 +14,7 @@ let lastPage = null;   // for a screenshot if the test fails
 
   /* ---------- phone ---------- */
   const c = await b.newContext({ ...devices['iPhone 13'] }), p = lastPage = await c.newPage(), cdp = await c.newCDPSession(p);
+  await c.addInitScript(() => { if (!localStorage.getItem('ks.prefs')) localStorage.setItem('ks.prefs', '{"confirmEnd":false}'); });   // these tests end turns directly; solo.js tests the end-turn check
   p.on('pageerror', e => errs.push('phone: ' + e.message));
   await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
   const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((q, i) => ({ x: q[0], y: q[1], id: i })) });
@@ -84,6 +85,7 @@ let lastPage = null;   // for a screenshot if the test fails
   await touch('touchEnd', []); await wait(100);
   const z1 = await scale();
   ok(z1 > z0 * 1.5, 'pinching out zooms the board in (' + z0.toFixed(2) + ' → ' + z1.toFixed(2) + ')');
+  await p.$eval('.boardwrap', w => { w.scrollLeft = (w.scrollWidth - w.clientWidth) / 2; });   // from the middle, so there's room to move either way
   const sl0 = await p.$eval('.boardwrap', e => e.scrollLeft);
   await touch('touchStart', [[bx, by]]); for (let i = 1; i <= 8; i++) { await touch('touchMove', [[bx - i * 12, by]]); await wait(16); } await touch('touchEnd', []); await wait(100);
   ok(await p.$eval('.boardwrap', e => e.scrollLeft) > sl0, 'dragging the board with one finger moves it');
@@ -137,6 +139,7 @@ let lastPage = null;   // for a screenshot if the test fails
 
   /* ---------- desktop: mouse drags ---------- */
   const d = lastPage = await b.newPage({ viewport: { width: 1400, height: 900 } });
+  await d.addInitScript(() => { if (!localStorage.getItem('ks.prefs')) localStorage.setItem('ks.prefs', '{"confirmEnd":false}'); });   // these tests end turns directly; solo.js tests the end-turn check
   d.on('pageerror', e => errs.push('desktop: ' + e.message));
   await d.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
   await d.goto('file://' + REPO + '/index.html');
