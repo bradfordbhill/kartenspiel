@@ -33,7 +33,7 @@ H
   echo '</script></body></html>'
 }
 
-page 'Kartenspiel — playtest table' '' src/data.js src/engine.js src/bots.js src/cardface.js src/cardart.js src/ui.js > index.html
+page 'Kartenspiel — playtest table' '' src/data.js src/engine.js src/bots.js src/cardface.js src/cardart.js src/patchnotes.js src/ui.js > index.html
 
 mkdir -p site
 server=$(node -e 'process.stdout.write(JSON.stringify(process.env.KARTENSPIEL_SERVER || ""))')
@@ -47,7 +47,7 @@ app_head='<link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/favicon-32.png">'
-page 'Kartenspiel' "$app_head" site/config.js.tmp src/data.js src/engine.js src/bots.js src/net.js src/cardface.js src/cardart.js src/ui.js > site/index.html
+page 'Kartenspiel' "$app_head" site/config.js.tmp src/data.js src/engine.js src/bots.js src/net.js src/cardface.js src/cardart.js src/patchnotes.js src/ui.js > site/index.html
 rm site/config.js.tmp
 mkdir -p site/icons
 cp assets/icons/*.png site/icons/

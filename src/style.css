@@ -442,6 +442,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .help ol, .help ul { padding-left: 22px; margin: 4px 0; } .help li { margin: 3px 0; }
 .help .totop { text-align: right; margin: 2px 0 6px; }
 @media (max-width: 900px) { .helpwrap { grid-template-columns: 1fr; padding: 4px; } .helptoc { position: static; } .helptoc ol { columns: 2; column-gap: 14px; } .helptoc li { break-inside: avoid; } }
+/* patch notes: the page, and the "What's new" window after an update (under dialogs, over the game) */
+.help.notes { margin: 0 auto; }
+.notes .patch { border-bottom: 1px dotted var(--lo); padding-bottom: 4px; }
+.patchpop { position: fixed; right: 12px; bottom: 34px; width: min(380px, calc(100vw - 24px)); max-height: 60vh; display: flex; flex-direction: column; padding: 3px; z-index: 48; }
+.patchpop .body { overflow: auto; padding: 4px 10px; font-size: 13px; }
+.patchpop .patch h2 { font-size: 20px; margin: 6px 0 0; } .patchpop ul { padding-left: 18px; margin: 4px 0; } .patchpop li { margin: 3px 0; }
+.patchpop .btns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 8px 6px; } .patchpop .grow { flex: 1; }
+@media (max-width: 900px), (max-height: 520px) { .patchpop { right: 8px; left: 8px; width: auto; bottom: calc(64px + env(safe-area-inset-bottom)); } }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }

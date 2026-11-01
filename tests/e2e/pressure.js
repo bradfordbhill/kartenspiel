@@ -20,7 +20,7 @@ put('acorn', '8,0', 2);                                                         
   async function load(ctxOpts) {
     const c = await b.newContext(ctxOpts), p = await c.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
-    await p.addInitScript(s => localStorage.setItem('ks.sandbox', s), JSON.stringify(st));
+    await p.addInitScript(s => { localStorage.setItem('ks.sandbox', s); localStorage.setItem('ks.prefs', '{"patchNotes":false}'); }, JSON.stringify(st));
     await p.goto('file://' + REPO + '/index.html'); await p.click('[data-page="sandbox"]'); await p.click('[data-sbmode="look"]'); return p;
   }
   const p = await load({ viewport: { width: 1400, height: 900 } });
@@ -56,7 +56,7 @@ put('acorn', '8,0', 2);                                                         
   [['sanctuary', '2,0', 1], ['front-lines', '1,0', 0], ['post-office', '2,-1', 2], ['fairgrounds', '5,0', 2], ['artillery', '6,0', 0]].forEach(([id, k, o]) => { G({ t: 'sbPlace', id, k }); G({ t: 'sbClaim', k, owner: o }); });
   const c2 = await b.newContext({ ...devices['iPhone 13'], colorScheme: 'dark' }), ph = await c2.newPage(); ph.on('pageerror', e => errs.push('phone: ' + e.message));
   await ph.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
-  await ph.addInitScript(s => { localStorage.setItem('ks.game', s); window.ksBotDelay = 1e9; }, JSON.stringify(g));
+  await ph.addInitScript(s => { localStorage.setItem('ks.game', s); localStorage.setItem('ks.prefs', '{"patchNotes":false}'); window.ksBotDelay = 1e9; }, JSON.stringify(g));
   await ph.goto('file://' + REPO + '/site/index.html'); await ph.tap('[data-act="hotseatSetup"]'); await ph.tap('[data-act="resume"]'); await ph.waitForTimeout(300);
   ok((await ph.$$('.mgame .gchev')).length >= 3 && !!(await ph.$('.mgame .gchev.hot')), 'the chevrons show in the phone layout too');
   await ph.screenshot({ path: SHOTS + '/phone-dark.png' });

@@ -840,6 +840,7 @@
       case 'profile': return profilePage();
       case 'new': return newGamePage();
       case 'help': return helpPage();
+      case 'notes': return notesPage();
       default: return ONLINE ? homePage() : newGamePage();
     }
   }
@@ -1252,6 +1253,37 @@
     fr.readAsDataURL(file);
   }
 
+  /* ----- patch notes ----- */
+  // KPatch (src/patchnotes.js) lists the updates, newest first. Players who've played before see the newest one in
+  // a small "What's new" window the first time they open the game after an update, unless they've turned it off.
+  function patchToggle() {
+    return prefs.patchNotes === false ? 'Update messages are off. <button class="btn sm" data-act="patchOn">Show what’s new after updates</button>'
+      : 'After an update, a short “What’s new” appears when you open the game. <button class="btn sm" data-act="patchOff">Don’t show these</button>';
+  }
+  function notesList(list) { return list.map(function (n) { return '<section class="patch"><h2>' + esc(n.title) + '</h2><div class="small muted">' + esc(n.date) + '</div><ul>' + n.notes.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></section>'; }).join(''); }
+  function notesPage() {
+    lsSet('ks.seenPatch', KPatch[0].v); hidePatchPop();
+    return '<div class="page scroll"><div class="pane help notes"><h2 class="plain" style="font-size:20px">Patch notes</h2><p class="small">' + patchToggle() + '</p>' + notesList(KPatch) + '</div></div>';
+  }
+  // The "What's new" window: shown once per update, to returning players, unless turned off.
+  var patchPop = null;
+  function maybePatchPopup() {
+    var seen = lsGet('ks.seenPatch'), latest = KPatch[0].v;
+    if (seen === latest) return;
+    var returning = seen != null || ['ks.game', 'ks.setup', 'ks.lib', 'ks.faces', 'ks.token'].some(function (k) { return lsGet(k) != null; });
+    if (!returning || prefs.patchNotes === false) { lsSet('ks.seenPatch', latest); return; }   // a first visit: nothing to catch up on
+    var newer = KPatch.filter(function (n) { return seen == null ? n === KPatch[0] : n.v > seen; }).slice(0, 2);
+    patchPop = document.createElement('div'); patchPop.className = 'patchpop raised'; patchPop.setAttribute('role', 'status');
+    patchPop.innerHTML = '<div class="titlebar">' + crest() + '<span>What’s new</span><span class="grow"></span><button class="btn tb" data-act="notesDismiss" aria-label="Close">×</button></div><div class="body">' + notesList(newer) + '</div>' +
+      '<div class="btns"><label class="small"><input type="checkbox" id="patchOffBox"> Don’t show patch notes</label><span class="grow"></span><button class="btn" data-page="notes">All patch notes</button><button class="btn def" data-act="notesDismiss">Got it</button></div>';
+    document.body.appendChild(patchPop);
+  }
+  function hidePatchPop() {
+    if (!patchPop) return;
+    var off = patchPop.querySelector('#patchOffBox'); if (off && off.checked) setPref('patchNotes', false);
+    patchPop.remove(); patchPop = null; lsSet('ks.seenPatch', KPatch[0].v);
+  }
+
   /* ----- help ----- */
   // The Help page (static text).
   /* ----- help ----- */
@@ -1302,6 +1334,7 @@
         '<li>When your turn comes round, the dialog shows <b>what everyone else did</b>.</li>' +
         '<li><b>⇅ Sort</b> orders your hand as drawn, by suit or by cost.</li>' +
         '<li>Against bots, <b>Bots</b> above the board sets how fast they play. A finished game offers a <b>Rematch</b>.</li></ul>' +
+        '<p>' + patchToggle() + '</p>' +
         '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' },
       { id: 'modes', title: 'Ways to play', only: 'online', html: '<ul>' +
         '<li><b>Single player:</b> on <b>Play locally</b>, set any seat to a greedy, tactician or warlord bot.</li>' +
@@ -1326,6 +1359,7 @@
         '<li><b>Building discount:</b> placing next to a card you own costs 3● less.</li>' +
         '<li><b>No wandering:</b> a card can’t move to a space that touches no other card.</li>' +
         '<li><b>Ascension:</b> a stack holding five different suits Ascends: invulnerable, every suit, +8◇ and +12●.</li></ul>' },
+      { id: 'notes', title: 'Patch notes', html: '<p>What changed in each update: <button class="linkbtn" data-page="notes">Patch notes</button>. The newest is <b>' + esc(KPatch[0].title) + '</b> (' + esc(KPatch[0].date) + ').</p>' },
       { id: 'rulings', title: 'Rulings in this version', html: '<p class="muted">Where a card’s text left room for doubt, the game does this:</p><ul>' +
         '<li><b>Foundations</b> can’t be targeted by other cards; only Overwhelm takes one down.</li>' +
         '<li><b>Cathedral</b> counts Sceptre cards in your Kingdom. <b>Gluttony</b> stays a Blessing.</li>' +
@@ -1485,7 +1519,7 @@
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
       appBox() +
-      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>. Want to draw in this style? Try <a href="dithry/" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool.</p></div></div>';
+      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> (and <button class="linkbtn" data-page="notes">what’s new</button>) or browse the <button class="linkbtn" data-page="library">cards</button>. Want to draw in this style? Try <a href="dithry/" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool.</p></div></div>';
   }
 
   /* ----- online: sign in, server list, lobby, game ----- */
@@ -1645,8 +1679,8 @@
   }
   // The Menu sheet: the pages (the tab bar is hidden on phones during a game), then the board toolbar.
   function menuSheet(ctx) {
-    var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
-      : [['new', 'New game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
+    var tabs = (ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
+      : [['new', 'New game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']]).concat([['notes', 'Patch notes']]);
     return '<div class="panelhead">Go to</div><div class="row">' + tabs.map(function (t) { return '<button class="btn" data-page="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       (document.fullscreenEnabled && !isStandalone() ? '<div class="row" style="margin-top:6px"><button class="btn" data-act="fullscreen">' + (document.fullscreenElement ? 'Leave full screen' : 'Full screen') + '</button></div>' : '') +
       '<div class="panelhead" style="margin-top:8px">Board</div>' + boardBar(ctx) +
@@ -2003,6 +2037,9 @@
         ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
       case 'keepPlaying': ctx.ui.endAsked = false; render(); return;
       case 'noEndAsk': setPref('confirmEnd', false); ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
+      case 'notesDismiss': hidePatchPop(); return;
+      case 'patchOff': setPref('patchNotes', false); render(); toast('You won’t see update messages. Patch notes stay in Help.'); return;
+      case 'patchOn': setPref('patchNotes', true); render(); toast('After the next update, you’ll see what’s new.'); return;
       case 'hideHints': setPref('hints', false); render(); toast('Hints are off. Turn them back on from Help.'); return;
       case 'showHints': setPref('hints', true); setPref('confirmEnd', true); render(); toast('Hints and the end-turn check are on.'); return;
       case 'hideHintsAll': setPref('hints', false); setPref('confirmEnd', false); render(); toast('Hints and the end-turn check are off.'); return;
@@ -2260,4 +2297,5 @@
   }
   var sv = lsGet('ks.game'); if (sv && sv.players && sv.winner == null) { /* offered on New game page */ }
   render();
+  maybePatchPopup();   // after an update: what's new
 })();

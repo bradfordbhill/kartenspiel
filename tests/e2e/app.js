@@ -49,6 +49,23 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
   await c.setOffline(false);
 
 
+  // patch notes: a first visit has nothing to catch up on; after an update, returning players see what's new once
+  const pc = await b.newContext({ viewport: { width: 1280, height: 800 } }), pp = await pc.newPage(); pp.on('pageerror', e => errs.push('notes: ' + e.message));
+  await pp.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
+  const latest = require(REPO + '/src/patchnotes.js');
+  await pp.goto(url); ok(!(await pp.$('.patchpop')) && await pp.evaluate(() => JSON.parse(localStorage.getItem('ks.seenPatch'))) === latest[0].v, 'a first visit shows no update message');
+  await pp.evaluate(v => localStorage.setItem('ks.seenPatch', JSON.stringify(v)), latest[2].v); await pp.reload();
+  ok(!!(await pp.$('.patchpop')) && (await pp.$$eval('.patchpop .patch h2', e => e.map(x => x.textContent))).join() === [latest[0].title, latest[1].title].join(), 'after an update, a “What’s new” window shows the newest notes');
+  await pp.check('#patchOffBox'); await pp.click('.patchpop .btns [data-act="notesDismiss"]');
+  ok(!(await pp.$('.patchpop')) && await pp.evaluate(() => JSON.parse(localStorage.getItem('ks.prefs')).patchNotes) === false, 'Got it closes it, and “Don’t show patch notes” is remembered');
+  await pp.evaluate(v => localStorage.setItem('ks.seenPatch', JSON.stringify(v)), latest[2].v); await pp.reload();
+  ok(!(await pp.$('.patchpop')), 'with patch notes turned off, updates show nothing');
+  await pp.click('[data-page="notes"]');
+  ok((await pp.$$('.notes .patch')).length === latest.length && !!(await pp.$('[data-act="patchOn"]')), 'the Patch notes page (linked from Home) lists every update and can turn the messages back on');
+  await pp.click('[data-act="patchOn"]'); ok(await pp.evaluate(() => JSON.parse(localStorage.getItem('ks.prefs')).patchNotes) === true, 'and turning them back on works');
+  await pp.click('[data-page="help"]'); ok(!!(await pp.$('#help-notes [data-page="notes"]')), 'Help links to the patch notes too');
+  await pc.close();
+
   // iPhone: no install button exists there, so the box says how
   const ic = await b.newContext({ ...devices['iPhone 13'] }), ip = await ic.newPage(); ip.on('pageerror', e => errs.push('iphone: ' + e.message));
   await ip.route(/fonts\.(googleapis|gstatic)/, r => r.abort()); await ip.goto(url);

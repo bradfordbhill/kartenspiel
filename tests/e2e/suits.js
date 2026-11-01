@@ -19,7 +19,7 @@ const sanc = give('sanctuary'), enc = give('encampment'), phal = give('phalanx')
   const b = await chromium.launch(), errs = [];
   const p = await b.newPage({ viewport: { width: 1400, height: 900 } }); p.on('pageerror', e => errs.push(e.message));
   await p.route(/fonts\.(googleapis|gstatic)/, r => r.abort());
-  await p.addInitScript(s => localStorage.setItem('ks.game', s), JSON.stringify(st));
+  await p.addInitScript(s => { localStorage.setItem('ks.game', s); localStorage.setItem('ks.prefs', '{"patchNotes":false}'); }, JSON.stringify(st));   // a seeded game looks like a returning player: no update message
   await p.goto('file://' + REPO + '/index.html'); await p.click('[data-act="resume"]');
   const chevs = k => p.$$eval('.cell:has([data-cell="' + k + '"]) .chev', els => els.map(e => (e.classList.contains('g') ? 'green ' : 'red ') + [...e.classList].find(c => c.startsWith('d-')).slice(2)).sort().join(', '));
 
@@ -51,7 +51,7 @@ const sanc = give('sanctuary'), enc = give('encampment'), phal = give('phalanx')
 
   // phone: in the Menu sheet
   const c = await b.newContext({ ...devices['iPhone 13'] }), ph = await c.newPage(); ph.on('pageerror', e => errs.push('phone: ' + e.message));
-  await ph.route(/fonts\.(googleapis|gstatic)/, r => r.abort()); await ph.addInitScript(s => localStorage.setItem('ks.game', s), JSON.stringify(st));
+  await ph.route(/fonts\.(googleapis|gstatic)/, r => r.abort()); await ph.addInitScript(s => { localStorage.setItem('ks.game', s); localStorage.setItem('ks.prefs', '{"patchNotes":false}'); }, JSON.stringify(st));   // a seeded game looks like a returning player: no update message
   await ph.goto('file://' + REPO + '/index.html'); await ph.tap('[data-act="resume"]'); await ph.tap('[data-sheet="menu"]'); await ph.tap('.msheet [data-act="suits"]');
   ok(!!(await ph.$('.modal svg.suitwheel')), 'on a phone, Menu → Suits opens the wheel');
 

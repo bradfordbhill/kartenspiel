@@ -21,6 +21,7 @@ Online play needs the game server in `server/`, which you host yourself (see [De
 | `src/bots.js` | The bots (greedy, tactician, raider, warlord): single player in both apps, and the simulator |
 | `src/net.js` | Public site only: the connection to the game server |
 | `src/cardface.js` | Shared by the game and Dithry: card-face markup, suit icons, the suit textures, and the painted faces (`KFace.faces()`) |
+| `src/patchnotes.js` | Patch notes, newest first (`KPatch`). **Add an entry when you push a change players will notice:** returning players see it in a “What’s new” window once (they can turn that off), and every entry is on the Patch notes page |
 | `src/cardart.js` | Painted card faces built into the game for every player (`KCardArt`), merged in from an art pack by `tools/cardart.js` |
 | `src/sw.js`, `assets/` | The service worker (offline play), app manifest and icons, which `build.sh` copies into `site/`; and `assets/logo.png`, the Fraktur logo, which `build.sh` inlines into both apps |
 | `server/server.js` | The game server: accounts, profiles, lobbies, and every online game's real state |

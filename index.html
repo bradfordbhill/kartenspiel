@@ -456,6 +456,14 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 .help ol, .help ul { padding-left: 22px; margin: 4px 0; } .help li { margin: 3px 0; }
 .help .totop { text-align: right; margin: 2px 0 6px; }
 @media (max-width: 900px) { .helpwrap { grid-template-columns: 1fr; padding: 4px; } .helptoc { position: static; } .helptoc ol { columns: 2; column-gap: 14px; } .helptoc li { break-inside: avoid; } }
+/* patch notes: the page, and the "What's new" window after an update (under dialogs, over the game) */
+.help.notes { margin: 0 auto; }
+.notes .patch { border-bottom: 1px dotted var(--lo); padding-bottom: 4px; }
+.patchpop { position: fixed; right: 12px; bottom: 34px; width: min(380px, calc(100vw - 24px)); max-height: 60vh; display: flex; flex-direction: column; padding: 3px; z-index: 48; }
+.patchpop .body { overflow: auto; padding: 4px 10px; font-size: 13px; }
+.patchpop .patch h2 { font-size: 20px; margin: 6px 0 0; } .patchpop ul { padding-left: 18px; margin: 4px 0; } .patchpop li { margin: 3px 0; }
+.patchpop .btns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 4px 8px 6px; } .patchpop .grow { flex: 1; }
+@media (max-width: 900px), (max-height: 520px) { .patchpop { right: 8px; left: 8px; width: auto; bottom: calc(64px + env(safe-area-inset-bottom)); } }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }
@@ -5560,6 +5568,48 @@ if (typeof module !== 'undefined') module.exports = KFace;
 var KCardArt = {
 };
 if (typeof module !== 'undefined') module.exports = KCardArt;
+/* Kartenspiel patch notes, newest first. Add an entry at the top when you push a change players will notice:
+   players who have played before see the newest entry in a "What's new" window the next time they open the game
+   (unless they've turned that off), and every entry is on the Patch notes page (Help → Patch notes).
+   v must be new for each entry (the date, plus a number for a second update that day). */
+var KPatch = [
+  { v: '2026.11.01.2', date: '1 November 2026', title: 'Patch notes and a clearer Help', notes: [
+    'This page: <b>patch notes</b>, with a short “What’s new” when the game updates. You can turn those off.',
+    '<b>Help</b> is rewritten as short sections with a table of contents.'
+  ] },
+  { v: '2026.11.01.1', date: '1 November 2026', title: 'Smoother turns', notes: [
+    '<b>Hints</b> on your turn suggest a next step, like playing your Foundation first.',
+    'Ending a turn while you could still play or claim a card <b>asks once</b>.',
+    'Your next turn opens with <b>what everyone else did</b> since your last one.',
+    'Cards you can’t play say why. <b>⇅ Sort</b> your hand by suit or cost.',
+    'Set how fast <b>bots</b> play, start a <b>Rematch</b>, and your last setup is remembered.'
+  ] },
+  { v: '2026.10.31.3', date: '31 October 2026', title: 'Paint your own cards', notes: [
+    '<b>Dithry</b>, a pixel-art paint tool in the game’s dithered style, at <i>dithry/</i>.',
+    'Its card mode paints each card’s face, in hand and on the board, behind its text. Saving shows it in the game straight away.',
+    'Each suit has its own muted palette, and a painted card can use light text over a dark painting.'
+  ] },
+  { v: '2026.10.31.2', date: '31 October 2026', title: 'A medieval look', notes: [
+    'A gilded Fraktur logo, a heraldic crest and blackletter headings.',
+    'Every card has a faint dithered pattern of its suit: flames, masonry, vines, headstones, waves, bubbles.',
+    'The board is a night prairie with a walled city on the horizon. Cards on the board are square.',
+    'Overwhelm pressure shows as chevrons between cards, in the colour of the suit doing the pressing.'
+  ] },
+  { v: '2026.10.31.1', date: '31 October 2026', title: 'iPhone fix', notes: [
+    'Moving and zooming the board on iPhone no longer zooms by itself or jumps.'
+  ] },
+  { v: '2026.10.30.2', date: '30 October 2026', title: 'Phones, apps and guests', notes: [
+    'A phone layout, and <b>drag and drop</b> for cards and meeples.',
+    '<b>Install</b> Kartenspiel as an app; single player and pass-and-play work offline.',
+    '<b>Log in as guest</b> to play online without an account.',
+    'The suit wheel (who pressures whom) and placement arrows, keyboard shortcuts, and the Quickview and War overlays.'
+  ] },
+  { v: '2026.10.30.1', date: '30 October 2026', title: 'Kartenspiel goes online', notes: [
+    'This site: <b>single player</b> against bots, <b>pass-and-play</b>, and <b>online</b> tables with profiles and stats.',
+    'A clearer pixel font.'
+  ] }
+];
+if (typeof module !== 'undefined') module.exports = KPatch;
 /* Kartenspiel playtest UI. All game logic lives in KEngine; this file only renders state and dispatches actions. */
 (function () {
   var E = KEngine, D = KData;
@@ -6402,6 +6452,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       case 'profile': return profilePage();
       case 'new': return newGamePage();
       case 'help': return helpPage();
+      case 'notes': return notesPage();
       default: return ONLINE ? homePage() : newGamePage();
     }
   }
@@ -6814,6 +6865,37 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
     fr.readAsDataURL(file);
   }
 
+  /* ----- patch notes ----- */
+  // KPatch (src/patchnotes.js) lists the updates, newest first. Players who've played before see the newest one in
+  // a small "What's new" window the first time they open the game after an update, unless they've turned it off.
+  function patchToggle() {
+    return prefs.patchNotes === false ? 'Update messages are off. <button class="btn sm" data-act="patchOn">Show what’s new after updates</button>'
+      : 'After an update, a short “What’s new” appears when you open the game. <button class="btn sm" data-act="patchOff">Don’t show these</button>';
+  }
+  function notesList(list) { return list.map(function (n) { return '<section class="patch"><h2>' + esc(n.title) + '</h2><div class="small muted">' + esc(n.date) + '</div><ul>' + n.notes.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></section>'; }).join(''); }
+  function notesPage() {
+    lsSet('ks.seenPatch', KPatch[0].v); hidePatchPop();
+    return '<div class="page scroll"><div class="pane help notes"><h2 class="plain" style="font-size:20px">Patch notes</h2><p class="small">' + patchToggle() + '</p>' + notesList(KPatch) + '</div></div>';
+  }
+  // The "What's new" window: shown once per update, to returning players, unless turned off.
+  var patchPop = null;
+  function maybePatchPopup() {
+    var seen = lsGet('ks.seenPatch'), latest = KPatch[0].v;
+    if (seen === latest) return;
+    var returning = seen != null || ['ks.game', 'ks.setup', 'ks.lib', 'ks.faces', 'ks.token'].some(function (k) { return lsGet(k) != null; });
+    if (!returning || prefs.patchNotes === false) { lsSet('ks.seenPatch', latest); return; }   // a first visit: nothing to catch up on
+    var newer = KPatch.filter(function (n) { return seen == null ? n === KPatch[0] : n.v > seen; }).slice(0, 2);
+    patchPop = document.createElement('div'); patchPop.className = 'patchpop raised'; patchPop.setAttribute('role', 'status');
+    patchPop.innerHTML = '<div class="titlebar">' + crest() + '<span>What’s new</span><span class="grow"></span><button class="btn tb" data-act="notesDismiss" aria-label="Close">×</button></div><div class="body">' + notesList(newer) + '</div>' +
+      '<div class="btns"><label class="small"><input type="checkbox" id="patchOffBox"> Don’t show patch notes</label><span class="grow"></span><button class="btn" data-page="notes">All patch notes</button><button class="btn def" data-act="notesDismiss">Got it</button></div>';
+    document.body.appendChild(patchPop);
+  }
+  function hidePatchPop() {
+    if (!patchPop) return;
+    var off = patchPop.querySelector('#patchOffBox'); if (off && off.checked) setPref('patchNotes', false);
+    patchPop.remove(); patchPop = null; lsSet('ks.seenPatch', KPatch[0].v);
+  }
+
   /* ----- help ----- */
   // The Help page (static text).
   /* ----- help ----- */
@@ -6864,6 +6946,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
         '<li>When your turn comes round, the dialog shows <b>what everyone else did</b>.</li>' +
         '<li><b>⇅ Sort</b> orders your hand as drawn, by suit or by cost.</li>' +
         '<li>Against bots, <b>Bots</b> above the board sets how fast they play. A finished game offers a <b>Rematch</b>.</li></ul>' +
+        '<p>' + patchToggle() + '</p>' +
         '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' },
       { id: 'modes', title: 'Ways to play', only: 'online', html: '<ul>' +
         '<li><b>Single player:</b> on <b>Play locally</b>, set any seat to a greedy, tactician or warlord bot.</li>' +
@@ -6888,6 +6971,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
         '<li><b>Building discount:</b> placing next to a card you own costs 3● less.</li>' +
         '<li><b>No wandering:</b> a card can’t move to a space that touches no other card.</li>' +
         '<li><b>Ascension:</b> a stack holding five different suits Ascends: invulnerable, every suit, +8◇ and +12●.</li></ul>' },
+      { id: 'notes', title: 'Patch notes', html: '<p>What changed in each update: <button class="linkbtn" data-page="notes">Patch notes</button>. The newest is <b>' + esc(KPatch[0].title) + '</b> (' + esc(KPatch[0].date) + ').</p>' },
       { id: 'rulings', title: 'Rulings in this version', html: '<p class="muted">Where a card’s text left room for doubt, the game does this:</p><ul>' +
         '<li><b>Foundations</b> can’t be targeted by other cards; only Overwhelm takes one down.</li>' +
         '<li><b>Cathedral</b> counts Sceptre cards in your Kingdom. <b>Gluttony</b> stays a Blessing.</li>' +
@@ -7047,7 +7131,7 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
       appBox() +
-      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> or browse the <button class="linkbtn" data-page="library">cards</button>. Want to draw in this style? Try <a href="dithry/" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool.</p></div></div>';
+      '<p class="small muted">New here? Read the <button class="linkbtn" data-page="help">rules and help</button> (and <button class="linkbtn" data-page="notes">what’s new</button>) or browse the <button class="linkbtn" data-page="library">cards</button>. Want to draw in this style? Try <a href="dithry/" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool.</p></div></div>';
   }
 
   /* ----- online: sign in, server list, lobby, game ----- */
@@ -7207,8 +7291,8 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   }
   // The Menu sheet: the pages (the tab bar is hidden on phones during a game), then the board toolbar.
   function menuSheet(ctx) {
-    var tabs = ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
-      : [['new', 'New game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']];
+    var tabs = (ONLINE ? [['home', 'Home'], ['new', 'Play locally'], ['online', 'Online'], ['profile', 'Profile'], ['library', 'Cards'], ['help', 'Help']]
+      : [['new', 'New game'], ['sandbox', 'Sandbox'], ['library', 'Library'], ['builder', 'Card builder'], ['help', 'Help']]).concat([['notes', 'Patch notes']]);
     return '<div class="panelhead">Go to</div><div class="row">' + tabs.map(function (t) { return '<button class="btn" data-page="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       (document.fullscreenEnabled && !isStandalone() ? '<div class="row" style="margin-top:6px"><button class="btn" data-act="fullscreen">' + (document.fullscreenElement ? 'Leave full screen' : 'Full screen') + '</button></div>' : '') +
       '<div class="panelhead" style="margin-top:8px">Board</div>' + boardBar(ctx) +
@@ -7565,6 +7649,9 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
         ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
       case 'keepPlaying': ctx.ui.endAsked = false; render(); return;
       case 'noEndAsk': setPref('confirmEnd', false); ctx.ui.endAsked = false; dispatch(ctx, { t: 'endTurn' }); return;
+      case 'notesDismiss': hidePatchPop(); return;
+      case 'patchOff': setPref('patchNotes', false); render(); toast('You won’t see update messages. Patch notes stay in Help.'); return;
+      case 'patchOn': setPref('patchNotes', true); render(); toast('After the next update, you’ll see what’s new.'); return;
       case 'hideHints': setPref('hints', false); render(); toast('Hints are off. Turn them back on from Help.'); return;
       case 'showHints': setPref('hints', true); setPref('confirmEnd', true); render(); toast('Hints and the end-turn check are on.'); return;
       case 'hideHintsAll': setPref('hints', false); setPref('confirmEnd', false); render(); toast('Hints and the end-turn check are off.'); return;
@@ -7822,5 +7909,6 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   }
   var sv = lsGet('ks.game'); if (sv && sv.players && sv.winner == null) { /* offered on New game page */ }
   render();
+  maybePatchPopup();   // after an update: what's new
 })();
 </script></body></html>
