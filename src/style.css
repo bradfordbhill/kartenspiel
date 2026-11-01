@@ -432,6 +432,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 @media (max-width: 900px), (max-height: 520px) { .mhand .handinfo { display: none; } .prompt.hint { font-size: 11.5px; line-height: 1.25; padding: 2px 6px; gap: 4px; flex-wrap: nowrap; } .prompt.hint .linkbtn { white-space: nowrap; } }
 .hcard .blocktag { position: absolute; left: 4px; right: 4px; bottom: 22px; z-index: 2; background: #5a5a5a; color: #fff; border: 1px solid #000; text-align: center; font-size: 10.5px; font-weight: 700; padding: 1px 2px; pointer-events: none; }
 .recap { margin-top: 8px; } .recap .log { max-height: 180px; overflow: auto; margin-top: 3px; font-size: 12px; }
+/* Help: a table of contents beside short sections (above them on phones) */
+.helpwrap { display: grid; grid-template-columns: 210px minmax(0, 760px); gap: 10px; justify-content: center; padding: 8px; align-items: start; }
+.helptoc { position: sticky; top: 8px; padding: 0 0 6px; font-size: 13px; }
+.helptoc ol { margin: 6px 0 0; padding-left: 26px; } .helptoc li { margin: 3px 0; } .helptoc .linkbtn { text-align: left; }
+.help .helpsec { padding-bottom: 2px; border-bottom: 1px dotted var(--lo); scroll-margin-top: 8px; transition: background-color .4s; }
+.help .helpsec.flash { background-color: var(--tip); }
+.help h3 { font-size: 13px; margin: 10px 0 2px; }
+.help ol, .help ul { padding-left: 22px; margin: 4px 0; } .help li { margin: 3px 0; }
+.help .totop { text-align: right; margin: 2px 0 6px; }
+@media (max-width: 900px) { .helpwrap { grid-template-columns: 1fr; padding: 4px; } .helptoc { position: static; } .helptoc ol { columns: 2; column-gap: 14px; } .helptoc li { break-inside: avoid; } }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }

@@ -59,6 +59,13 @@ const out = []; const ok = (c, m) => out.push((c ? 'PASS ' : 'FAIL ') + m);
   ok((await st()).cur === 1 && (await st()).turn.started, 'Space starts the next player’s turn');
   await p.click('[data-page="help"]');
   ok(/Keyboard shortcuts/.test(await p.textContent('.help')), 'the Help page lists the shortcuts');
+  const toc = await p.$$eval('.helptoc [data-help]', e => e.map(x => x.getAttribute('data-help')));
+  ok(toc.length >= 12, 'Help opens with a table of contents (' + toc.length + ' sections)');
+  ok(await p.evaluate(ids => ids.every(id => !!document.getElementById('help-' + id)), toc), 'every entry has its section');
+  await p.click('.helptoc [data-help="controls"]'); await p.waitForTimeout(700);
+  ok(await p.$eval('#help-controls', e => { const r = e.getBoundingClientRect(); return r.top >= 0 && r.top < 200; }), 'choosing an entry scrolls to its section');
+  await p.click('#help-controls [data-help="top"]'); await p.waitForTimeout(700);
+  ok(await p.$eval('#helpscroll', e => e.scrollTop) === 0, '“↑ Contents” goes back to the top');
 
   ok(errs.length === 0, 'no page errors ' + errs.join(' | '));
   await b.close(); console.log(out.join('\n')); process.exit(0);

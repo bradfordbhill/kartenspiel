@@ -446,6 +446,16 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none;
 @media (max-width: 900px), (max-height: 520px) { .mhand .handinfo { display: none; } .prompt.hint { font-size: 11.5px; line-height: 1.25; padding: 2px 6px; gap: 4px; flex-wrap: nowrap; } .prompt.hint .linkbtn { white-space: nowrap; } }
 .hcard .blocktag { position: absolute; left: 4px; right: 4px; bottom: 22px; z-index: 2; background: #5a5a5a; color: #fff; border: 1px solid #000; text-align: center; font-size: 10.5px; font-weight: 700; padding: 1px 2px; pointer-events: none; }
 .recap { margin-top: 8px; } .recap .log { max-height: 180px; overflow: auto; margin-top: 3px; font-size: 12px; }
+/* Help: a table of contents beside short sections (above them on phones) */
+.helpwrap { display: grid; grid-template-columns: 210px minmax(0, 760px); gap: 10px; justify-content: center; padding: 8px; align-items: start; }
+.helptoc { position: sticky; top: 8px; padding: 0 0 6px; font-size: 13px; }
+.helptoc ol { margin: 6px 0 0; padding-left: 26px; } .helptoc li { margin: 3px 0; } .helptoc .linkbtn { text-align: left; }
+.help .helpsec { padding-bottom: 2px; border-bottom: 1px dotted var(--lo); scroll-margin-top: 8px; transition: background-color .4s; }
+.help .helpsec.flash { background-color: var(--tip); }
+.help h3 { font-size: 13px; margin: 10px 0 2px; }
+.help ol, .help ul { padding-left: 22px; margin: 4px 0; } .help li { margin: 3px 0; }
+.help .totop { text-align: right; margin: 2px 0 6px; }
+@media (max-width: 900px) { .helpwrap { grid-template-columns: 1fr; padding: 4px; } .helptoc { position: static; } .helptoc ol { columns: 2; column-gap: 14px; } .helptoc li { break-inside: avoid; } }
 a.btn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
 .appbox { margin: 0 0 12px; }
 .guestrow { margin-top: 10px; padding-top: 8px; border-top: 1px dotted var(--lo); }
@@ -6806,48 +6816,97 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
 
   /* ----- help ----- */
   // The Help page (static text).
-  function helpPage() {
-    return helpEdition('<div class="page scroll"><div class="pane help">' +
-      '<h2>Getting around</h2><p>Use <b>New game</b> for a hot-seat game on one device, and <b>Sandbox</b> to place any card anywhere and watch scores and Overwhelm update. <b>Library</b> lists every card; <b>Card builder</b> edits one.</p>' +
-      '<p>The board always fits on screen. Use the zoom buttons for a closer look. Click any card to see it full size in the right panel. While a card is selected, yellow outlines show what its rules look at (filled yellow = counted right now). Turn on <i>What sees it</i> to outline, in blue, the cards whose rules look at the selected card. The small <i>n/3</i> tag shows how many enemy-suit neighbors a card has against its Overwhelm number; it turns red one step before Overwhelm. A chevron in the gap between two cards shows pressure: it points at the card being pressed, in the colour of the suit doing the pressing (smaller chevrons where the gaps cross for a Foundation’s diagonals). Two cards that pressure each other get one chevron each way. One away from Overwhelm, that card’s chevrons grow and go solid.</p>' +
-      '<p><b>Hover</b> over any card to see a magnified copy with its rules text. A card with a <b>bright green border</b> has a once-per-turn ability you can use right now (and afford); select it and use the button in the right panel. The <b>Overlay</b> menu covers every card with one kind of information. <b>Quickview</b> shows each card’s ● production and ◇ value in its owner’s colour (unclaimed cards’ ● in grey), with each player’s totals above the board. <b>War</b> splits each card into one strip per enemy neighbour it takes to Overwhelm it, filled in its owner’s colour as enemies gather; a red outline means one more will do it. Log lines are color-coded: blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, gray card movement, italic gray referee edits.</p>' +
-      (ONLINE ? '<h2>Install as an app</h2><p>Add Kartenspiel to your home screen to play full screen with no browser bars: <b>Install app</b> on the Home page (Android, or Chrome and Edge on a computer), or on iPhone and iPad tap Share, then <b>Add to Home Screen</b>. Single player and pass-and-play then work offline too.</p>' : '') +
-      '<h2>Drag and drop, and phones</h2><p>Drag a card from your hand onto a green space to play it, or anywhere on the board for cards played straight from hand. Drag your meeple (shown while a claim is available) onto an orange-outlined card to claim it, and drop two cards on the discard pile to discard 2 and draw 1. Clicking still works for all of it.</p><p>On a phone the game screen rearranges: your numbers and <b>End turn</b> along the top, the board in the middle, your hand along the bottom, and <b>Players</b>, <b>Log</b>, <b>Card</b> and <b>Menu</b> as tabs. Pinch to zoom, drag the board to move around, tap a card for its details, and press and hold any card to read it.</p>' +
-      '<h2>A turn</h2><ol><li>Pass the device. The next player clicks <b>Start turn</b>: they gain ● from their Kingdom (3● before their Foundation is down) and draw cards (2 by default; set on the New game page). Or they take back one meeple instead, which is their whole turn.</li>' +
-      '<li>Click a card in hand, then a green space. The green number is the cost there (Watchtower adds to it). Play as many cards as your ● allows.</li>' +
-      '<li>Claim once per turn: the last card you placed, or an unclaimed card next to it. Your cursor turns into a meeple in your color: click an orange-outlined card to claim it. A card you claim produces its ● right away.</li>' +
-      '<li>Any time during your turn: <b>Discard 2, draw 1</b>.</li><li><b>End turn</b>. If you have 48◇ or more at that moment, you win.</li></ol>' +
-      '<h2>Suits: who pressures whom</h2>' + suitWheelHTML(app.lib) +
-      '<h2>Rules the table enforces</h2><ul><li>Placement: orthogonal adjacency, placement icons (at least one allowed side touches, all others clear), Watchtower on a corner only.</li><li>Weak-to: you cannot play your archetype’s weak suit.</li><li>Foundation by turn 3; it is always yours and needs no meeple. It can never be discarded, buried from hand, or taken by another player.</li>' +
-      '<li>Actions and Blessings that affect adjacent cards (Absolution, Phalanx-style effects) are placed in a space first. All others are played straight from hand with <b>Play it</b>. Either way they resolve, then are buried under a card they affected (your choice); if they affected nothing, under an adjacent card, or for cards played from hand, any card you choose. Curses tuck under their target; Sarcophagus covers it.</li>' +
-      '<li>Overwhelm: 3 enemy-suit neighbors (Encampment 4; Foundations 8 counting diagonals). Enemies are the suit its archetype is weak to, plus Sword for every suit but Sword. Different enemy suits add up. Credit goes to whoever caused it.</li>' +
-      '<li>Ruined and Overwhelmed cards keep their suit, lose effects and owner; meeples go home. A Foundation that is Overwhelmed eliminates its player and Ruins their cards.</li>' +
-      '<li>Buried cards count toward the Kingdom of the card above them; tucked Curses count as buried.</li>' +
-      '<li>Rule variants (each can be switched off on the New game page): same-suit burials raise a card’s Overwhelm number; every 2 same-suit burials give a Defense token that stops one Ruin or Curse; placing next to your own card costs 3● less; cards can’t move away from every other card; and a stack holding five different suits Ascends.</li></ul>' +
-      '<h2>Assumptions made for this build</h2><ul><li>Cathedral counts Sceptre cards in your Kingdom.</li><li>Gluttony stays a Blessing (the library sheet lists it as a Curse, but it has no Curse effect).</li>' +
-      '<li>Spice Caravan moves at the end of its owner’s turn, trying East first, then West; an unclaimed Caravan stays put. Acorn gains its token at the end of its owner’s turn.</li><li>Sleeping Giant moves into the space of the card that moved or was Ruined. Burying a card ends its claims.</li>' +
-      '<li>Rear Guard swaps in automatically when the targeted card belongs to Rear Guard’s owner. Ballroom’s draw is automatic.</li><li>Revenge can only be revealed when a card you own is Overwhelmed, and is then discarded.</li>' +
-      '<li>Confessional takes a Curse off a Cursed card on the board, or a Curse card from your hand. A refused University swap leaves one of your meeples parked on University until it leaves play.</li>' +
-      '<li>A card set aside by Last Will and Testament returns to your hand at the start of your next turn, free to play that turn only.</li><li>Foundations cannot be targeted by other cards: they are never Ruined, moved, covered, Cursed, recolored, copied or picked by an effect. Only Overwhelm can take one down.</li><li>Seizure puts the other revealed cards on the bottom of the deck; Inquisition discards them.</li>' +
-      '<li>Acorn gains a token on itself each of its owner’s turns; each token is worth 1◇ and 1●.</li><li>Topiary copies the target’s value, income and abilities, not its one-time effect.</li>' +
-      '<li>Watchtower’s extra cost applies to the 4 spaces orthogonally next to it.</li><li>Living Death takes the card directly under the top card.</li></ul>' +
-      '<h2>When something isn’t automated</h2><p>Every card on the board has <b>Referee tools</b>: Ruin or flip back, change suit, move, remove, bury a card under it, adjust tokens, and claim for any player. <b>Undo</b> steps back one action at a time. An effect can be cancelled from the prompt bar.</p>' +
-      '<h2>Card builder</h2><p>Pick how a card scores, what it sees (for highlighting), which sides may touch, its Overwhelm number, what happens when it is played (a list of presets, or JSON steps), and any ongoing ability or modifier. Saved cards go to the shared library when it is available, otherwise to this browser. Games in progress keep the card set they started with.</p>' +
-      '<h2>Card art</h2><p>Any image works as a card’s <b>Artwork</b>. To match the game’s look, draw it in <a href="' + (ONLINE ? 'dithry/' : 'dithry.html') + '" target="_blank" rel="noopener">Dithry</a>, the pixel-art and dithered-gradient paint tool: start a <i>Kartenspiel card art</i> picture (64 × 24), export it at 1×, and choose the PNG here. Pixel art stays crisp on the cards.</p>' +
-      '<h2>Saving</h2><p><b>Copy debug report</b> (above the board) copies the log, a text map of the board, every card\u2019s state and the full saved state, so a bug can be pasted into a message and reproduced.</p><p>The current game and sandbox are kept in this browser and survive a reload. <b>Copy current game as text</b> on the New game page gives you a save you can paste back later, which is also the format a future online version would send between players.</p>' +
-      '</div></div>');
+  /* ----- help ----- */
+  // Help is a list of short sections with a table of contents; each section says which edition it belongs to
+  // (online: the public site only; table: the playtest table only).
+  function helpSections() {
+    var tap = 'Click (or tap)', dithry = ONLINE ? 'dithry/' : 'dithry.html';
+    var S = [
+      { id: 'start', title: 'Quick start', html: '<ol>' +
+        (ONLINE ? '<li>On <b>Home</b>, choose <b>Single player</b> (against bots), <b>Pass-and-Play</b> (one device) or <b>Online</b>.</li>' : '<li>Open <b>New game</b>, pick 2–5 players and their archetypes, and press <b>Start game</b>.</li>') +
+        '<li>On your first turn, play your <b>Foundation</b>: drag it onto the board.</li>' +
+        '<li>Play more cards next to your cards, then <b>claim</b> one with a meeple.</li>' +
+        '<li>Press <b>End turn</b>. The first to <b>48◇</b> at the end of their turn wins.</li></ol>' +
+        '<p class="muted">The hint line above the board suggests a next step while you learn.</p>' },
+      { id: 'turn', title: 'A turn', html: '<ol>' +
+        '<li><b>Start your turn.</b> You gain ● from your Kingdom (3● before your Foundation is down) and draw 2 cards. Or take back one meeple instead: that is your whole turn.</li>' +
+        '<li><b>Play cards</b> while your ● lasts. Green-bordered cards in your hand are ones you can afford.</li>' +
+        '<li><b>Claim once:</b> the card you just placed, or an unclaimed card next to it. It produces its ● right away.</li>' +
+        '<li>Any time: <b>Discard 2, draw 1</b>.</li>' +
+        '<li><b>End turn.</b> At 48◇ or more, you win.</li></ol>' },
+      { id: 'play', title: 'Playing cards', html: '<ul>' +
+        '<li><b>Placing:</b> drag a card onto a <b>green space</b>, or ' + tap.toLowerCase() + ' the card, then the space. The number on the space is the cost there.</li>' +
+        '<li><b>Where it fits:</b> next to another card, on a side its placement icon allows (✛ any side; arrows for some sides; ✕ corners only). The other sides must be clear.</li>' +
+        '<li><b>Your Foundation</b> must be down by turn 3. It is always yours and needs no meeple.</li>' +
+        '<li><b>Weak suit:</b> your archetype can’t play the suit it is weak to.</li>' +
+        '<li><b>Actions and Blessings</b> either go in a space or are played straight from hand (<b>Play it</b>); then they are buried under a card they affected. <b>Curses</b> tuck under their target.</li>' +
+        '<li>A card you can’t play says why on the card.</li></ul>' },
+      { id: 'claim', title: 'Claiming and meeples', html: '<ul>' +
+        '<li>When a claim is open, cards you can claim have an <b>orange outline</b>. Drag your meeple onto one, or ' + tap.toLowerCase() + ' it.</li>' +
+        '<li>A claimed card is in your <b>Kingdom</b>: it scores ◇ for you and produces ● each turn.</li>' +
+        '<li>Out of meeples? <b>Take one back</b> at the start of a turn, instead of taking the turn.</li></ul>' },
+      { id: 'suits', title: 'Suits and Overwhelm', html: suitWheelHTML(app.lib) + '<ul>' +
+        '<li>A card is <b>Overwhelmed</b> when enough cards of suits that pressure it surround it: 3 (Encampment 4; a Foundation 8, counting diagonals). Different pressuring suits add up.</li>' +
+        '<li>Ruined and Overwhelmed cards keep their suit but lose their effects and owner; meeples go home. An Overwhelmed Foundation knocks its player out.</li></ul>' },
+      { id: 'board', title: 'Reading the board', html: '<ul>' +
+        '<li><b>Select a card</b> to see it full size. Yellow outlines show what its rules look at (filled = counted now); <b>What sees it</b> outlines, in blue, the cards that look at it.</li>' +
+        '<li>The <b>n/3 tag</b> counts a card’s enemy neighbours against its Overwhelm number; it turns red one step before.</li>' +
+        '<li><b>Chevrons</b> in the gaps show pressure: they point at the card being pressed, in the colour of the suit pressing it. One step from Overwhelm they grow and go solid.</li>' +
+        '<li>A <b>bright green border</b> on a board card: an ability you can use now. Select it and use the button in the card panel.</li>' +
+        '<li><b>Overlays:</b> <b>Quickview</b> shows each card’s ● and ◇ in its owner’s colour; <b>War</b> fills one strip per enemy it takes to Overwhelm a card.</li>' +
+        '<li><b>Log colours:</b> blue plays, green claims, amber ●, gold ◇, red Ruin and Overwhelm, purple Curses, grey card movement.</li></ul>' },
+      { id: 'controls', title: 'Controls', html: '<h3>Mouse</h3><p>Hover any card for a magnified copy. Drag cards from your hand onto the board, your meeple onto a card to claim it, and two cards onto the discard pile to discard 2 and draw 1. Clicking works for all of it.</p>' +
+        '<h3>Phones and tablets</h3><p>Your numbers and <b>End turn</b> are along the top, your hand along the bottom, and <b>Players</b>, <b>Log</b>, <b>Card</b> and <b>Menu</b> are tabs. Pinch to zoom, drag the board to move, tap a card for its details, and press and hold a card to read it.</p>' +
+        '<h3>Keyboard shortcuts</h3>' + keysTable() },
+      { id: 'comforts', title: 'Hints and settings', html: '<ul>' +
+        '<li><b>Hints</b> suggest a next step on your turn.</li>' +
+        '<li>Ending a turn while you could still play or claim a card <b>asks once</b>.</li>' +
+        '<li>When your turn comes round, the dialog shows <b>what everyone else did</b>.</li>' +
+        '<li><b>⇅ Sort</b> orders your hand as drawn, by suit or by cost.</li>' +
+        '<li>Against bots, <b>Bots</b> above the board sets how fast they play. A finished game offers a <b>Rematch</b>.</li></ul>' +
+        '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' },
+      { id: 'modes', title: 'Ways to play', only: 'online', html: '<ul>' +
+        '<li><b>Single player:</b> on <b>Play locally</b>, set any seat to a greedy, tactician or warlord bot.</li>' +
+        '<li><b>Pass-and-Play:</b> one device, passed between turns.</li>' +
+        '<li><b>Online:</b> join a public table or start a private one and share its code. Archetypes are first come, first served; the host starts. You only see your own hand. Lose your connection and you have two minutes to return; leaving a game counts as a loss.</li>' +
+        '<li><b>Profile</b> keeps your record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</li></ul>' },
+      { id: 'modes', title: 'Ways to play', only: 'table', html: '<ul>' +
+        '<li><b>New game:</b> hot-seat on one device; any seat can be a bot.</li>' +
+        '<li><b>Sandbox:</b> place any card anywhere and watch scores and Overwhelm update.</li>' +
+        '<li><b>Library</b> lists every card; <b>Card builder</b> edits one: how it scores, what it sees, where it may touch, its Overwhelm number, what it does when played, and any ability. Saved cards go to the shared library when there is one, otherwise to this browser. Games keep the card set they started with.</li></ul>' },
+      { id: 'app', title: 'Install as an app', only: 'online', html: '<p>Play full screen from your home screen: <b>Install app</b> on the Home page (Android, or Chrome and Edge on a computer), or on iPhone and iPad tap <b>Share → Add to Home Screen</b>. Single player and pass-and-play then work offline.</p>' },
+      { id: 'art', title: 'Card art', html: '<p><a href="' + dithry + '" target="_blank" rel="noopener">Dithry</a> is a pixel-art paint tool in the game’s dithered style. Its card mode (<b>Paint cards</b> in the ' + (ONLINE ? 'Cards' : 'Library') + ' page) paints each card’s face, in hand and on the board, behind its text; saving shows it here straight away.</p>' +
+        (ONLINE ? '' : '<p>For a card’s small art band, export a 64 × 24 picture from Dithry at 1× and choose it under <b>Artwork</b> in the Card builder.</p>') },
+      { id: 'referee', title: 'Referee and undo', html: '<p>' + (ONLINE ? 'In pass-and-play games, every' : 'Every') + ' card on the board has <b>Referee tools</b>: Ruin or flip back, change suit, move, remove, bury, tokens and claims, for anything the rules don’t automate. <b>Undo</b> steps back one action at a time. ' + (ONLINE ? 'Online games have neither: the server enforces the rules.' : 'An effect can be cancelled from the prompt bar.') + '</p>' },
+      { id: 'saving', title: 'Saving and bug reports', html: '<ul><li>The current game' + (ONLINE ? '' : ' and the sandbox') + ' are kept in this browser and survive a reload.</li>' +
+        (ONLINE ? '' : '<li><b>Copy current game as text</b> on the New game page gives a save you can paste back later.</li>') +
+        '<li><b>Copy debug report</b> above the board copies the log, the board and every card’s state, ready to paste into a bug report.</li></ul>' },
+      { id: 'variants', title: 'Rule variants', html: '<p class="muted">On by default; each can be switched off when you set up a game.</p><ul>' +
+        '<li><b>Seat start:</b> later seats get more ● on their first turn (3, 6, 9, 12, 15).</li>' +
+        '<li><b>Deep foundations:</b> each same-suit card buried under a card raises its Overwhelm number by 1.</li>' +
+        '<li><b>Defense tokens:</b> every 2 same-suit cards buried under a card give it a token that stops one Ruin or Curse.</li>' +
+        '<li><b>Building discount:</b> placing next to a card you own costs 3● less.</li>' +
+        '<li><b>No wandering:</b> a card can’t move to a space that touches no other card.</li>' +
+        '<li><b>Ascension:</b> a stack holding five different suits Ascends: invulnerable, every suit, +8◇ and +12●.</li></ul>' },
+      { id: 'rulings', title: 'Rulings in this version', html: '<p class="muted">Where a card’s text left room for doubt, the game does this:</p><ul>' +
+        '<li><b>Foundations</b> can’t be targeted by other cards; only Overwhelm takes one down.</li>' +
+        '<li><b>Cathedral</b> counts Sceptre cards in your Kingdom. <b>Gluttony</b> stays a Blessing.</li>' +
+        '<li><b>Spice Caravan</b> moves at the end of its owner’s turn, East first, then West; unclaimed, it stays. <b>Acorn</b> gains a token (1◇ and 1●) at the end of its owner’s turn.</li>' +
+        '<li><b>Sleeping Giant</b> moves into the space of the card that moved or was Ruined. Burying a card ends its claims.</li>' +
+        '<li><b>Rear Guard</b> swaps in automatically for its owner’s cards. <b>Ballroom</b>’s draw is automatic.</li>' +
+        '<li><b>Revenge</b> can only be revealed when a card you own is Overwhelmed, and is then discarded.</li>' +
+        '<li><b>Confessional</b> removes a Curse from a card on the board or from your hand. A refused <b>University</b> swap parks one of your meeples on it until it leaves play.</li>' +
+        '<li>A card set aside by <b>Last Will and Testament</b> comes back at the start of your next turn, free that turn only.</li>' +
+        '<li><b>Seizure</b> puts the other revealed cards on the bottom of the deck; <b>Inquisition</b> discards them.</li>' +
+        '<li><b>Topiary</b> copies value, income and abilities, not one-time effects. <b>Watchtower</b>’s extra cost applies to the 4 spaces beside it. <b>Living Death</b> takes the card directly under the top card.</li></ul>' }
+    ];
+    return S.filter(function (x) { return !x.only || (x.only === 'online') === ONLINE; });
   }
-  // The public site has no sandbox or card builder: swap the first paragraph and drop the builder section.
-  function helpEdition(h) {
-    h = h.replace(/<\/div><\/div>$/, '<h2>Comforts</h2><p>While it’s your turn, a <b>hint</b> line suggests a next step (play your Foundation first; claim with a meeple; out of ●). Ending a turn while you could still play a card or claim one asks once first. When your turn comes round, the dialog shows <b>what everyone else did</b> since your last turn. Cards you can’t play say why. <b>Sort</b> orders your hand by suit or cost; against bots, <b>Bots</b> sets how fast they play; a finished game offers a <b>Rematch</b>.</p>' +
-      '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' +
-      '<h2>Keyboard shortcuts</h2>' + keysTable() + '</div></div>');
-    if (!ONLINE) return h;
-    return h.replace(/<h2>Getting around<\/h2><p>.*?<\/p>/, '<h2>Getting around</h2><p><b>Single player</b> puts you against bots: on the Play locally page, set any seat to a greedy, tactician or warlord bot. <b>Pass-and-Play</b> is a hot-seat game on one device. <b>Online</b> lists public tables to join; you can also start a private table and share its code. ' +
-        'Pick an archetype in the table’s lobby (first come, first served); the host starts the game. Your <b>Profile</b> keeps your win/loss record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</p>' +
-        '<p>Online, you only ever see your own hand. If you lose your connection you have two minutes to come back before you forfeit; leaving a game in progress counts as a loss.</p>')
-      .replace(/<h2>Card builder<\/h2><p>.*?<\/p>/, '')
-      .replace(/<p>Every card on the board has <b>Referee tools<\/b>.*?<\/p>/, '<p>In a pass-and-play game, every card on the board has <b>Referee tools</b> (Ruin or flip back, change suit, move, remove, bury, tokens, claims) and <b>Undo</b> steps back one action. Online games have neither: the server enforces the rules.</p>');
+  function helpPage() {
+    var S = helpSections();
+    var toc = '<nav class="helptoc raised" aria-label="Help contents"><div class="panelhead">Contents</div><ol>' + S.map(function (x) { return '<li><button class="linkbtn" data-help="' + x.id + '">' + esc(x.title) + '</button></li>'; }).join('') + '</ol></nav>';
+    var body = S.map(function (x) { return '<section class="helpsec" id="help-' + x.id + '"><h2>' + esc(x.title) + '</h2>' + x.html + '<p class="totop"><button class="linkbtn small" data-help="top">↑ Contents</button></p></section>'; }).join('');
+    return '<div class="page scroll" id="helpscroll"><div class="helpwrap">' + toc + '<div class="pane help">' + body + '</div></div></div>';
   }
 
   /* ---------------- bots (single player) ---------------- */
@@ -7429,8 +7488,13 @@ if (typeof module !== 'undefined') module.exports = KCardArt;
   /* ---------------- events ---------------- */
   // One click handler for the whole app. Elements say what they do through data- attributes (data-act, data-cell, data-hand, ...).
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-page],[data-act],[data-cell],[data-hand],[data-pick],[data-answer],[data-answer-p],[data-row],[data-sort]');
+    var t = e.target.closest('[data-page],[data-act],[data-cell],[data-hand],[data-pick],[data-answer],[data-answer-p],[data-row],[data-sort],[data-help]');
     if (!t) return;
+    if (t.hasAttribute('data-help')) {   // Help's table of contents
+      var hid = t.getAttribute('data-help'), sc = $('#helpscroll'), tg = hid === 'top' ? null : document.getElementById('help-' + hid);
+      if (!sc) return; if (tg) { tg.scrollIntoView({ behavior: 'smooth', block: 'start' }); tg.classList.add('flash'); setTimeout(function () { tg.classList.remove('flash'); }, 900); } else sc.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (t.hasAttribute('data-page')) { if (t.disabled) return; app.page = t.getAttribute('data-page'); app.modal = null; app.sheet = null; if (app.page === 'profile') { N.viewing = null; N.profileFor = null; } render(); return; }
     if (t.hasAttribute('data-row')) { app.libUI.sel = t.getAttribute('data-row'); render(); return; }
     if (t.hasAttribute('data-sort')) { app.libUI.sort = t.getAttribute('data-sort'); render(); return; }
