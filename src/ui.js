@@ -755,7 +755,7 @@
     var st = ctx.state, sc = E.scores(st), h = '<div class="plist">';
     st.players.forEach(function (pl, i) {
       var isCur = ctx.kind === 'game' && i === st.cur;
-      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + (i === fixedSeat(ctx) ? ' (you)' : '') + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + (ctx.online && !isConnected(pl.name) ? ' · offline' : '') + (pl.bot ? ' · ' + esc(BOT_NAMES[pl.bot] || pl.bot) : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
+      h += '<div class="pcard' + (isCur ? ' cur' : '') + (pl.out ? ' out' : '') + '"><div class="pname"><span class="swatch" style="background:' + pl.color + '"></span> <b>' + esc(pl.name) + (i === fixedSeat(ctx) ? ' (you)' : '') + '</b> <span class="small">' + esc(pl.arch) + (pl.out ? ' (out)' : '') + (ctx.online && !isConnected(pl.name) ? ' · offline' : '') + (pl.bot ? ' · ' + esc(BOT_NAMES[pl.bot] || pl.bot) : '') + (ctx.thinking === i ? ' · <i>thinking…</i>' : '') + '</span>' + (isCur ? '<span class="turnmark">◀ turn</span>' : '') + '</div>' +
         '<div class="pbody"><span data-fx="pile-' + i + '">' + jewelPile(sc[i].total) + '</span><div class="pstats"><div class="bignum" title="Victory points: cards ' + sc[i].cards + ' + tokens ' + sc[i].tokens + '">' + sc[i].total + '<span class="unit">◇</span></div>' +
         '<div class="small">♟ ' + pl.meeples + ' meeples' + (ctx.kind === 'game' ? ' · ' + pl.hand.length + ' in hand' : '') + (pl.reserve > 0 ? ' · ' + pl.reserve + '● Reserves' : '') + '</div></div></div></div>';
     });
@@ -861,7 +861,7 @@
     if (saved && saved.players && saved.winner == null && !app.game) h += '<div class="banner row" style="margin-bottom:8px">A game in progress was saved in this browser (round ' + saved.round + ', ' + esc(saved.players.map(function (p) { return p.name; }).join(', ')) + '). <button class="btn" data-act="resume">Resume it</button></div>';
     if (app.game) h += '<div class="banner row" style="margin-bottom:8px">A game is running. Starting a new one replaces it. <button class="btn" data-page="game">Back to the game</button></div>';
     h += '<fieldset><legend>Players</legend><div class="row" style="margin-bottom:6px">Number of players <select data-set="n">' + [2, 3, 4, 5].map(function (n) { return '<option' + (n === setup.n ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select><span class="muted small">Each archetype can be taken by only one player. Turn order goes top to bottom.</span></div>' +
-      '<p class="small muted" style="margin:0 0 6px">Bots: <b>Greedy</b> takes the best move for itself right now. <b>Tactician</b> also uses every card ability. <b>Warlord</b> plays for War and Conquest, aiming Ruins and Overwhelms at rivals.</p>';
+      '<p class="small muted" style="margin:0 0 6px">Bots: <b>Greedy</b> takes the best move for itself right now. <b>Tactician</b> also uses every card ability. <b>Warlord</b> plays for War and Conquest, aiming Ruins and Overwhelms at rivals. <b>Genius</b> thinks each turn through and how rivals might answer, using only what a player could see; it takes a second or two per move. Every bot plays for its archetype’s goal.</p>';
     for (var i = 0; i < setup.n; i++) {
       var p = setup.players[i], taken = setup.players.slice(0, setup.n).map(function (q, j) { return j !== i ? q.arch : null; });
       h += '<div class="row" style="margin:3px 0"><span class="swatch" style="background:' + COLORS[i] + ';width:14px;height:14px"></span>' +
@@ -1337,7 +1337,7 @@
         '<p>' + patchToggle() + '</p>' +
         '<p>Hints and the end-turn check are ' + (prefs.hints === false || prefs.confirmEnd === false ? 'off. <button class="btn sm" data-act="showHints">Turn them back on</button>' : 'on. <button class="btn sm" data-act="hideHintsAll">Turn them off</button>') + '</p>' },
       { id: 'modes', title: 'Ways to play', only: 'online', html: '<ul>' +
-        '<li><b>Single player:</b> on <b>Play locally</b>, set any seat to a greedy, tactician or warlord bot.</li>' +
+        '<li><b>Single player:</b> on <b>Play locally</b>, set any seat to a greedy, tactician, warlord or genius bot.</li>' +
         '<li><b>Pass-and-Play:</b> one device, passed between turns.</li>' +
         '<li><b>Online:</b> join a public table or start a private one and share its code. Archetypes are first come, first served; the host starts. You only see your own hand. Lose your connection and you have two minutes to return; leaving a game counts as a loss.</li>' +
         '<li><b>Profile</b> keeps your record, most played archetypes and cards, and recent games. <b>Cards</b> lists every card.</li></ul>' },
@@ -1383,8 +1383,8 @@
 
   /* ---------------- bots (single player) ---------------- */
   // Bot styles a seat can be given on the New game page (KBots also has 'raider', used by the simulator).
-  var BOT_CHOICES = ['greedy', 'tactician', 'warlord'];
-  var BOT_NAMES = { greedy: 'Greedy bot', tactician: 'Tactician bot', warlord: 'Warlord bot', raider: 'Raider bot' };
+  var BOT_CHOICES = ['greedy', 'tactician', 'warlord', 'genius'];
+  var BOT_NAMES = { greedy: 'Greedy bot', tactician: 'Tactician bot', warlord: 'Warlord bot', raider: 'Raider bot', genius: 'Genius bot' };
   // The bot that must act now, or null: whoever a prompt or a revealed hand waits on, else the current player.
   function botToAct(st) {
     if (st.winner != null) return null;
@@ -1405,12 +1405,15 @@
     var st = ctx.state, p = botToAct(st); if (p == null) { ctx.botQueue = null; return; }
     var pd = st.pending, a = null;
     if (ctx.botQueue && ctx.botQueue.length && ctx.botExpect === st) a = ctx.botQueue.shift();
-    if (a && a.t === 'answer' && !(pd && isBot(st, pd.player))) a = null;      // the plan answered for a human: they answer themselves
+    if (a && a.t === 'answer' && !(pd && pd.player === ctx.botQueueFor)) a = null;   // the plan answered for someone else: they answer themselves
     if (!a) {
       ctx.botQueue = null;
+      // The Genius thinks for a second or two: show it, then think on the next tick.
+      var who = pd ? pd.player : p;
+      if (!(st.reveal && !pd) && st.players[who].bot === 'genius' && ctx.thinkFor !== st) { ctx.thinkFor = st; ctx.thinking = who; render(); ctx.botTimer = setTimeout(function () { botStep(ctx); }, 30); return; }
       if (st.reveal && !pd) a = { t: 'closeReveal' };
       else if (pd) a = { t: 'answer', v: KBots.choose(st, pd.player, st.players[pd.player].bot) };
-      else { ctx.botQueue = KBots.plan(st, st.players[p].bot); a = ctx.botQueue.shift(); }
+      else { ctx.botQueue = KBots.plan(st, st.players[p].bot); ctx.botQueueFor = p; a = ctx.botQueue.shift(); }
     }
     if (E.apply(st, a).error) {          // shouldn't happen; fall back to something legal rather than stall
       ctx.botQueue = null;
@@ -1418,7 +1421,7 @@
         : { t: st.turn.started ? 'endTurn' : 'startTurn' };
       if (E.apply(st, a).error) { ctx.err = st.players[p].name + ' is stuck. Use the referee tools or Undo.'; render(); return; }
     }
-    dispatch(ctx, a); ctx.botExpect = ctx.state;
+    ctx.thinking = null; dispatch(ctx, a); ctx.botExpect = ctx.state;
   }
 
   /* ---------------- online play (public site only) ---------------- */
@@ -1515,7 +1518,7 @@
     var saved = !app.game && lsGet('ks.game'), resume = app.game ? '<button class="btn big" data-page="game">Back to your game</button>' : saved && saved.players && saved.winner == null ? '<button class="btn big" data-act="resume">Resume saved game</button>' : '';
     return '<div class="page scroll"><div class="home">' + logoHTML() + fleuron() +
       '<p>An asymmetric tableau-building card game for 2–5 players. Six archetypes share one board: build your Kingdom, claim cards with your meeples, and Overwhelm your rivals. First to the victory target wins.</p>' +
-      '<div class="choices"><div class="choice raised"><h2>Single player</h2><p>Play against the computer. Choose each opponent: greedy, tactician or warlord bot.</p><div class="row"><button class="btn def big" data-act="soloSetup">Play vs bots</button>' + resume + '</div></div>' +
+      '<div class="choices"><div class="choice raised"><h2>Single player</h2><p>Play against the computer. Choose each opponent: greedy, tactician, warlord or genius bot.</p><div class="row"><button class="btn def big" data-act="soloSetup">Play vs bots</button>' + resume + '</div></div>' +
       '<div class="choice raised"><h2>Pass-and-Play</h2><p>Everyone plays on this device and passes it between turns. Nothing to sign up for.</p><div class="row"><button class="btn def big" data-act="hotseatSetup">New game</button></div></div>' +
       '<div class="choice raised"><h2>Online Multiplayer</h2><p>Join a public table from the server list, or start a private one and share its code. Your profile tracks your record.</p><div class="row"><button class="btn def big" data-page="online">Play online</button></div></div></div>' +
       appBox() +

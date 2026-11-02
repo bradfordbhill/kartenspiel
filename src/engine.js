@@ -1105,8 +1105,12 @@ var KEngine = (function () {
 
   // The one entry point: apply(state, action) returns a new state. Actions look like { t: "play", uid, k }.
   // The UI, the tests and the simulator all play the game through this.
+  // A state marked `sharedDefs` (the Genius bot's imagined games) shares its card definitions with the state it came
+  // from instead of copying them: apply never changes a definition, and the copy is most of the cost.
   function apply(st0, a) {
-    var st = clone(st0); st.error = null;
+    var st;
+    if (st0.sharedDefs) { var defs = st0.defs; st0.defs = null; st = clone(st0); st0.defs = defs; st.defs = defs; } else st = clone(st0);
+    st.error = null;
     var p = a.p != null ? a.p : st.cur;
     if (st.winner != null && a.t !== 'closeReveal') return err(st, 'The game is over.');
     switch (a.t) {

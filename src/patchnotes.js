@@ -3,6 +3,11 @@
    (unless they've turned that off), and every entry is on the Patch notes page (Help → Patch notes).
    v must be new for each entry (the date, plus a number for a second update that day). */
 var KPatch = [
+  { v: '2026.11.02.2', date: '2 November 2026', title: 'The Genius bot', notes: [
+    'A new opponent for single player: the <b>Genius bot</b>. It thinks each turn through, imagining how its rivals might answer, and takes a second or two per move.',
+    'It plays fair: it sees only what you would see at the table, never your hand or the deck, and guesses the rest.',
+    'Against tactician bots it wins more often than a tactician would in its seat, with any archetype.'
+  ] },
   { v: '2026.11.02.1', date: '2 November 2026', title: 'Bots that know their archetype', notes: [
     'Every bot now plays for its <b>archetype’s goal</b>: Archbishops hold Sceptre cards, Hedonists Goblets, Philosophers a card of each missing suit, Cryptkeepers cards to bury, Gardeners cards to grow their region, Warmongers War.',
     'Bots get rid of cards they can’t play first, use <b>Discard 2, draw 1</b>, place their Foundation with room to grow, and take back a meeple when they run out.',

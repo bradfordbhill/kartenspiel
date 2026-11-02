@@ -20,7 +20,7 @@ chk('Plan', turns>20&&same===turns, 'replay reaches the state the bot computed (
 
 // 2. The single-player driver (same rules as ui.js): bots act from a plan, stop at a human's prompt, re-plan after it.
 function drive(st, kinds, human){
-  let queue=null, expect=null, steps=0, humanAnswers=0, replans=0;
+  let queue=null, queueFor=null, expect=null, steps=0, humanAnswers=0, replans=0;
   const isBot=p=>kinds[p]!=='human';
   while(st.winner==null && st.round<=30 && steps++<4000){
     const pd=st.pending, who=pd?pd.player:st.reveal?st.reveal.to:st.cur;
@@ -31,11 +31,11 @@ function drive(st, kinds, human){
       const n=E.apply(st,a); if(n.error) return {err:'human '+a.t+': '+n.error}; st=n; continue; }
     let a=null;
     if(queue&&queue.length&&expect===st) a=queue.shift();
-    if(a&&a.t==='answer'&&(!st.pending||!isBot(st.pending.player))) a=null;    // plan answered for a human: drop it
+    if(a&&a.t==='answer'&&(!st.pending||st.pending.player!==queueFor)) a=null;    // plan answered for someone else: drop it
     if(!a){ queue=null;
       if(st.reveal&&!pd) a={t:'closeReveal'};
       else if(pd) a={t:'answer',v:B.choose(st,pd.player,kinds[pd.player])};
-      else { queue=B.plan(st,kinds[st.cur]); replans++; a=queue.shift(); } }
+      else { queue=B.plan(st,kinds[st.cur]); queueFor=st.cur; replans++; a=queue.shift(); } }
     const n=E.apply(st,a);
     if(n.error){ queue=null; const f=E.apply(st,{t:st.turn.started?'endTurn':'startTurn'}); if(f.error) return {err:'bot stuck: '+n.error}; st=f; expect=st; continue; }
     st=n; expect=st;
