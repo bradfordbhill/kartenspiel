@@ -1,0 +1,9 @@
+/* Claudenspiel's look, loaded after Kartenspiel's style.css: a dusk-violet desk, oxblood-to-copper title bars and a
+   verdigris logo, so the fork never passes for the original. */
+:root { --desk: #3d3350; --title1: #5a1020; --title2: #b4602a; --sel: #5a1020; --focus: #5a1020; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --desk: #1c1726; --title1: #3d0c18; --title2: #8a4520; --sel: #8a4520; --focus: #f0a86a; } }
+:root[data-theme="dark"] { --desk: #1c1726; --title1: #3d0c18; --title2: #8a4520; --sel: #8a4520; --focus: #f0a86a; }
+h1.logo { aspect-ratio: 153 / 31; width: 460px; }
+h1.logo.small { width: 300px; }
+@media (max-width: 460px) { h1.logo { width: 300px; } }
+.log div.turn { color: #5a1020; }

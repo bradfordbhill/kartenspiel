@@ -1,0 +1,73 @@
+// Rules checks for changed and new cards. Run: node tests/qc3.js (prints only failures, then a pass count).
+// Each T(...) block sets up a small game with the referee actions (sbPlace, sbClaim, sbGive, ...), plays the
+// card through E.apply like a real player would, then check()s the result.
+// Helpers: game(arch, ...) starts a game with 99●; F(k) plays the Foundation; put(id, k, owner) places a card;
+// give(id) puts one in hand; ans(v) answers the pending prompt.
+const D=require('../src/data.js'), E=require('../src/engine.js');
+let st, results=[];
+function A(a){const r=E.apply(st,a); if(r.error){return r.error;} st=r; return null;}
+function must(a){const e=A(a); if(e) throw new Error(a.t+': '+e);}
+function game(a0,a1,a2){ const ps=[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}]; if(a2) ps.push({name:'C',arch:a2});
+  st=E.newGame(D.STARTER,{players:ps,seed:11}); must({t:'startTurn'}); st.players[0].ap=99; }
+function F(k,p){ p=p||0; // place player's foundation via real play
+  must({t:'play',uid:st.players[p].foundationUid,k}); }
+function put(id,k,owner){ must({t:'sbPlace',id,k}); if(owner!=null) must({t:'sbClaim',k,owner}); }
+function give(id,p){ p=p||0; must({t:'sbGive',i:p,id}); return st.players[p].hand[st.players[p].hand.length-1]; }
+function top(k){ const u=E.top(st,k); return u?st.cards[u]:null; }
+function name(k){ const u=E.top(st,k); return u?st.defs[st.cards[u].def].name:null; }
+function check(card,cond,msg){ results.push([card,cond?'PASS':'FAIL',msg]); }
+function T(card,fn){ try{ fn(); }catch(e){ results.push([card,"FAIL","threw: "+e.message+" @ "+(e.stack.split("\n")[1]||"")]); } }
+const ans=v=>must({t:'answer',v});
+function blk(id){ const u=give(id); return !!E.playBlock(st,0,u); }
+const P0=()=>st.players[0];
+
+const name2=k=>{const u=E.top(st,k);return u?st.defs[st.cards[u].def].name:null};
+// ---- changed rules ----
+T('Foundations',()=>{ game('Archbishop'); F('0,0'); check('Foundations',P0().ap===107,'Foundation gives 8● (ap '+P0().ap+')'); put('sanctuary','1,0',0); check('Foundations',E.cardValue(st,'0,0',0)===12,'Cathedral 6◇ per Sceptre = '+E.cardValue(st,'0,0',0));
+  game('Philosopher'); F('0,0'); put('acorn','1,0',0); put('fairgrounds','2,0',0); check('Foundations',E.cardValue(st,'0,0',0)===15,'Observatory 5◇ per suit'); });
+T('Warcamp',()=>{ game('Warmonger','Philosopher'); F('0,0'); put('eureka','5,5'); put('phalanx','4,5'); put('phalanx','6,5'); const e=give('encampment'); const L=E.legalCells(st,e); 
+  must({t:'sbPlace',id:'phalanx',k:'5,4'}); st.turn.lastKey=null; must({t:'sbCheck',credit:0}); check('Warcamp',top('5,5').ruined&&P0().tokens===8,'8◇ per Overwhelm ('+P0().tokens+')'); });
+T('Communion',()=>{ game('Archbishop'); F('0,0'); const c=give('communion'); const L=E.legalCells(st,c); check('Communion',('0,1' in L)&&!('1,0' in L),'N/S placement'); must({t:'play',uid:c,k:'0,1'}); ans([st.pending.options[0]]); must({t:'claim',k:'0,1'}); check('Communion',E.cardValue(st,'0,1',0)===5,'Structure worth 5◇'); });
+T('Halberd Strike',()=>{ game('Warmonger'); F('0,0'); put('eureka','-1,0'); const h=give('halberd-strike'); must({t:'cast',uid:h}); check('Halberd Strike',st.pending.options.includes('-1,0'),'targets card next to own'); ans('-1,0'); check('Halberd Strike',top('-1,0').ruined,'ruined (Action from hand)'); });
+T('Portcullis',()=>{ game('Warmonger','Philosopher'); F('0,0'); put('eureka','-1,0',1); for(let i=0;i<4;i++) give('eureka',1); const p=give('portcullis'); must({t:'play',uid:p,k:'0,1'}); ans('-1,0'); ans(st.pending.options.slice(0,st.pending.count)); check('Portcullis',st.players[1].hand.length===3,'owner of card next to yours discards to 3'); });
+T('Seizure',()=>{ game('Warmonger'); F('0,0'); const s=give('seizure'); must({t:'cast',uid:s}); ans('Leaf'); const h=P0().hand; check('Seizure',st.defs[st.cards[h[h.length-1]].def].suit==='Leaf','instant: drew a Leaf'); if(st.pending) ans(st.pending.options[0]); });
+T('Acorn',()=>{ game('Gardener'); F('0,0'); const a=give('acorn'); must({t:'play',uid:a,k:'1,0'}); must({t:'claim',k:'1,0'}); must({t:'endTurn'}); must({t:'startTurn'}); const t1=top('1,0').tokens; must({t:'endTurn'}); must({t:'startTurn'}); must({t:'endTurn'}); must({t:'startTurn'});
+  check('Acorn',t1===1,'no token on the opponent’s turn'); check('Acorn',top('1,0').tokens===2,'token at the end of each of its owner’s turns ('+top('1,0').tokens+')'); });
+T('Turn the Soil',()=>{ game('Gardener'); F('0,0'); put('acorn','1,0',0); put('fountain','0,1',0); put('burrow','2,0',0); const t=give('turn-the-soil'); must({t:'cast',uid:t}); check('Turn the Soil',P0().hand.length===6,'4 + floor(4 Leaf/2)=6 ('+P0().hand.length+')'); });
+T('Burrow',()=>{ game('Gardener'); F('0,0'); const b=give('burrow'); const L=E.legalCells(st,b); check('Burrow',('1,0' in L)&&('0,1' in L)&&!('0,-1' in L),'N/E/W sides'); must({t:'play',uid:b,k:'0,1'}); must({t:'claim',k:'0,1'}); check('Burrow',E.cardValue(st,'0,1',0)===1,'1◇ per card north'); });
+T('Hilltop Relic',()=>{ game('Philosopher'); F('0,0'); const h=give('hilltop-relic'); must({t:'play',uid:h,k:'1,0'}); must({t:'claim',k:'1,0'}); must({t:'ability',k:'1,0'}); check('Hilltop Relic',P0().tokens===2,'12● → 2◇'); });
+T('Procession',()=>{ game('Hedonist','Cryptkeeper'); F('0,0'); give('embalm',1); const p=give('procession'); const h=P0().hand.length; must({t:'cast',uid:p}); check('Procession',st.pending.options.length===0&&st.pending.allowNone,'Cryptkeeper not choosable'); ans(null); check('Procession',P0().hand.length===h,'drew instead (cast −1 +1)'); if(st.pending) ans(st.pending.options[0]); });
+T('Secrets and Whispers',()=>{ game('Hedonist','Archbishop'); F('0,0'); put('sanctuary','1,0',1); const s=give('secrets-and-whispers'); must({t:'cast',uid:s}); ans('1,0'); check('Secrets and Whispers',E.noIncome(st,'1,0')&&st.board['1,0'].length===2,'Action curse tucks under target, no ●'); });
+// ---- new cards ----
+T('Last Will and Testament',()=>{ game('Cryptkeeper'); F('0,0'); const o=give('obelisk'); const l=give('last-will'); must({t:'cast',uid:l}); ans([o]); check('Last Will and Testament',P0().aside.includes(o)&&!P0().hand.includes(o),'set aside'); if(st.pending) ans(st.pending.options[0]);
+  must({t:'endTurn'}); must({t:'startTurn'}); must({t:'endTurn'}); must({t:'startTurn'}); check('Last Will and Testament',P0().hand.includes(o)&&E.isFree(st,o),'back in hand, free'); const L=E.legalCells(st,o); const k=Object.keys(L)[0]; check('Last Will and Testament',L[k]===0,'costs 0'); st.players[0].ap=0; must({t:'play',uid:o,k}); check('Last Will and Testament',name2(k)==='Obelisk','played for free'); });
+T('Funeral Pyre',()=>{ game('Cryptkeeper'); F('0,0'); const f=give('funeral-pyre'); const L=E.legalCells(st,f); check('Funeral Pyre',('1,0' in L)&&!('0,1' in L),'E/W/S placement'); must({t:'play',uid:f,k:'1,0'}); must({t:'claim',k:'1,0'}); give('eureka'); check('Funeral Pyre',E.abilityReady(st,'1,0'),'ready'); must({t:'ability',k:'1,0'}); ans([st.pending.options[0]]); check('Funeral Pyre',st.board['1,0'].length===2&&E.cardValue(st,'0,0',0)===3,'buried under it; Mausoleum counts it (3◇)'); });
+T('Crumbling Ossuary',()=>{ game('Hedonist','Cryptkeeper'); F('0,0'); put('crumbling-ossuary','2,0'); const f=give('fairgrounds'); must({t:'play',uid:f,k:'1,0'}); must({t:'claim',k:'1,0'}); check('Crumbling Ossuary',P0().ap===0,'non-Cryptkeeper loses remaining ●'); });
+T('Ballroom',()=>{ game('Hedonist'); F('0,0'); put('ballroom','2,1',0); const c=give('choreography'); must({t:'play',uid:c,k:'1,0'}); must({t:'claim',k:'1,0'}); const h=P0().hand.length; must({t:'ability',k:'1,0'}); ans('1,1'); check('Ballroom',P0().hand.length===h+1,'owner draws when a card moves next to it'); });
+T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'claim',k:'0,1'}); check('Spice Caravan',E.cardIncome(st,'0,1')===8,'8● per turn'); st.opts.noWander=false; must({t:'endTurn'}); check('Spice Caravan',name2('1,1')==='Spice Caravan'&&P0().tokens===1,'moved east, owner +1◇'); });
+T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); put('eureka','-1,1'); put('eureka','1,1'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'claim',k:'0,1'}); must({t:'endTurn'}); check('Spice Caravan',!E.top(st,'0,1'),'boxed in: discarded'); });
+T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'endTurn'}); check('Spice Caravan',name2('0,1')==='Spice Caravan','unclaimed: stays put'); });
+T('Sleeping Giant',()=>{ game('Hedonist','Philosopher'); F('0,0'); put('sleeping-giant','2,0'); put('eureka','3,0',1); must({t:'sbBury',id:'acorn',k:'2,0'}); const ph=give('phalanx'); must({t:'play',uid:ph,k:'3,1'}); ans('3,0'); if(st.pending) ans(st.pending.options[0]);
+  check('Sleeping Giant',name2('3,0')==='Sleeping Giant'&&st.board['3,0'].length>=2,'moved onto the Ruined card and buried it'); check('Sleeping Giant',name2('2,0')==='Acorn','left its buried card behind'); });
+T('The Wise Old Tree',()=>{ game('Gardener','Warmonger'); F('0,0'); const w=give('wise-old-tree'); must({t:'play',uid:w,k:'1,0'}); check('The Wise Old Tree',E.claimOptions(st,0).length===0,'cannot be claimed'); check('The Wise Old Tree',E.kingdom(st,0).includes('1,0')&&E.cardValue(st,'0,0',0)===6,'counts in Gardener’s Kingdom (region 2, 3◇ each in Claudenspiel)');
+  ['2,0','1,1','1,-1'].forEach(k=>put('phalanx',k)); must({t:'sbCheck'}); check('The Wise Old Tree',!top('1,0').ruined,'cannot be Overwhelmed'); });
+T('Proliferation',()=>{ game('Gardener'); F('0,0'); put('fountain','0,1',0); const p=give('proliferation'); must({t:'cast',uid:p}); check('Proliferation',!st.pending.options.includes('0,0'),'not the Foundation'); ans('0,1'); const h=P0().hand.map(u=>st.cards[u].def); check('Proliferation',h.includes('fountain'),'copy added to hand'); if(st.pending) ans(st.pending.options[0]); });
+T('Lay on Hands',()=>{ game('Archbishop','Hedonist'); F('0,0'); put('sanctuary','1,0',0); must({t:'sbBury',id:'secrets-and-whispers',k:'1,0'}); check('Lay on Hands',E.noIncome(st,'1,0'),'setup cursed'); const l=give('lay-on-hands'); must({t:'cast',uid:l}); ans('1,0'); check('Lay on Hands',!E.isCursed(st,'1,0'),'curse removed'); });
+T('Tithing Hall',()=>{ game('Archbishop'); F('0,0'); put('eureka','-1,0'); const t=give('tithing-hall'); must({t:'play',uid:t,k:'1,0'}); must({t:'claim',k:'1,0'}); must({t:'ability',k:'1,0'}); check('Tithing Hall',st.pending.options.includes('-1,0'),'any card next to a card you own'); ans('-1,0'); ans('Goblet'); });
+T('Tithe',()=>{ game('Archbishop','Hedonist'); F('0,0'); put('fairgrounds','5,5',1); put('sanctuary','4,5'); put('sanctuary','6,5'); give('eureka',1); give('acorn',1); const t=give('tithe'); const h=P0().hand.length; must({t:'cast',uid:t}); ans('5,5'); check('Tithe',st.pending.player===1&&st.pending.count===2,'owner offers 2'); ans(st.pending.options.slice(0,2)); check('Tithe',P0().hand.length===h,'took 1 (cast −1 +1)'); if(st.pending) ans(st.pending.options[0]); });
+T('Confessional',()=>{ game('Hedonist','Archbishop'); F('0,0'); put('confessional','2,0',1); put('fairgrounds','1,0',0); must({t:'sbBury',id:'secrets-and-whispers',k:'1,0'}); check('Confessional',E.abilityReady(st,'2,0'),'usable by a non-owner'); must({t:'ability',k:'2,0'}); ans('1,0');
+  check('Confessional',P0().tokens===3&&!E.isCursed(st,'1,0')&&st.players[1].hand.some(u=>st.cards[u].def==='secrets-and-whispers'),'3◇ to confessor, curse to the Archbishop’s hand'); });
+T('Flying Buttresses',()=>{ game('Archbishop','Cryptkeeper'); F('0,0'); put('flying-buttresses','1,0',0); const s=give('sarcophagus',0); st.players[0].arch='Hedonist'; must({t:'play',uid:s,k:'1,1'}); check('Flying Buttresses',!st.pending||!st.pending.options.includes('1,0'),'cannot be covered (Buried)'); });
+T('Rear Guard',()=>{ game('Warmonger','Philosopher'); F('0,0'); put('sanctuary','5,5',1); put('rear-guard','6,6',1); const p=give('phalanx'); must({t:'play',uid:p,k:'5,4'}); ans('5,5'); if(st.pending) ans(st.pending.options[0]);
+  check('Rear Guard',name2('5,5')==='Rear Guard'&&top('5,5').ruined&&!top('6,6').ruined&&name2('6,6')==='Sanctuary','swapped in and was Ruined instead'); });
+T('Revenge',()=>{ game('Warmonger','Philosopher'); F('0,0'); put('eureka','5,5',1); put('acorn','5,6'); put('fairgrounds','6,5'); const r=give('revenge',1); check('Revenge',!!E.playBlock(st,1,r),'cannot be played normally');
+  ['4,5','5,4'].forEach(k=>put('phalanx',k)); must({t:'sbPlace',id:'phalanx',k:'6,5'}); must({t:'sbCheck',credit:0});
+  check('Revenge',st.pending&&st.pending.kind==='confirm'&&st.pending.player===1,'owner is asked'); ans(true); ans(st.pending.options[0]); if(st.pending&&st.pending.kind==='cell') ans(st.pending.options[0]); ans('Tome'); check('Revenge',!st.players[1].hand.includes(r),'revealed and discarded'); });
+T('Eureka',()=>{ game('Philosopher'); const e=give('eureka'); must({t:'cast',uid:e}); ans(1); check('Eureka',st.reveal&&st.reveal.of===1,'reveal'); });
+T('Alchemy Lab',()=>{ game('Philosopher'); F('0,0'); put('alchemy-lab','5,5',0); put('acorn','4,5'); put('acorn','6,5'); put('acorn','5,4'); must({t:'sbCheck'}); check('Alchemy Lab',st.pending&&st.pending.kind==='confirm','asks owner'); ans(true); ans('Sword'); ans('Bone'); ans('Tome');
+  const s=['4,5','6,5','5,4'].map(k=>E.suitOf(st,E.top(st,k))); check('Alchemy Lab',new Set(s).size===3,'three different suits: '+s); });
+T('Errata',()=>{ game('Philosopher'); F('0,0'); put('fairgrounds','1,0',0); put('sanctuary','9,9'); const e=give('errata'); must({t:'cast',uid:e}); ans('1,0'); ans('9,9'); check('Errata',top('9,9').claimants[0]===0&&!top('1,0').claimants.length,'meeple moved anywhere'); });
+T('University',()=>{ game('Philosopher','Hedonist'); F('0,0'); const u=give('university'); must({t:'play',uid:u,k:'1,0'}); must({t:'claim',k:'1,0'}); put('fairgrounds','5,5',1);
+  must({t:'ability',k:'1,0'}); ans('1,0'); ans('5,5'); check('University',st.pending.kind==='confirm'&&st.pending.player===1,'opponent asked'); const m=P0().meeples; ans(false); check('University',P0().meeples===m-1&&top('1,0').parked[0]===1,'refused: meeple parked on University');
+  game('Philosopher','Hedonist'); F('0,0'); const u2=give('university'); must({t:'play',uid:u2,k:'1,0'}); must({t:'claim',k:'1,0'}); put('fairgrounds','5,5',1); must({t:'ability',k:'1,0'}); ans('1,0'); ans('5,5'); ans(true); check('University',top('5,5').claimants[0]===0&&top('1,0').claimants[0]===1,'accepted: swapped'); });
+results.forEach(r=>{ if(r[1]!=='PASS') console.log(r[1],'|',r[0],'|',r[2]); }); console.log(results.filter(r=>r[1]==='PASS').length,'pass /',results.length);
