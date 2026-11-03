@@ -5282,7 +5282,8 @@ var KBots = (function () {
   const MAIN = { Archbishop: 'Sceptre', Hedonist: 'Goblet', Warmonger: 'Sword', Cryptkeeper: 'Bone', Gardener: 'Leaf', Philosopher: 'Tome' };
 
   // Apply an action, or null if it's illegal. While planning (st._botLog exists), each state remembers the actions that led to it.
-  function ap(st,a){const r=E.apply(st,a); if(r.error) return null; if(st._botLog) r._botLog=st._botLog.concat([a]); return r;}
+  // In an imagined world (the Genius's), a step can reach a card the world doesn't hold; that counts as illegal too.
+  function ap(st,a){let r; try{ r=E.apply(st,a); }catch(e){ if(!st.sharedDefs) throw e; return null; } if(r.error) return null; if(st._botLog) r._botLog=st._botLog.concat([a]); return r;}
   function tot(st,p){return E.scores(st)[p].total;}
   function oppSum(st,p,f){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m+=f(st,i)});return m;}
   function oppBest(st,p){let m=0;st.players.forEach((q,i)=>{if(i!==p&&!q.out)m=Math.max(m,tot(st,i))});return m;}
