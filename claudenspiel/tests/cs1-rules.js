@@ -27,9 +27,9 @@ chk('Seat start', game(['Gardener','Hedonist']).opts.seatStart===false, 'Seat st
 // 2. The deck.
 st=game(['Gardener','Hedonist']);
 const inPlay=st.deck.length+st.players.reduce((a,p)=>a+p.hand.filter(u=>u!==p.foundationUid).length,0);
-chk('Deck', inPlay===116, 'the deck holds 116 cards ('+inPlay+')');
-const bySuit={}; D.STARTER.forEach(c=>{ if(c.type!=='Foundation') bySuit[c.suit]=(bySuit[c.suit]||0)+c.copies; });
-chk('Deck', Object.values(bySuit).every(n=>n>=18&&n<=20), 'every suit has 18 to 20 cards ('+JSON.stringify(bySuit)+')');
+chk('Deck', inPlay===122, 'the deck holds 122 cards: 116, plus 6 Grounds from 0.2 ('+inPlay+')');
+const bySuit={}; D.STARTER.forEach(c=>{ if(c.type!=='Foundation'&&c.type!=='Grounds') bySuit[c.suit]=(bySuit[c.suit]||0)+c.copies; });
+chk('Deck', Object.values(bySuit).every(n=>n>=18&&n<=20), 'every suit has 18 to 20 cards besides Grounds ('+JSON.stringify(bySuit)+')');
 chk('Deck', ['obelisk','watchtower','communion','sleeping-giant'].every(id=>D.STARTER.find(c=>c.id===id).copies===1), 'the strongest and strangest cards stay single');
 
 // 3. Foundations.

@@ -4,7 +4,7 @@ const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a){const r=E.apply(st,a); if(r.error) throw new Error(a.t+': '+r.error); st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]); const ans=v=>A({t:'answer',v});
 function T(n,f){ try{f()}catch(e){R.push([n,'FAIL','threw '+e.message])} }
-function game(a0,a1){ st=E.newGame(D.STARTER,{players:[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}],seed:11}); A({t:'startTurn'}); st.players[0].ap=99; A({t:'play',uid:st.players[0].foundationUid,k:'0,0'}); }
+function game(a0,a1){ st=E.newGame(D.STARTER,{players:[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}],seed:11,seatTokens:0}); A({t:'startTurn'}); st.players[0].ap=99; A({t:'play',uid:st.players[0].foundationUid,k:'0,0'}); }
 const give=(id,p)=>{A({t:'sbGive',i:p||0,id}); const h=st.players[p||0].hand; return h[h.length-1];};
 const top=k=>st.cards[E.top(st,k)], nm=k=>st.defs[top(k).def].name;
 function toB(){ A({t:'endTurn'}); A({t:'startTurn'}); st.players[1].ap=99; if(!st.players[1].foundationPlaced) A({t:'play',uid:st.players[1].foundationUid,k:'0,-1'}); }

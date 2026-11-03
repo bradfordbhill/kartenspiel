@@ -7,6 +7,8 @@ const game=(a0,a1,seed)=>E.newGame(D.STARTER,{players:[{name:'A',arch:a0},{name:
 // Move a named card from the deck (or the other hand) into player p's hand; returns its uid.
 function give(st,p,id){ let u=st.deck.find(x=>st.cards[x].def===id);
   if(u) st.deck.splice(st.deck.indexOf(u),1); else { st.players.forEach(q=>{ const i=q.hand.findIndex(x=>st.cards[x].def===id); if(i>=0&&!u){ u=q.hand[i]; q.hand.splice(i,1); } }); }
+  if(!u){ u=st.discard.find(x=>st.cards[x].def===id); if(u) st.discard.splice(st.discard.indexOf(u),1); }   // Claudenspiel: copies can already be in play or discarded
+  if(!u) throw new Error('no free copy of '+id);
   st.players[p].hand.push(u); return u; }
 const ask=(st,p,kind,options,count,prompt)=>{ const s=JSON.parse(JSON.stringify(st)); s.pending={kind,player:p,count,options,prompt:prompt||'Discard'}; return B.choose(s,p,'greedy'); };
 

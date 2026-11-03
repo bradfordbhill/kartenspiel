@@ -17,7 +17,7 @@ var KData = (function () {
     return d;
   }
 
-  // The starter library (87 cards). Card fields:
+  // The starter library (87 cards in Kartenspiel; Claudenspiel adds its own, such as the Grounds). Card fields:
   //   id                    unique; used in saves and to look the card up
   //   name, suit, type      type is one of TYPES above
   //   cost, income          ● to place it; ● it gives its owner each turn
@@ -273,7 +273,7 @@ var KData = (function () {
     "cost": 16,
     "copies": 1,
     "income": 6,
-    "text": "Worth 8◇. Double its value if fully surrounded.",
+    "text": "Worth 6◇. Double its value if fully surrounded.",
     "place": [
      "N",
      "E",
@@ -283,7 +283,7 @@ var KData = (function () {
     "overwhelm": null,
     "score": {
      "kind": "flatDoubledIfSurrounded",
-     "n": 8
+     "n": 6
     },
     "sees": {
      "area": "adjacent"
@@ -982,15 +982,17 @@ var KData = (function () {
     "cost": 6,
     "copies": 2,
     "income": 3,
-    "text": "2◇ per adjacent Leaf card.",
+    "text": "3◇ per adjacent Leaf card.",
     "place": [
      "N",
-     "S"
+     "E",
+     "S",
+     "W"
     ],
     "overwhelm": null,
     "score": {
      "kind": "perAdjacentSuit",
-     "n": 2,
+     "n": 3,
      "suit": "Leaf"
     },
     "sees": {
@@ -3359,6 +3361,111 @@ var KData = (function () {
     "weakTo": "",
     "art": "",
     "note": "PLACEHOLDER cost (the sheet gave none). The protection ends if Standard Bearer is unburied."
+   },
+   {
+    "type": "Grounds",
+    "copies": 2,
+    "income": 0,
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Claudenspiel 0.2: the first Grounds. Shelter for a crowded Kingdom.",
+    "id": "marsh",
+    "name": "Marsh",
+    "suit": "Leaf",
+    "cost": 6,
+    "mods": {
+     "owShift": 1
+    },
+    "text": "Grounds: nobody claims it, and it never counts as an enemy. Cards next to it need one more enemy to be Overwhelmed."
+   },
+   {
+    "type": "Grounds",
+    "copies": 2,
+    "income": 0,
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Claudenspiel 0.2: lay it beside a rival's best card.",
+    "id": "battlefield",
+    "name": "Battlefield",
+    "suit": "Sword",
+    "cost": 6,
+    "mods": {
+     "owShift": -1
+    },
+    "text": "Grounds: nobody claims it, and it never counts as an enemy. Cards next to it need one fewer enemy to be Overwhelmed."
+   },
+   {
+    "type": "Grounds",
+    "copies": 2,
+    "income": 0,
+    "place": [
+     "N",
+     "E",
+     "S",
+     "W"
+    ],
+    "overwhelm": null,
+    "score": {
+     "kind": "none"
+    },
+    "sees": {
+     "area": "adjacent"
+    },
+    "onPlay": [],
+    "curse": null,
+    "ability": null,
+    "perTurn": null,
+    "incomePerToken": 0,
+    "archetype": "",
+    "weakTo": "",
+    "art": "",
+    "note": "Claudenspiel 0.2: open to everyone, so place it where you will build next.",
+    "id": "crossroads",
+    "name": "Crossroads",
+    "suit": "Goblet",
+    "cost": 3,
+    "mods": {
+     "adjacentCost": -3
+    },
+    "text": "Grounds: nobody claims it, and it never counts as an enemy. Placing a card next to it costs 3● less."
    }
   ].map(c);
 

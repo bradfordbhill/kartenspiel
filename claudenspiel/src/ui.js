@@ -634,7 +634,18 @@
       '<button class="btn sm" data-act="suits" title="Which suits pressure which">Suits</button>' +
       '<label>Overlay <select data-sel="overlay">' + [['none', 'None'], ['quick', 'Quickview (● and ◇)'], ['war', 'War (Overwhelm)']].map(function (o) { return '<option value="' + o[0] + '"' + ((u.overlay || 'none') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
       overlayTotal(ctx) +
-      '<span class="muted legend">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>';
+      '<span class="muted legend">Yellow: what the selected card sees (filled = counted). Blue: cards that see it.</span></div>' + raceBar(ctx);
+  }
+  // Claudenspiel: the race to the target, every player on one track. A bell marks the last round once it has begun.
+  function raceBar(ctx) {
+    var st = ctx.state; if (ctx.kind !== 'game') return '';
+    var sc = E.scores(st), T = +st.opts.target || 48, top = Math.max(T, Math.max.apply(null, sc.map(function (s) { return s.total; })));
+    var lanes = st.players.map(function (pl, i) {
+      var t = sc[i].total, w = Math.max(1, Math.round(100 * Math.min(t, top) / top));
+      return '<div class="lane' + (i === st.cur ? ' cur' : '') + (pl.out ? ' out' : '') + '" title="' + esc(pl.name) + ': ' + t + '◇ of ' + T + '◇"><span class="lname">' + esc(pl.name) + '</span>' +
+        '<span class="track"><span class="fill" style="width:' + w + '%;background:' + pl.color + '"></span><span class="goal" style="left:' + Math.round(100 * T / top) + '%"></span></span><b>' + t + '◇</b></div>';
+    }).join('');
+    return '<div class="race raised" role="img" aria-label="Score race to ' + T + '◇">' + lanes + (st.lastRound ? '<div class="lastround">🔔 Last round: ' + esc(st.players[st.lastRound.by].name) + ' reached ' + T + '◇</div>' : '') + '</div>';
   }
 
   /* ---------------- inspector ---------------- */
@@ -748,7 +759,7 @@
         '<td title="Cards ' + sc[i].cards + ' + tokens ' + sc[i].tokens + '">' + sc[i].total + '</td><td>' + (isCur || ctx.kind === 'sandbox' ? pl.ap : '') + '</td><td>' + pl.meeples + '</td>' + (ctx.kind === 'game' ? '<td>' + pl.hand.length + '</td>' : '') + '</tr>';
     });
     h += '</table>';
-    if (ctx.kind === 'game') h += '<p class="small muted" style="margin:4px 0 0">First to ' + st.opts.target + '◇ at the end of their turn wins. Banked tokens are included.</p>';
+    if (ctx.kind === 'game') h += '<p class="small muted" style="margin:4px 0 0">' + (st.opts.lastRound ? 'Reaching ' + st.opts.target + '◇ starts the last round; then the highest total wins.' : 'First to ' + st.opts.target + '◇ at the end of their turn wins.') + ' Banked tokens are included.</p>';
     return h;
   }
   function playerCards(ctx) {
@@ -760,7 +771,7 @@
         '<div class="small">♟ ' + pl.meeples + ' meeples' + (ctx.kind === 'game' ? ' · ' + pl.hand.length + ' in hand' : '') + (pl.reserve > 0 ? ' · ' + pl.reserve + '● Reserves' : '') + '</div></div></div></div>';
     });
     h += '</div>';
-    if (ctx.kind === 'game') h += '<p class="small muted" style="margin:4px 0 0">First to ' + st.opts.target + '◇ at the end of their turn wins. Banked tokens are included.</p>';
+    if (ctx.kind === 'game') h += '<p class="small muted" style="margin:4px 0 0">' + (st.opts.lastRound ? 'Reaching ' + st.opts.target + '◇ starts the last round; then the highest total wins.' : 'First to ' + st.opts.target + '◇ at the end of their turn wins.') + ' Banked tokens are included.</p>';
     return h;
   }
   // Pick a color for a log line by matching its text.
@@ -847,7 +858,7 @@
 
   /* ----- new game ----- */
   // New game page options, kept for the next game.
-  var setup = { n: 2, players: [], handSize: 4, drawPerTurn: 2, meeples: 8, target: 48, enforceWeak: true, foundationBy: 3, autoEnd: true, seatStart: false, burySuitOW: true, defense: true, adjDiscount: true, noWander: true, ascension: true, lastRound: true };
+  var setup = { n: 2, players: [], handSize: 4, drawPerTurn: 2, meeples: 8, target: 48, enforceWeak: true, foundationBy: 3, autoEnd: true, seatStart: false, burySuitOW: true, defense: true, adjDiscount: true, noWander: true, ascension: true, lastRound: true, banking: true, buyClaim: true };
   (function () { var s = lsGet('cs.setup'); if (s && s.players && s.players.length) for (var k in s) setup[k] = s[k]; })();   // the last game's setup
   function archetypes() { return sortLib(app.lib.filter(function (c) { return c.type === 'Foundation' && c.archetype; })); }
   function ensureSetup() {
@@ -886,6 +897,8 @@
       '<label>No wandering</label><label><input type="checkbox" data-set="noWander"' + (setup.noWander ? ' checked' : '') + '> Cards cannot move to a space that touches no other card</label>' +
       '<label>Ascension</label><label><input type="checkbox" data-set="ascension"' + (setup.ascension ? ' checked' : '') + '> A stack holding five different suits Ascends: invulnerable, every suit, +8◇ and +12●</label>' +
       '<label>Last round</label><label><input type="checkbox" data-set="lastRound"' + (setup.lastRound !== false ? ' checked' : '') + '> Reaching the target starts the last round: everyone gets the same number of turns, then the highest total wins</label>' +
+      '<label>Banking</label><label><input type="checkbox" data-set="banking"' + (setup.banking !== false ? ' checked' : '') + '> At the end of your turn, every 6● you didn’t spend becomes 1◇ (at most 2◇)</label>' +
+      '<label>Second claim</label><label><input type="checkbox" data-set="buyClaim"' + (setup.buyClaim !== false ? ' checked' : '') + '> Once a turn, after claiming, pay 10● to claim once more</label>' +
       '</div></fieldset>';
     var dup = {}, bad = false; for (var j = 0; j < setup.n; j++) { if (dup[setup.players[j].arch]) bad = true; dup[setup.players[j].arch] = 1; }
     h += '<div class="row"><button class="btn def" data-act="start"' + (bad ? ' disabled' : '') + '>Start game</button>' + (bad ? '<span class="err">Two players picked the same archetype.</span>' : '') +
@@ -902,7 +915,7 @@
     var h = '<div class="page"><div class="gamegrid">';
     h += '<div class="left"><div class="pane raised" style="flex:0 0 auto">' + playersPanel(ctx) + '</div>';
     h += '<div class="pane raised col" style="flex:0 0 auto"><div class="apbox"><span data-fx="jar">' + apJar(st.turn.started ? pl.ap : 0) + '</span><div><div class="bignum">' + (st.turn.started ? pl.ap : '—') + '<span class="unit">●</span></div><div class="small">' + (st.turn.started ? (myTurn(ctx) ? 'Aktion points left' : esc(pl.name) + '’s ● left') : 'Turn not started') + '</div>' + (pl.debt > 0 ? '<div class="reserve" title="Owed for reactions; taken from your next turn">− ' + pl.debt + '● owed next turn</div>' : '') + (pl.reserve > 0 ? '<div class="reserve" title="Reserves are spent like ● after your ● runs out, and stay between turns">+ ' + pl.reserve + '● Reserves</div>' : '') +
-      (st.turn.started ? (function () { var co = E.claimOptions(st, st.cur).length; return '<div class="claimstate' + (co ? ' avail' : '') + '">' + (st.turn.claimed ? 'Claim used' : co ? meepleChip(ctx) + ' Claim available' : 'Claim: nothing to claim yet') + '</div>'; })() : '') + '</div></div>' +
+      (st.turn.started ? (function () { var co = E.claimOptions(st, st.cur).length; return '<div class="claimstate' + (co ? ' avail' : '') + '">' + (st.turn.claimed ? 'Claim used' : co ? meepleChip(ctx) + ' Claim available' : 'Claim: nothing to claim yet') + '</div>' + (st.opts.buyClaim && st.turn.claimed && !st.turn.boughtClaim && myTurn(ctx) && (st.players[st.cur].ap || 0) >= E.CLAIM_PRICE && st.players[st.cur].meeples > 0 ? '<button class="btn sm" data-act="buyClaim" title="Claudenspiel: once a turn, pay ' + E.CLAIM_PRICE + '● to claim once more">Buy a claim (' + E.CLAIM_PRICE + '●)</button>' : ''); })() : '') + '</div></div>' +
       '<div class="row"><button class="btn def big" data-act="endTurn"' + (myTurn(ctx) && st.turn.started && !st.pending && !st.res && st.winner == null ? '' : ' disabled') + '>End turn</button>' +
       (ctx.online ? '' : '<button class="btn big" data-act="undo"' + (ctx.hist.length ? '' : ' disabled') + ' title="Undo the last action">Undo</button>') + '</div>' +
       (ctx.online ? '' : '<details class="small" data-keep="ref"' + (app.open.ref ? ' open' : '') + '><summary>Referee</summary><div class="col" style="margin-top:4px"><div class="row">● <button class="btn sm" data-act="apAdj" data-d="-1">−</button><button class="btn sm" data-act="apAdj" data-d="1">+</button> ◇ tokens <button class="btn sm" data-act="tokAdj" data-d="-1">−</button><button class="btn sm" data-act="tokAdj" data-d="1">+</button></div>' +
@@ -1291,14 +1304,21 @@
   // Help is a list of short sections with a table of contents; each section says which edition it belongs to
   // (online: the public site only; table: the playtest table only).
   function helpSections() {
-    var tap = 'Click (or tap)', dithry = ONLINE ? 'dithry/' : 'dithry.html';
+    var tap = 'Click (or tap)', dithry = ONLINE ? 'dithry/' : '../dithry.html';
     var S = [
       { id: 'start', title: 'Quick start', html: '<ol>' +
         (ONLINE ? '<li>On <b>Home</b>, choose <b>Single player</b> (against bots), <b>Pass-and-Play</b> (one device) or <b>Online</b>.</li>' : '<li>Open <b>New game</b>, pick 2–5 players and their archetypes, and press <b>Start game</b>.</li>') +
         '<li>On your first turn, play your <b>Foundation</b>: drag it onto the board.</li>' +
         '<li>Play more cards next to your cards, then <b>claim</b> one with a meeple.</li>' +
-        '<li>Press <b>End turn</b>. The first to <b>48◇</b> at the end of their turn wins.</li></ol>' +
+        '<li>Press <b>End turn</b>. Every 6● you didn’t spend banks 1◇ (at most 2). Reaching <b>48◇</b> starts the <b>last round</b>: everyone gets the same number of turns, then the highest total wins.</li></ol>' +
         '<p class="muted">The hint line above the board suggests a next step while you learn.</p>' },
+      { id: 'claudenspiel', title: 'What Claudenspiel changes', html: '<p>Claudenspiel is Claude’s own fork of Kartenspiel. Its rules differ:</p><ul>' +
+        '<li><b>The last round:</b> reaching the target starts it. Everyone gets the same number of turns, then the highest total wins; a tie goes to whoever got there first. With three or more players, earlier seats start with 3◇ for each seat after them, since later seats see the score to beat.</li>' +
+        '<li><b>Banking:</b> at the end of your turn, every 6● you didn’t spend becomes 1◇, at most 2◇ a turn.</li>' +
+        '<li><b>A second claim:</b> once a turn, after claiming, press <b>Buy a claim</b> and pay 10● to claim once more.</li>' +
+        '<li><b>Grounds:</b> terrain cards. You place them like a Structure, but nobody claims them and they never count as an enemy. <i>Marsh</i>: cards next to it need one more enemy to be Overwhelmed. <i>Battlefield</i>: one fewer. <i>Crossroads</i>: placing next to it costs 3● less.</li>' +
+        '<li>A 116-card deck with two or three copies of the staples, and reworked cards: Orchard, Observatory, Obelisk, Fountain, Revenge, Repent and Brambles.</li></ul>' +
+        '<p>Every rule can be switched off on the New game page.</p>' },
       { id: 'turn', title: 'A turn', html: '<ol>' +
         '<li><b>Start your turn.</b> You gain ● from your Kingdom (3● before your Foundation is down) and draw 2 cards. Or take back one meeple instead: that is your whole turn.</li>' +
         '<li><b>Play cards</b> while your ● lasts. Green-bordered cards in your hand are ones you can afford.</li>' +
@@ -2015,7 +2035,7 @@
       case 'fit': ctx.ui.fit = true; render(); return;
       case 'start': {
         var players = []; for (var i = 0; i < setup.n; i++) players.push({ name: setup.players[i].name.trim() || ('Player ' + (i + 1)), arch: setup.players[i].arch, color: COLORS[i] });
-        var st = E.newGame(app.lib, { seed: window.ksSeed, players: players, handSize: +setup.handSize || 4, meeples: +setup.meeples || 8, target: +setup.target || 48, enforceWeak: setup.enforceWeak, foundationBy: +setup.foundationBy, drawPerTurn: setup.drawPerTurn === '' || setup.drawPerTurn == null ? 2 : +setup.drawPerTurn, autoEnd: setup.autoEnd, seatStart: setup.seatStart, burySuitOW: setup.burySuitOW, defense: setup.defense, adjDiscount: setup.adjDiscount, noWander: setup.noWander, ascension: setup.ascension, lastRound: setup.lastRound !== false });
+        var st = E.newGame(app.lib, { seed: window.ksSeed, players: players, handSize: +setup.handSize || 4, meeples: +setup.meeples || 8, target: +setup.target || 48, enforceWeak: setup.enforceWeak, foundationBy: +setup.foundationBy, drawPerTurn: setup.drawPerTurn === '' || setup.drawPerTurn == null ? 2 : +setup.drawPerTurn, autoEnd: setup.autoEnd, seatStart: setup.seatStart, burySuitOW: setup.burySuitOW, defense: setup.defense, adjDiscount: setup.adjDiscount, noWander: setup.noWander, ascension: setup.ascension, lastRound: setup.lastRound !== false, banking: setup.banking !== false, buyClaim: setup.buyClaim !== false });
         st.players.forEach(function (pl, i) { var kind = setup.players[i].kind; if (kind && kind !== 'human') pl.bot = kind; });
         app.game = newCtx(st, 'game'); lsSet('cs.game', st); lsSet('cs.setup', setup); app.page = 'game'; render(); return;
       }
@@ -2034,6 +2054,7 @@
       }
       case 'resume': { var sv = lsGet('cs.game'); if (sv) { app.game = newCtx(sv, 'game'); app.page = 'game'; render(); } return; }
       case 'startTurn': dispatch(ctx, { t: 'startTurn' }); return;
+      case 'buyClaim': dispatch(ctx, { t: 'buyClaim' }); return;
       case 'reclaimMode': ctx.ui.mode = 'reclaim'; render(); return;
       case 'cancelMode': ctx.ui.mode = null; render(); return;
       case 'endTurn':   // with cards you could still play or a card you could claim, ask once first

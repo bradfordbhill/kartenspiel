@@ -3,7 +3,7 @@
 const D=require('../src/data.js'), E=require('../src/engine.js');
 let st, R=[]; function A(a,soft){const r=E.apply(st,a); if(r.error){ if(soft) return; throw new Error(a.t+': '+r.error);} st=r;}
 const chk=(n,c,m)=>R.push([n,c?'PASS':'FAIL',m]); const ans=v=>A({t:'answer',v});
-function game(a0,a1,a2,opts){ const ps=[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}]; if(a2) ps.push({name:'C',arch:a2}); st=E.newGame(D.STARTER,Object.assign({players:ps,seed:9},opts||{})); }
+function game(a0,a1,a2,opts){ const ps=[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}]; if(a2) ps.push({name:'C',arch:a2}); st=E.newGame(D.STARTER,Object.assign({players:ps,seed:9,seatTokens:0},opts||{})); }
 const give=(id,p)=>{A({t:'sbGive',i:p||0,id}); const h=st.players[p||0].hand; return h[h.length-1];};
 const top=k=>st.cards[E.top(st,k)];
 // seat start (off by default in Claudenspiel, so switched on here)

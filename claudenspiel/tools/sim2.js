@@ -10,7 +10,7 @@ function game(n,g,stats,lineup){
   if(lineup) { const must=Object.keys(lineup).filter(a=>a!=='*'); combos=combos.filter(c=>must.every(a=>c.includes(a))); }
   const c=combos[g%combos.length], rot=Math.floor(g/combos.length)%n; const archs=c.slice(rot).concat(c.slice(0,rot));
   const strats=archs.map((a,i)=>lineup ? (lineup[a]||lineup['*']||'greedy') : STRATS[(g+i*(n===3?1:2)+Math.floor(g/combos.length))%3]);
-  let st=E.newGame(D.STARTER,{players:archs.map((a,i)=>({name:'P'+i,arch:a})),seed:5000+g+n*1000}); let guard=0;
+  let st=E.newGame(D.STARTER,{players:archs.map((a,i)=>({name:'P'+i,arch:a})),seed:5000+g+n*1000,seatTokens:process.env.SEATTOK!=null?+process.env.SEATTOK:undefined}); let guard=0;
   while(st.winner==null && st.round<=30 && guard++<400){ if(st.pending) { st=B.resolve(st,st.cur,strats[st.cur],strats); if(!st) break; continue; } const s=B.turn(st,stats,strats); if(!s) break; st=s; }
   return {st,archs,strats}; }
 // Command line: play games [from, to) (stopping after ~255 s) and save results for analyze2.js.
@@ -19,7 +19,7 @@ if(require.main===module){
   const lineup=process.argv[6] ? Object.fromEntries(process.argv[6].split(',').map(x=>x.split('='))) : null;
   const stats={played:{},abil:{},left:[],inc:[]}, games=[], cards={};
   const t0=Date.now();
-  for(let g=from; g<to; g++){ if(Date.now()-t0>255000) break; const {st,archs,strats}=game(n,g,stats,lineup); const sc=E.scores(st);
+  for(let g=from; g<to; g++){ if(Date.now()-t0>(+process.env.SECS||255)*1000) break; const {st,archs,strats}=game(n,g,stats,lineup); const sc=E.scores(st);
     const L=st.log, cnt=re=>L.filter(l=>re.test(l)).length;
     games.push({n,g,rounds:st.round,winner:st.winner,archs,strats,scores:sc.map(s=>s.total),income:st.players.map((q,i)=>E.income(st,i)),out:st.players.map(q=>q.out),
       ruins:cnt(/ is Ruined/), over:cnt(/ is Overwhelmed/), curses:cnt(/ is tucked under| covers |Curse/)-cnt(/destroyed|absorbs/), defended:cnt(/absorbs/), ascended:cnt(/ASCENDS/), elim:cnt(/out of the game/),

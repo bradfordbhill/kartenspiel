@@ -180,7 +180,13 @@ var KBots = (function () {
       if(!st.turn.claimed){ const c=bestClaim(st,p,strat); if(c) st=c; } }
     if(!st.turn.claimed){ const c=bestClaim(st,p,strat); if(c) st=c; }
     if(strat!=='greedy'&&strat!=='quick') st=useAbilities(st,p,strat,stats); else st=useAbilities(st,p,'greedy',stats);
+    st=buyClaim(st,p,strat,stats);
     return swapDead(st,p,stats); }
+  // Claudenspiel: pay for a second claim when the best claim is worth more than the ● would bank (10● ≈ 1.7◇).
+  function buyClaim(st,p,strat,stats){ if(!st.opts.buyClaim||!st.turn.claimed||st.turn.boughtClaim) return st;
+    const s=ap(st,{t:'buyClaim'}); if(!s) return st; const c=bestClaim(s,p,strat); if(!c) return st;
+    const bar=strat==='gsim'?1:(st.opts.banking?1.7:0.5);
+    if(evalState(st,c,p,strat)>bar){ stats.bought=(stats.bought||0)+1; return c; } return st; }
 
   // The rest of the current player's turn as a list of actions, for replaying one at a time (single player).
   // It ends with endTurn and any answers given right after it; replay stops early at a prompt meant for someone else.
@@ -259,7 +265,8 @@ var KBots = (function () {
         if(!E.needsPlacement(d)){ if((E.isFree(w,u)?0:+d.cost)<=cash) add(resolve(ap(w,{t:'cast',uid:u}),p,'gsim'),u); return; }
         const L=E.legalCells(w,u); Object.keys(L).filter(k=>L[k]<=cash).slice(0,24).forEach(k=>{ const s=resolve(ap(w,{t:'play',uid:u,k}),p,'gsim'); if(!s||s.pending) return; add(s.turn.claimed?s:(bestClaim(s,p,'gsim')||s),u); }); });
       E.keys(w).forEach(k=>{ if(E.abilityReady(w,k)) add(resolve(ap(w,{t:'ability',k}),p,'gsim'),'A'+k); });
-      E.claimOptions(w,p).forEach(k=>add(ap(w,{t:'claim',k}),'C'+k)); }
+      E.claimOptions(w,p).forEach(k=>add(ap(w,{t:'claim',k}),'C'+k));
+      const bw=ap(w,{t:'buyClaim'}); if(bw) E.claimOptions(bw,p).forEach(k=>add(ap(bw,{t:'claim',k}),'B'+k)); }
     out.sort((a,b)=>b.v-a.v); const seen={}, keep=[];
     for(const o of out){ if((seen[o.key]||0)>=2&&o.key!=='line') continue; seen[o.key]=(seen[o.key]||0)+1; keep.push(o); if(keep.length>=GENIUS.lines) break; }
     if(!keep.some(o=>o.key==='line')) keep.push(out.find(o=>o.key==='line'));

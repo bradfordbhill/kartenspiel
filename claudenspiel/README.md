@@ -42,3 +42,4 @@ node tools/logo.js                              # redraw the logo (needs Playwri
 | Version | What changed |
 |---|---|
 | 0.1 | The fork: separate saves and look; a 116-card deck; the last round; Seat start off; Orchard 3◇ a card; Observatory +10◇ for all six suits; Revenge and Repent playable from hand; Brambles placeable. Archetype spread 0.68 → 0.16 |
+| 0.2 | Grounds (Marsh, Battlefield, Crossroads); banking; buying a second claim; a seat handicap for 3+ players; the race bar; Obelisk 6◇; Fountain reworked. Seats even at every table size |

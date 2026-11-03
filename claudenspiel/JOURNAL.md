@@ -2,6 +2,36 @@
 
 Claude's decision log for Claudenspiel, newest first: what changed, why, and what the bots measured. "Win index" is wins divided by the wins a seat would get by chance; 1.0 is par.
 
+## 3 November 2026 · 0.2, ground, gold and the race
+
+**Seat order, measured properly first.** With 630 more 3–4 player games on 0.1, the later seats really did win too often under the last round: 3 players 0.69 · 1.02 · 1.30, 4 players 0.63 · 0.93 · 1.23 · 1.21. Later seats see the score they have to beat, and earlier seats' cards sit open to attack longer. Kartenspiel's Seat start pushed the wrong way (more ● for later seats), so 0.2 does the opposite: earlier seats start with ◇ for every seat after them. Tested 2◇ and 3◇ per seat on the same deals; 3◇ evened it (3 players 1.03 · 0.95 · 1.03, 4 players 1.00 · 1.06 · 0.89 · 1.06). Two players were already even in 0.1, and with 0.2's economy a paired test of 0◇ against 1◇ (850+ games each) confirmed it: 0.99 · 1.01 with none, so two players get no handicap.
+
+**Changes, and why.**
+- *Grounds* (Marsh, Battlefield, Crossroads; 2 copies each, deck 122). Kartenspiel listed the Grounds type but had no cards. Terrain gives placement a second dimension: where you build now depends on the land, not only on your neighbours. Grounds are never claimed, never counted as enemies and never Overwhelmed. The archetype ban applies to them too (a Gardener can't lay a Goblet Crossroads); that seemed right, so it stays.
+- *Banking* (6● → 1◇, at most 2◇ a turn) and *buying a second claim* (10●). In Kartenspiel about half of all ● went unspent and ● per turn barely changed the scoring pace, because one claim a turn is the limit. Both rules give ● a use.
+- *A bought claim can't be paid with Reserves.* The first 0.2 test let Warcamp's Reserves buy a claim nearly every turn: the Warmonger jumped to 1.48. Paid from this turn's ● only, it came back to 1.01.
+- *Obelisk* 6◇ (was 8), still doubled when surrounded: the strongest card under every bot in Kartenspiel. *Fountain* 3◇ per Leaf neighbour and any side (was 2◇, north and south only): the weakest card, and it now pairs with Marsh.
+- *Race bar* above the board: every player's ◇ on one track to the target, with the last round announced. The wishlist's first UI item.
+
+**Measured** (mixed greedy, tactician and raider bots, 1,146 games of 2–4 players, before the 2-player handicap was set to 0):
+
+| | 0.1 | 0.2 |
+|---|---|---|
+| Archbishop | 1.05 | 0.96 |
+| Cryptkeeper | 1.07 | 0.89 |
+| Gardener | 0.99 | 0.97 |
+| Hedonist | 1.03 | 1.08 |
+| Philosopher | 0.95 | 1.08 |
+| Warmonger | 0.91 | 1.01 |
+| **Spread** | 0.16 | 0.19 |
+
+Seat index, 0.2: 3 players 1.07 · 0.91 · 1.01; 4 players 1.20 · 0.94 · 0.98 · 0.88 (127 games, so within noise). Median game length 5 rounds (6 in 0.1): banking and second claims speed the race up.
+
+**Open questions.**
+- Games are a round shorter. Watch whether 48◇ should rise to 52◇ so the board gets fuller.
+- Cryptkeeper slipped to 0.89; next balance pass.
+- The bots barely use Grounds. Teach them (the Genius's danger term should see Marsh), then measure the cards properly.
+
 ## 3 November 2026 · 0.1, the fork
 
 **Setup.** Forked from Kartenspiel at commit 1b43db7 into `claudenspiel/`, as the offline edition (single player, pass-and-play, sandbox, card builder). No server and no service worker; the GitHub Pages deploy is untouched. Storage keys renamed `ks.*` → `cs.*` so the two games never share saves, settings or painted cards. New logo and colours, so the fork never passes for the original.

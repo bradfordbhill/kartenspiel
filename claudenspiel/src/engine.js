@@ -18,6 +18,7 @@ var KEngine = (function () {
   var DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
   var DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
   var SUITS = ['Sceptre', 'Goblet', 'Sword', 'Bone', 'Leaf', 'Tome'];
+  var BANK_RATE = 6, BANK_MAX = 2, CLAIM_PRICE = 10;   // Claudenspiel's economy: banking and the bought claim
 
   // K / XY convert between [x, y] and the "x,y" key used by st.board.
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -74,7 +75,9 @@ var KEngine = (function () {
   function untargetable(st, uid) { return isFoundation(st, uid) || !!(rawDef(st, uid).mods || {}).immune || !!(st.cards[uid] && st.cards[uid].ascended); }
   function unburiable(st, uid) { var m = rawDef(st, uid).mods || {}; return untargetable(st, uid) || !!m.unburiable; }
   // Foundations, Curses and kingdomOf cards (The Wise Old Tree) never take meeples.
-  function unclaimable(st, uid) { var d = def(st, uid); return d.type === 'Foundation' || d.type === 'Curse' || !!(d.mods && d.mods.kingdomOf); }
+  // Grounds (Claudenspiel): terrain on the board that nobody owns.
+  function unclaimable(st, uid) { var d = def(st, uid); return d.type === 'Foundation' || d.type === 'Curse' || d.type === 'Grounds' || !!(d.mods && d.mods.kingdomOf); }
+  function isGrounds(st, uid) { return !!uid && rawDef(st, uid).type === 'Grounds'; }
   // A player's Kingdom: every cell whose top card they own.
   function kingdom(st, p) { return keys(st).filter(function (k) { return ownedBy(st, k, p); }); }
   // Curses have two modes: "under" (tucked beneath the target) and "top" (covers it, like Sarcophagus).
@@ -254,7 +257,7 @@ var KEngine = (function () {
     if (isFree(st, uid)) return 0;
     var d = rawDef(st, uid), extra = 0;
     n4(k).forEach(function (x) { if (active(st, x)) { var m = def(st, top(st, x)).mods || {}; if (m.adjacentCost) extra += +m.adjacentCost; } });
-    var total = (+d.cost || 0) + extra + taxAt(st, k);
+    var total = Math.max(0, (+d.cost || 0) + extra + taxAt(st, k));   // Crossroads makes extra negative
     if (st.opts.adjDiscount && st.cur != null && n4(k).some(function (x) { return ownedBy(st, x, st.cur); })) total = Math.max(0, total - 3);
     return total;
   }
@@ -337,10 +340,13 @@ var KEngine = (function () {
   // 8 for Foundations, which also count diagonals), adjusted by burials and Curses.
   function overwhelmCount(st, k) {
     var u = top(st, k); if (!u) return null;
+    // Grounds are never Overwhelmed and never count as an enemy; their owShift moves the number for cards next to them.
+    if (isGrounds(st, u)) return { n: 0, th: 99, bonus: 0, minus: 0 };
     var fd = isFoundation(st, u), d = def(st, u), en = enemies(st, suitOf(st, u));
     var around = fd ? n8(k) : n4(k);
-    var n = around.filter(function (x) { var t = top(st, x); return t && en.some(function (s) { return hasSuit(st, t, s); }); }).length;
+    var n = around.filter(function (x) { var t = top(st, x); return t && !isGrounds(st, t) && en.some(function (s) { return hasSuit(st, t, s); }); }).length;
     var th = d.overwhelm != null && d.overwhelm !== '' ? +d.overwhelm : (fd ? 8 : 3), bonus = st.opts.burySuitOW ? onSuitBuried(st, k) : 0;
+    n4(k).forEach(function (x) { var t = top(st, x); if (isGrounds(st, t) && active(st, x)) bonus += +((def(st, t).mods || {}).owShift || 0); });
     var minus = curseFx(st, k, 'owMinus') + curseFx(st, k, 'intoxicate');
     return { n: n, th: Math.max(1, th + bonus - minus), bonus: bonus, minus: minus };
   }
@@ -1071,7 +1077,7 @@ var KEngine = (function () {
     var st = {
       v: 1, defs: {}, players: [], cur: 0, round: 1, deck: [], discard: [], board: {}, cards: {}, uid: 1,
       turn: null, res: null, pending: null, reveal: null, log: [], winner: null, seed: (setup.seed || Date.now()) % 2147483647,
-      opts: { handSize: setup.handSize || 4, meeples: setup.meeples || 8, target: setup.target || 48, sandbox: !!setup.sandbox, enforceWeak: setup.enforceWeak !== false, lastRound: setup.lastRound !== false, foundationBy: setup.foundationBy || 3, drawPerTurn: setup.drawPerTurn != null ? +setup.drawPerTurn : 2, autoEnd: setup.autoEnd !== false, seatStart: setup.seatStart === true,
+      opts: { handSize: setup.handSize || 4, meeples: setup.meeples || 8, target: setup.target || 48, sandbox: !!setup.sandbox, enforceWeak: setup.enforceWeak !== false, lastRound: setup.lastRound !== false, banking: setup.banking !== false, seatTokens: setup.seatTokens != null ? +setup.seatTokens : (setup.players.length > 2 ? 3 : 0) /* 2 players are already even */, buyClaim: setup.buyClaim !== false, foundationBy: setup.foundationBy || 3, drawPerTurn: setup.drawPerTurn != null ? +setup.drawPerTurn : 2, autoEnd: setup.autoEnd !== false, seatStart: setup.seatStart === true,
         burySuitOW: setup.burySuitOW !== false, defense: setup.defense !== false, adjDiscount: setup.adjDiscount !== false, noWander: setup.noWander !== false, ascension: setup.ascension !== false }
     };
     defs.forEach(function (d) { var c = clone(d); c.art = ''; st.defs[d.id] = c; });
@@ -1088,6 +1094,9 @@ var KEngine = (function () {
       defs.forEach(function (d) { if (d.type === 'Foundation') return; for (var i = 0; i < (+d.copies || 0); i++) st.deck.push(mk(d.id)); });
       shuffle(st.deck, st);
       st.players.forEach(function (pl, i) { draw(st, i, st.opts.handSize); });
+      // Seat handicap (Claudenspiel): with the last round, later seats see the score to beat, so earlier seats start
+      // with opts.seatTokens◇ for every seat after them.
+      if (st.opts.seatTokens) st.players.forEach(function (pl, i) { pl.tokens = st.opts.seatTokens * (st.players.length - 1 - i); });
       st.players[0].turns = 1;
       log(st, 'New game: ' + st.players.map(function (p) { return p.name + ' (' + p.arch + ')'; }).join(', ') + '.');
       beginTurn(st);
@@ -1256,6 +1265,19 @@ var KEngine = (function () {
         startRes(st, 'ability', au, ak, steps); return st;
       }
 
+      // Buy a second claim (Claudenspiel): once a turn, after claiming, pay CLAIM_PRICE● to claim again.
+      case 'buyClaim': {
+        if (!st.opts.buyClaim) return err(st, 'Buying a claim is switched off for this game.');
+        if (st.pending || st.res) return err(st, 'Finish the current effect first.');
+        if (!st.turn.started) return err(st, 'Start your turn first.');
+        if (!st.turn.claimed) return err(st, 'You still have your claim for this turn.');
+        if (st.turn.boughtClaim) return err(st, 'You can buy only one extra claim a turn.');
+        // Paid from this turn's ● only, never from Reserves (Warcamp would otherwise buy one every turn).
+        var bp = st.players[p]; if ((bp.ap || 0) < CLAIM_PRICE) return err(st, 'A second claim costs ' + CLAIM_PRICE + '● of this turn’s ● (Reserves can’t pay for it).');
+        if (bp.meeples <= 0) return err(st, 'You have no meeples left.');
+        bp.ap -= CLAIM_PRICE; st.turn.claimed = false; st.turn.boughtClaim = true; log(st, bp.name + ' pays ' + CLAIM_PRICE + '● for a second claim.'); return st;
+      }
+
       // Discard 2 cards, draw 1.
       case 'swap': {
         if (st.pending || st.res) return err(st, 'Finish the current effect first.');
@@ -1273,6 +1295,8 @@ var KEngine = (function () {
         if (!st.turn.started) return err(st, 'Start your turn first.');
         var ep = st.players[p];
         if (!ep.foundationPlaced && ep.turns >= st.opts.foundationBy && st.opts.foundationBy > 0) return err(st, 'You must place your Foundation by your turn ' + st.opts.foundationBy + '.');
+        // Banking (Claudenspiel): every full BANK_RATE● left unspent becomes a 1◇ token, at most BANK_MAX a turn.
+        if (st.opts.banking) { var bk = Math.min(BANK_MAX, Math.floor((ep.ap || 0) / BANK_RATE)); if (bk > 0) { ep.tokens = (ep.tokens || 0) + bk; ep.ap -= bk * BANK_RATE; log(st, ep.name + ' banks ' + bk + '◇ from unspent ●.'); } }
         endOfTurnEffects(st); afterBoardChange(st, p);
         if (st.res || st.pending) { st.endAfter = true; return st; }
         finishTurn(st, p); return st;
@@ -1398,7 +1422,7 @@ var KEngine = (function () {
     newGame: newGame, apply: apply, scores: scores, income: income, cardValue: cardValue, volcanicBonus: volcanicBonus,
     legalCells: legalCells, needsPlacement: needsPlacement, protectedStack: protectedStack, funds: funds, curseFx: curseFx, hasSuit: hasSuit, onSuitBuried: onSuitBuried, valueParts: valueParts, bankedBreakdown: bankedBreakdown, abilityReady: abilityReady, isFree: isFree, untargetable: untargetable, playBlock: playBlock, sight: sight, bounds: bounds, top: top, keys: keys, def: def, rawDef: rawDef,
     suitOf: suitOf, isCursed: isCursed, isCovered: isCovered, noIncome: noIncome, overwhelmCount: overwhelmCount, enemies: enemies,
-    archInfo: archInfo, kingdom: kingdom, claimOptions: claimOptions, redact: redact, cardIncome: cardIncome, n4: n4, K: K, XY: XY, SUITS: SUITS
+    archInfo: archInfo, isGrounds: isGrounds, CLAIM_PRICE: CLAIM_PRICE, BANK_RATE: BANK_RATE, BANK_MAX: BANK_MAX, kingdom: kingdom, claimOptions: claimOptions, redact: redact, cardIncome: cardIncome, n4: n4, K: K, XY: XY, SUITS: SUITS
   };
 })();
 if (typeof module !== 'undefined') module.exports = KEngine;

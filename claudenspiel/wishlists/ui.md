@@ -9,7 +9,8 @@ What Claudenspiel should look and feel like. ✅ done, ▶ next up, ○ later.
 - ○ Fork Dithry into Claudenspiel, so painted cards save under `cs.faces` and show up here.
 
 ## Reading the game
-- ▶ A score race bar along the top: every player's ◇ on one track to 48, with each player's likely pace (from the Genius's race model) as a ghost marker.
+- ✅ 0.2 A score race bar above the board: every player's ◇ on one track to the target, and the last round announced.
+- ○ Add each player's likely pace (from the Genius's race model) to the race bar as a ghost marker.
 - ▶ "Why is this good?" on hover in the hand: what the card would score if played and claimed right now, at the best space.
 - ○ Turn replay: step through the last round's moves on the board, like a chess move list.
 - ○ A post-game report: each player's ◇ over time, the turning points (big claims, Ruins, Overwhelms), and the Genius's suggested better move at the two biggest moments.

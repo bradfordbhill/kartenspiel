@@ -8,7 +8,8 @@ let st, results=[];
 function A(a){const r=E.apply(st,a); if(r.error){return r.error;} st=r; return null;}
 function must(a){const e=A(a); if(e) throw new Error(a.t+': '+e);}
 function game(a0,a1,a2){ const ps=[{name:'A',arch:a0},{name:'B',arch:a1||'Warmonger'}]; if(a2) ps.push({name:'C',arch:a2});
-  st=E.newGame(D.STARTER,{players:ps,seed:11}); must({t:'startTurn'}); st.players[0].ap=99; }
+  st=E.newGame(D.STARTER,{players:ps,seed:11,seatTokens:0}); must({t:'startTurn'});   // seatTokens 0: these checks count ◇ from zero
+  st.players[0].ap=99; }
 function F(k,p){ p=p||0; // place player's foundation via real play
   must({t:'play',uid:st.players[p].foundationUid,k}); }
 function put(id,k,owner){ must({t:'sbPlace',id,k}); if(owner!=null) must({t:'sbClaim',k,owner}); }
@@ -44,7 +45,7 @@ T('Last Will and Testament',()=>{ game('Cryptkeeper'); F('0,0'); const o=give('o
 T('Funeral Pyre',()=>{ game('Cryptkeeper'); F('0,0'); const f=give('funeral-pyre'); const L=E.legalCells(st,f); check('Funeral Pyre',('1,0' in L)&&!('0,1' in L),'E/W/S placement'); must({t:'play',uid:f,k:'1,0'}); must({t:'claim',k:'1,0'}); give('eureka'); check('Funeral Pyre',E.abilityReady(st,'1,0'),'ready'); must({t:'ability',k:'1,0'}); ans([st.pending.options[0]]); check('Funeral Pyre',st.board['1,0'].length===2&&E.cardValue(st,'0,0',0)===3,'buried under it; Mausoleum counts it (3◇)'); });
 T('Crumbling Ossuary',()=>{ game('Hedonist','Cryptkeeper'); F('0,0'); put('crumbling-ossuary','2,0'); const f=give('fairgrounds'); must({t:'play',uid:f,k:'1,0'}); must({t:'claim',k:'1,0'}); check('Crumbling Ossuary',P0().ap===0,'non-Cryptkeeper loses remaining ●'); });
 T('Ballroom',()=>{ game('Hedonist'); F('0,0'); put('ballroom','2,1',0); const c=give('choreography'); must({t:'play',uid:c,k:'1,0'}); must({t:'claim',k:'1,0'}); const h=P0().hand.length; must({t:'ability',k:'1,0'}); ans('1,1'); check('Ballroom',P0().hand.length===h+1,'owner draws when a card moves next to it'); });
-T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'claim',k:'0,1'}); check('Spice Caravan',E.cardIncome(st,'0,1')===8,'8● per turn'); st.opts.noWander=false; must({t:'endTurn'}); check('Spice Caravan',name2('1,1')==='Spice Caravan'&&P0().tokens===1,'moved east, owner +1◇'); });
+T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'claim',k:'0,1'}); check('Spice Caravan',E.cardIncome(st,'0,1')===8,'8● per turn'); st.opts.noWander=false; st.opts.banking=false; must({t:'endTurn'}); check('Spice Caravan',name2('1,1')==='Spice Caravan'&&P0().tokens===1,'moved east, owner +1◇'); });
 T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); put('eureka','-1,1'); put('eureka','1,1'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'claim',k:'0,1'}); must({t:'endTurn'}); check('Spice Caravan',!E.top(st,'0,1'),'boxed in: discarded'); });
 T('Spice Caravan',()=>{ game('Hedonist'); F('0,0'); const s=give('spice-caravan'); must({t:'play',uid:s,k:'0,1'}); must({t:'endTurn'}); check('Spice Caravan',name2('0,1')==='Spice Caravan','unclaimed: stays put'); });
 T('Sleeping Giant',()=>{ game('Hedonist','Philosopher'); F('0,0'); put('sleeping-giant','2,0'); put('eureka','3,0',1); must({t:'sbBury',id:'acorn',k:'2,0'}); const ph=give('phalanx'); must({t:'play',uid:ph,k:'3,1'}); ans('3,0'); if(st.pending) ans(st.pending.options[0]);

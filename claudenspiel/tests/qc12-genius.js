@@ -16,7 +16,7 @@ function reach(st,g,r,strats){ let n=0; while(st.winner==null&&!(st.cur===g&&st.
 
 // 1. No cheating: the same decisions however the hidden cards lie.
 let same=0, tried=0, changedHidden=0, peeks=0;
-[['Gardener','Hedonist',3],['Philosopher','Warmonger',4],['Cryptkeeper','Archbishop',2],['Hedonist','Gardener',5]].forEach(([a,b,r],i)=>{
+[['Gardener','Hedonist',3],['Philosopher','Warmonger',4],['Cryptkeeper','Archbishop',2],['Hedonist','Gardener',5],['Warmonger','Philosopher',3],['Archbishop','Cryptkeeper',4],['Gardener','Warmonger',2],['Philosopher','Hedonist',5]].forEach(([a,b,r],i)=>{
   const strats=['tactician','tactician']; let st=reach(game([a,b],300+i),0,r,strats); if(st.winner!=null) return;
   st=E.apply(st,{t:'startTurn'});
   for(let salt=1;salt<=2;salt++){ const sc=scramble(st,0,salt*7919+i);
