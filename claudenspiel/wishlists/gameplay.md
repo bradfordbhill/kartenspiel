@@ -6,10 +6,10 @@ What Claudenspiel's rules and cards should become. ✅ done (with the release), 
 - ✅ 0.1 A 116-card deck: staples doubled or tripled, the strongest and strangest cards single, every suit 18–20 cards, Ruin cards scaled so War stays as common.
 - ✅ 0.1 Orchard 3◇ a card (Gardener was the strongest archetype in every test).
 - ✅ 0.1 Observatory +10◇ when all six suits are in the Kingdom (Philosopher was the weakest; 6◇ a suit as well overshot).
-- ▶ Obelisk: the strongest card under every kind of bot (win index ~1.7). Try cost 18, or "doubled if surrounded" → "+4 if surrounded".
+- ✅ 0.2 Obelisk: cost 18, 6◇ doubled if surrounded (was 16 and 8◇). Card-level effect not yet measured; needs a per-card study.
 - ▶ Cathedral: the Archbishop is still below par. Try 6◇ a Sceptre card plus 2◇ for each Sceptre card on the board that you don't own (mirrors Palace).
-- ▶ Fountain: the weakest card (0.61). Rework rather than tune.
-- ○ Death Ray: 2◇ for 12● is the worst printed value; give it 4◇ or make it cheaper.
+- ✅ 0.2 Fountain: 3◇ per adjacent Leaf (a tune, not a rework; re-measure, and rework if it is still last).
+- ✅ 0.2 Death Ray: 9● for 3◇.
 - ○ Re-run the Genius-only balance study after every balance release.
 
 ## Economy (● barely matters today: one claim a turn is the real limit, and about half of all ● goes unspent)

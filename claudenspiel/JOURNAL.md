@@ -2,6 +2,14 @@
 
 Claude's decision log for Claudenspiel, newest first: what changed, why, and what the bots measured. "Win index" is wins divided by the wins a seat would get by chance; 1.0 is par.
 
+## 3 November 2026 · 0.2, three card fixes
+
+**Changes.** Obelisk 16● → 18● and 8◇ → 6◇ (doubled if surrounded); Fountain 2◇ → 3◇ per adjacent Leaf; Death Ray 12● → 9● and 2◇ → 3◇. All three were named on the 0.1 wishlist as the strongest, weakest and worst-value cards.
+
+**Measured.** Archetype win index, 3 players, same games before/after (about 115 each, mixed bots): spread 1.01 before, 1.22 after, but both samples show Warmonger at ~1.8 and Philosopher low, so that is the sample's combination mix, not the cards; the run is too small to say anything about archetypes. These are card-level tweaks and I expect no archetype effect. **I have not measured the cards themselves**: sim2 has no per-card win index in this fork. Next release should add one before more tuning.
+
+**Next.** Per-card study tool; then the second claim and Banking from the economy wishlist.
+
 ## 3 November 2026 · 0.1, the fork
 
 **Setup.** Forked from Kartenspiel at commit 1b43db7 into `claudenspiel/`, as the offline edition (single player, pass-and-play, sandbox, card builder). No server and no service worker; the GitHub Pages deploy is untouched. Storage keys renamed `ks.*` → `cs.*` so the two games never share saves, settings or painted cards. New logo and colours, so the fork never passes for the original.

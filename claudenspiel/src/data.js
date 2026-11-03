@@ -270,10 +270,10 @@ var KData = (function () {
     "name": "Obelisk",
     "suit": "Bone",
     "type": "Structure",
-    "cost": 16,
+    "cost": 18,
     "copies": 1,
     "income": 6,
-    "text": "Worth 8◇. Double its value if fully surrounded.",
+    "text": "Worth 6◇. Double its value if fully surrounded.",
     "place": [
      "N",
      "E",
@@ -283,7 +283,7 @@ var KData = (function () {
     "overwhelm": null,
     "score": {
      "kind": "flatDoubledIfSurrounded",
-     "n": 8
+     "n": 6
     },
     "sees": {
      "area": "adjacent"
@@ -982,7 +982,7 @@ var KData = (function () {
     "cost": 6,
     "copies": 2,
     "income": 3,
-    "text": "2◇ per adjacent Leaf card.",
+    "text": "3◇ per adjacent Leaf card.",
     "place": [
      "N",
      "S"
@@ -990,7 +990,7 @@ var KData = (function () {
     "overwhelm": null,
     "score": {
      "kind": "perAdjacentSuit",
-     "n": 2,
+     "n": 3,
      "suit": "Leaf"
     },
     "sees": {
@@ -2178,7 +2178,7 @@ var KData = (function () {
     "name": "Death Ray",
     "suit": "Tome",
     "type": "Structure",
-    "cost": 12,
+    "cost": 9,
     "copies": 1,
     "income": 3,
     "text": "If you own at least 2 adjacent cards, Ruin the card directly east.",
@@ -2191,7 +2191,7 @@ var KData = (function () {
     "overwhelm": null,
     "score": {
      "kind": "flat",
-     "n": 2
+     "n": 3
     },
     "sees": {
      "area": "east1"
