@@ -37,6 +37,16 @@ node tools/rewrite-data.js changes.json         # apply a batch of card changes 
 node tools/logo.js                              # redraw the logo (needs Playwright and the network)
 ```
 
+## Publishing
+
+Claudenspiel is published on its own at https://bradfordbhill.github.io/claudenspiel/, from its own repository, `bradfordbhill/claudenspiel`, never from Kartenspiel's site. The published page is the offline edition (no online play).
+
+```
+tools/publish.sh
+```
+
+It builds the game and force-pushes it as `index.html` to that repository's `main` branch, which GitHub Pages serves as-is (Settings → Pages → Deploy from a branch → `main`, `/ (root)`). The repository holds only the published page; the source stays here.
+
 ## Releases
 
 | Version | What changed |

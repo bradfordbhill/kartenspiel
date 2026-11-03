@@ -1304,7 +1304,7 @@
   // Help is a list of short sections with a table of contents; each section says which edition it belongs to
   // (online: the public site only; table: the playtest table only).
   function helpSections() {
-    var tap = 'Click (or tap)', dithry = ONLINE ? 'dithry/' : '../dithry.html';
+    var tap = 'Click (or tap)', dithry = /github\.io$/.test(location.hostname) ? 'https://bradfordbhill.github.io/kartenspiel/dithry/' : '../dithry.html';
     var S = [
       { id: 'start', title: 'Quick start', html: '<ol>' +
         (ONLINE ? '<li>On <b>Home</b>, choose <b>Single player</b> (against bots), <b>Pass-and-Play</b> (one device) or <b>Online</b>.</li>' : '<li>Open <b>New game</b>, pick 2–5 players and their archetypes, and press <b>Start game</b>.</li>') +
